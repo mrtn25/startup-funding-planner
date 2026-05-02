@@ -4,7 +4,76 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Startup Funding & Dilution Planner</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+var invD={};
+ROUNDS.forEach(function(r){invD[r.id]=[];});
+var ITYPES=[
+  {id:'fff',label:'FFF',cls:'t-fff'},
+  {id:'angel',label:'Angel',cls:'t-angel'},
+  {id:'vc',label:'VC',cls:'t-vc'},
+  {id:'other',label:'Other',cls:'t-other'}
+];
+function itype(id){return ITYPES.find(function(x){return x.id===id;})||ITYPES[3];}
+function addInv(rid,tid){invD[rid].push({type:tid,name:'',amt:''});drawInv();}
+function delInv(rid,i){invD[rid].splice(i,1);drawInv();}
+function setInv(rid,i,k,v){invD[rid][i][k]=v;drawInv();}
+function drawInv(){
+  var c=document.getElementById('inv-c');if(!c)return;
+  var active=getActive();
+  if(!active.length){c.innerHTML='<p style="font-size:12px;color:var(--text2);">Enable at least one round above.</p>';return;}
+  var out='';
+  active.forEach(function(r,ri){
+    var inv=invD[r.id]||[];
+    var tot=inv.reduce(function(s,x){return s+(parseFloat(x.amt)||0);},0);
+    var rem=r.invest-tot;
+    var rows=inv.map(function(x,i){
+      var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest*100).toFixed(1):'0.0',tm=itype(x.type);
+      var opts=ITYPES.map(function(t){return '<option value="'+t.id+'"'+(t.id===x.type?' selected':'')+'>'+t.label+'</option>';}).join('');
+      return '<div class="inv-row">'
+        +'<select class="inv-sel '+tm.cls+'" onchange="invD[\''+r.id+'\']['+i+'].type=this.value;this.className=\'inv-sel \'+itype(this.value).cls;drawInv();">'+opts+'</select>'
+        +'<input class="inv-ni" type="text" placeholder="Investor name" value="'+(x.name||'')+'" oninput="setInv(\''+r.id+'\','+i+',\'name\',this.value)">'
+        +'<input class="inv-ai" type="number" min="0" step="0.05" placeholder="M€" value="'+(x.amt===''?'':x.amt)+'" oninput="setInv(\''+r.id+'\','+i+',\'amt\',this.value===\'\'?\'\':(parseFloat(this.value)||0))">'
+        +'<span style="font-size:11px;color:var(--text2);">M€</span>'
+        +'<span class="inv-pct" style="color:'+r.color+'">'+p+'% of round</span>'
+        +'<button class="inv-del" onclick="delInv(\''+r.id+'\','+i+')">&#x2715;</button>'
+        +'</div>';
+    }).join('');
+    var note='';
+    if(inv.length){
+      var st=Math.abs(rem)<0.005?'<span style="color:#085041;font-weight:500;">&#10003; fully assigned</span>':rem>0?'<span style="color:var(--warn-text);">'+rem.toFixed(2)+' M&#8364; unassigned</span>':'<span style="color:#991b1b;">&#9888; '+Math.abs(rem).toFixed(2)+' M&#8364; over-assigned</span>';
+      note='<div class="inv-note">Assigned: <strong>'+tot.toFixed(2)+' M&#8364;</strong> / '+r.invest+' M&#8364; &mdash; '+st+'</div>';
+    }
+    var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="addInv(\''+r.id+'\',\''+t.id+'\')">+ '+t.label+'</button>';}).join('');
+    out+='<div class="inv-block"><div class="inv-rtitle"><span class="dot" style="background:'+r.color+';width:10px;height:10px;"></span>'+r.name+' &nbsp;&middot;&nbsp; '+fmtM(r.invest)+'</div>'+rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div></div>';
+    if(ri<active.length-1)out+='<hr class="inv-sep">';
+  });
+  c.innerHTML=out;
+}
+function augCap(){
+  var tbl=document.getElementById('cap-tbl');if(!tbl)return;
+  tbl.querySelectorAll('.inv-detail').forEach(function(r){r.remove();});
+  var active=getActive();
+  Array.from(tbl.querySelectorAll('tr')).forEach(function(row){
+    if(row.classList.contains('inv-detail'))return;
+    var cells=row.querySelectorAll('td');if(!cells.length)return;
+    var nm=(cells[0]&&cells[0].textContent)||'';
+    active.forEach(function(r){
+      var inv=invD[r.id]||[];if(!inv.length)return;
+      if(nm.indexOf(r.name)>=0&&nm.toLowerCase().indexOf('investor')>=0){
+        var rp=parseFloat((cells[1]&&cells[1].textContent)||0)||0;
+        var after=row;
+        inv.forEach(function(x){
+          var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest)*rp:0,tm=itype(x.type);
+          var nr=document.createElement('tr');nr.className='inv-detail';
+          nr.innerHTML='<td style="padding-left:28px;"><span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-right:4px;font-weight:600;background:'+(tm.id==='fff'?'#FDE8FE':tm.id==='angel'?'#E8F4FF':tm.id==='vc'?'#E1F5EE':'var(--surface2)')+';color:'+(tm.id==='fff'?'#7B0F8C':tm.id==='angel'?'#0A5EA8':tm.id==='vc'?'#085041':'var(--text2)')+';">'+tm.label+'</span>'+(x.name||'<em>Unnamed</em>')+'</td><td>'+p.toFixed(2)+'%</td><td>'+fmtM(a)+'</td><td colspan="10"></td>';
+          after.parentNode.insertBefore(nr,after.nextSibling);after=nr;
+        });
+      }
+    });
+  });
+}
+
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -24,7 +93,609 @@
   --warn-bg:#3a2e0a;--warn-text:#fbbf24;--warn-border:#78530a;
   --accent:#AFA9EC;
 }}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
+.page{max-width:980px;margin:0 auto;padding:2rem 1.5rem 4rem;}
+h1{font-size:22px;font-weight:500;margin-bottom:4px;}
+.subtitle{font-size:13px;color:var(--text2);margin-bottom:2rem;}
+.sec-label{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;margin-top:1.75rem;}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:1rem;}
+.cf{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:1rem;}
+.mc{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;}
+.ml{font-size:11px;color:var(--text2);margin-bottom:3px;}
+.mv{font-size:18px;font-weight:500;}
+.ms{font-size:11px;color:var(--text2);margin-top:2px;}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:1rem;}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px;}
+.irow{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.irow:last-child{margin-bottom:0;}
+.il{font-size:12px;color:var(--text2);min-width:150px;}
+.iv{font-size:12px;font-weight:500;min-width:58px;text-align:right;}
+input[type=range]{flex:1;accent-color:var(--accent);}
+input[type=number],input[type=text]{padding:5px 8px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);}
+input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--accent);}
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:0.5px solid var(--border);text-transform:uppercase;letter-spacing:.06em;}
+.tbl td{padding:6px 8px;border-bottom:0.5px solid var(--border);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr.inactive td{opacity:.35;}
+.tbl input[type=range]{width:100%;}
+.tog{font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;}
+.tog.on{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
+.vp{background:var(--surface2);border-radius:var(--rsm);padding:2px 8px;font-size:11px;font-weight:500;white-space:nowrap;}
+.vp.sc{background:var(--warn-bg);color:var(--warn-text);}
+.er{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.en{font-size:11px;color:var(--text2);margin-top:4px;}
+.lb{font-size:11px;padding:4px 10px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;}
+.lb.on{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);}
+.lr{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:center;}
+.li{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);}
+.ls{width:10px;height:10px;border-radius:2px;}
+.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;}
+.bf{background:#EEEDFE;color:#3C3489;}.bi{background:#E1F5EE;color:#085041;}.be{background:#FAEEDA;color:#633806;}
+.bsec{background:#E1F5EE;color:#085041;}.bnd{background:#EAF3DE;color:#27500A;}.bcv{background:#FAEEDA;color:#633806;}
+.bw{background:var(--surface2);border-radius:var(--rsm);height:6px;overflow:hidden;width:90px;}
+.bf2{height:6px;border-radius:3px;}
+.ind-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem;}
+.ib{font-size:12px;padding:5px 13px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;}
+.ib.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.lp-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.lpb{font-size:11px;padding:4px 11px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;}
+.lpb.on{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);}
+.lps{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;}
+.lpst{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;}
+.lpr{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;align-items:center;}
+.lpr.tot{font-weight:500;border-top:0.5px solid var(--border);padding-top:6px;margin-top:4px;margin-bottom:0;}
+.wb{background:var(--warn-bg);border:0.5px solid var(--warn-border);border-radius:var(--rsm);padding:.75rem 1rem;font-size:12px;color:var(--warn-text);margin-top:8px;}
+.ok{font-size:11px;color:var(--text3);margin-top:8px;}
+.lpe{margin-top:14px;padding-top:12px;border-top:0.5px solid var(--border);}
+.lpet{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;}
+.lpv{display:flex;gap:8px;margin-bottom:7px;align-items:flex-start;}
+.lpv:last-child{margin-bottom:0;}
+.lpvt{font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.tf{background:#E1F5EE;color:#085041;}.tm{background:#FAEEDA;color:#633806;}.th{background:#fee2e2;color:#991b1b;}
+.lpvx{font-size:11px;color:var(--text2);line-height:1.55;}
+.ch{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;}
+.cts{display:flex;gap:6px;flex-shrink:0;}
+.ctb{font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--text2);}
+.ctb.on{font-weight:500;border-color:currentColor;}
+.nd-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.nd-row:last-child{margin-bottom:0;}
+.ndl{font-size:12px;color:var(--text2);min-width:130px;}
+.info-box{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6;}
+.info-box strong{color:var(--text);font-weight:500;}
+footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
+
+.inv-block{margin-bottom:20px;}
+.inv-rtitle{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.inv-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
+.inv-sel{font-size:11px;padding:3px 8px;border-radius:20px;cursor:pointer;font-weight:600;border:1px solid;}
+.inv-ni{padding:4px 8px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);width:150px;}
+.inv-ai{padding:4px 8px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);width:80px;text-align:right;}
+.inv-pct{font-size:11px;color:var(--text2);min-width:90px;}
+.inv-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px;}
+.inv-addbtn{font-size:11px;padding:3px 11px;border-radius:20px;background:transparent;cursor:pointer;font-weight:500;}
+.t-fff{background:#FDE8FE;color:#7B0F8C;border-color:#7B0F8C;}
+.t-angel{background:#E8F4FF;color:#0A5EA8;border-color:#0A5EA8;}
+.t-vc{background:#E1F5EE;color:#085041;border-color:#085041;}
+.t-other{background:var(--surface2);color:var(--text2);border-color:var(--border2);}
+.inv-note{font-size:11px;color:var(--text3);margin-top:6px;}
+.inv-sep{border:none;border-top:0.5px solid var(--border);margin:16px 0;}
+.inv-detail td{font-size:11px;color:var(--text2);padding:3px 8px;background:var(--surface2);}
 </style>
 </head>
-<body><p>Loading...</p></body>
+<body>
+<div class="page">
+<h1>&#x1F680; Startup Funding &amp; Dilution Planner</h1>
+<p class="subtitle">Plan your financing rounds — model FFF, Angels &amp; VCs, track dilution, build your cap table, and simulate exit scenarios.</p>
+
+<div class="sec-label">Industry</div>
+<div class="ind-bar" id="industryBar"></div>
+
+<div class="sec-label">Founding Structure</div>
+<div class="card">
+  <div class="irow"><span class="il">Number of Founders</span><input type="range" id="fc" min="1" max="5" value="2" step="1"><span class="iv" id="fc-v">2</span></div>
+  <div class="irow"><span class="il">ESOP Pool</span><input type="range" id="esop" min="0" max="20" value="10" step="1"><span class="iv" id="esop-v">10%</span></div>
+</div>
+
+<div class="sec-label">Non-Dilutive Funding &amp; Convertibles</div>
+<div class="card">
+  <div class="nd-row">
+    <span class="ndl">Grants / Non-Dilutive</span>
+    <input type="number" id="grantAmt" min="0" step="0.1" value="0" style="width:90px;text-align:right;">
+    <span style="font-size:12px;color:var(--text2);">Mio €</span>
+    <span style="font-size:12px;color:var(--text3);margin-left:4px;">(no equity effect)</span>
+  </div>
+  <div class="nd-row">
+    <span class="ndl">Convertible Note</span>
+    <input type="number" id="convAmt" min="0" step="0.1" value="0" style="width:90px;text-align:right;">
+    <span style="font-size:12px;color:var(--text2);">Mio €</span>
+    <span style="font-size:12px;color:var(--text2);margin-left:8px;">Discount</span>
+    <input type="number" id="convDiscount" min="0" max="40" step="1" value="20" style="width:52px;text-align:right;">
+    <span style="font-size:12px;color:var(--text2);">%</span>
+    <span style="font-size:12px;color:var(--text2);margin-left:8px;">Val. Cap</span>
+    <input type="number" id="convCap" min="0" step="0.5" value="0" style="width:90px;text-align:right;">
+    <span style="font-size:12px;color:var(--text2);">M€ (0 = no cap)</span>
+  </div>
+  <div class="info-box" id="convInfo" style="display:none;"></div>
+  <div class="info-box" style="margin-top:10px;">
+    <strong>Grants &amp; Non-Dilutive Funding</strong> (e.g. EU Horizon, EIC Accelerator, SBIR, Exist) extend your runway without equity dilution.<br><strong>Convertible Notes</strong> convert into equity at the next round. The <strong>Discount</strong> rewards early risk: the note converts at next-round price minus X%. The <strong>Valuation Cap</strong> limits the conversion valuation, protecting early investors at high follow-on valuations.
+  </div>
+</div>
+
+<div class="sec-label">Financing Rounds</div>
+<div class="cf">
+  <table class="tbl">
+    <thead><tr>
+      <th style="width:100px;padding-left:14px;">Round</th>
+      <th>Investment</th><th>Dilution %</th>
+      <th style="text-align:right;padding-right:14px;">Pre / Post-Money</th>
+      <th style="width:70px;"></th>
+    </tr></thead>
+    <tbody id="rounds-body"></tbody>
+  </table>
+</div>
+
+
+<div class="sec-label">Investor Breakdown by Round</div>
+<div class="card">
+  <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Add individual investors to each round — <strong style="color:#7B0F8C;">FFF</strong> (Friends, Family &amp; Fools), <strong style="color:#0A5EA8;">Angels</strong>, or <strong style="color:#085041;">VCs</strong>. Enter their name and investment amount. Ownership % is calculated automatically and shown in the Cap Table below.</p>
+  <div id="inv-c"></div>
+</div>
+
+<div class="sec-label">Secondary Sales</div>
+<div class="card">
+  <div id="secondary-rows"></div>
+  <div class="info-box" style="margin-top:10px;">
+    <strong>Secondary Sale:</strong> A founder sells existing shares directly to a buyer — no new capital, no dilution. Shares simply change hands. Common in later rounds to give founders liquidity before a full exit.
+  </div>
+</div>
+
+<div class="sec-label">Exit Scenario</div>
+<div class="card">
+  <div class="er">
+    <span style="font-size:12px;color:var(--text2);min-width:110px;">Exit Valuation</span>
+    <input type="number" id="exitDirect" min="1" step="1" style="width:105px;text-align:right;" placeholder="Mio €">
+    <span style="font-size:12px;color:var(--text2);">Mio €</span>
+    <span style="font-size:12px;color:var(--text2);padding:0 4px;">oder</span>
+    <input type="number" id="exitMultiple" min="0.1" step="0.1" value="3" style="width:64px;text-align:right;">
+    <span style="font-size:12px;color:var(--text2);">× Post-Money</span>
+    <button class="lb" id="linkBtn" onclick="toggleLink()"><span id="linkIcon">○</span> <span id="linkTxt">Link to last round</span></button>
+  </div>
+  <div class="en" id="exit-note">—</div>
+</div>
+
+<div class="sec-label">Liquidation Preference</div>
+<div class="card">
+  <div class="lp-btns">
+    <button class="lpb on" id="lpOff" onclick="setLP('none')">None (pro-rata)</button>
+    <button class="lpb" id="lpNonPart" onclick="setLP('nonpart')">1× non-participating</button>
+    <button class="lpb" id="lpPart" onclick="setLP('part')">1× participating</button>
+    <button class="lpb" id="lp2x" onclick="setLP('2x')">2× non-participating</button>
+  </div>
+  <div id="lpResults" style="display:none;">
+    <div class="g2" id="lpGrid"></div>
+    <div id="lpWarn"></div>
+    <div class="lpe">
+      <div class="lpet">What do the variants mean?</div>
+      <div class="lpv"><span class="lpvt tf">Keine (pro-rata)</span><span class="lpvx">Everyone receives exactly their ownership % of exit proceeds. No priority, no waterfall — fairest distribution.</span></div>
+      <div class="lpv"><span class="lpvt tf">1× non-participating</span><span class="lpvx">Investors first get their capital back, then forfeit their pro-rata share of the remainder. Today's standard for reputable VCs.</span></div>
+      <div class="lpv"><span class="lpvt tm">1× participating</span><span class="lpvx">Investors get their capital back AND keep their full share of the remainder. "Double dip" — unfavorable for founders at mid-range exits.</span></div>
+      <div class="lpv"><span class="lpvt th">2× non-participating</span><span class="lpvx">Investors receive 2x their capital before founders see anything. Occurs in down-rounds or tough negotiations.</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec-label">Dilution Chart</div>
+<div class="card">
+  <div class="ch">
+    <div class="lr" id="legend-row" style="margin-bottom:0;flex:1;"></div>
+    <div class="cts">
+      <button class="ctb" id="btnVal" onclick="toggleValuation()" style="color:#E24B4A;"><span style="width:14px;height:2px;background:#E24B4A;border-radius:1px;display:inline-block;"></span>Valuation</button>
+      <button class="ctb" id="btnInv" onclick="toggleInvestment()" style="color:#639922;"><span style="width:14px;height:0;border-top:2px dashed #639922;display:inline-block;"></span>Investment</button>
+    </div>
+  </div>
+  <div style="position:relative;width:100%;height:300px;"><canvas id="mainChart"></canvas></div>
+  <div style="margin-top:8px;font-size:11px;color:var(--text2);" id="chart-axis-note"></div>
+</div>
+
+<div class="g3" id="metrics-row"></div>
+
+<div class="sec-label">Cap Table</div>
+<div class="cf">
+  <table class="tbl" id="cap-tbl"></table>
+</div>
+
+<footer>All values are approximations based on industry benchmarks. Not a substitute for legal or tax advice.</footer>
+</div>
+
+<script>
+const INDUSTRIES={
+  custom:{label:'Custom',emoji:'',rounds:[{invest:0.5,dilPct:15},{invest:2,dilPct:20},{invest:8,dilPct:20},{invest:25,dilPct:18},{invest:60,dilPct:15},{invest:150,dilPct:13}],exitMultiple:5,esop:10},
+  saas:{label:'SaaS / B2B',emoji:'💻',rounds:[{invest:0.5,dilPct:12},{invest:2.5,dilPct:18},{invest:10,dilPct:20},{invest:30,dilPct:18},{invest:75,dilPct:15},{invest:200,dilPct:12}],exitMultiple:8,esop:12},
+  climate:{label:'Climate Tech',emoji:'🌱',rounds:[{invest:1,dilPct:15},{invest:4,dilPct:20},{invest:15,dilPct:22},{invest:50,dilPct:20},{invest:120,dilPct:17},{invest:300,dilPct:14}],exitMultiple:6,esop:10},
+  health:{label:'Health Tech',emoji:'🏥',rounds:[{invest:1.5,dilPct:18},{invest:5,dilPct:22},{invest:20,dilPct:22},{invest:60,dilPct:20},{invest:150,dilPct:17},{invest:400,dilPct:14}],exitMultiple:7,esop:12},
+  fintech:{label:'FinTech',emoji:'💳',rounds:[{invest:0.8,dilPct:14},{invest:3,dilPct:20},{invest:12,dilPct:20},{invest:40,dilPct:18},{invest:100,dilPct:15},{invest:250,dilPct:12}],exitMultiple:7,esop:10},
+  deeptech:{label:'Deep Tech',emoji:'⚛️',rounds:[{invest:2,dilPct:20},{invest:6,dilPct:22},{invest:20,dilPct:22},{invest:70,dilPct:20},{invest:180,dilPct:18},{invest:500,dilPct:15}],exitMultiple:10,esop:15},
+  consumer:{label:'Consumer',emoji:'🛍️',rounds:[{invest:0.3,dilPct:15},{invest:1.5,dilPct:20},{invest:6,dilPct:20},{invest:20,dilPct:18},{invest:50,dilPct:15},{invest:120,dilPct:12}],exitMultiple:5,esop:8},
+};
+let currentIndustry='custom';
+
+const ROUNDS=[
+  {id:'preSeed',name:'Pre-Seed',invest:0.5, dilPct:15,active:true, color:'#7F77DD',bg:'rgba(127,119,221,0.22)',investMax:5,  investStep:0.1},
+  {id:'seed',   name:'Seed',   invest:2,   dilPct:20,active:true, color:'#1D9E75',bg:'rgba(29,158,117,0.20)', investMax:15, investStep:0.5},
+  {id:'serA',   name:'Series A',invest:8,  dilPct:20,active:false,color:'#EF9F27',bg:'rgba(239,159,39,0.20)', investMax:50, investStep:1},
+  {id:'serB',   name:'Series B',invest:25, dilPct:18,active:false,color:'#D85A30',bg:'rgba(216,90,48,0.20)',  investMax:150,investStep:5},
+  {id:'serC',   name:'Series C',invest:60, dilPct:15,active:false,color:'#D4537E',bg:'rgba(212,83,126,0.20)',investMax:300,investStep:10},
+  {id:'serD',   name:'Series D',invest:150,dilPct:13,active:false,color:'#378ADD',bg:'rgba(55,138,221,0.20)',investMax:600,investStep:25},
+];
+
+let linked=false,suppressSync=false,lpMode='none',showVal=false,showInv=false;
+let secondaries=[];
+
+function fmtM(v){if(!isFinite(v))return '—';if(v>=1000)return (v/1000).toFixed(1).replace('.0','')+'Mrd €';if(v<1)return Math.round(v*1000)+' Tsd €';if(v<10)return v.toFixed(1)+' Mio €';return Math.round(v)+' Mio €';}
+function pct(v){return v.toFixed(1)+'%';}
+function getActive(){return ROUNDS.filter(r=>r.active);}
+function getLastPostM(){const a=getActive();return a.length?a[a.length-1].invest/a[a.length-1].dilPct*100:null;}
+
+function applyIndustry(key){
+  currentIndustry=key;const ind=INDUSTRIES[key];
+  if(key!=='custom'){
+    ROUNDS.forEach((r,i)=>{r.invest=ind.rounds[i].invest;r.dilPct=ind.rounds[i].dilPct;});
+    document.getElementById('esop').value=ind.esop;document.getElementById('esop-v').textContent=ind.esop+'%';
+    document.getElementById('exitMultiple').value=ind.exitMultiple;
+    const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitDirect').value=Math.round(lp*ind.exitMultiple);suppressSync=false;}
+  }
+  buildIndustryBar();renderRoundsTable(getSF());render();
+}
+function buildIndustryBar(){
+  const bar=document.getElementById('industryBar');bar.innerHTML='';
+  Object.entries(INDUSTRIES).forEach(([key,ind])=>{
+    const btn=document.createElement('button');btn.className='ib'+(currentIndustry===key?' active':'');
+    btn.textContent=(ind.emoji?ind.emoji+' ':'')+ind.label;btn.onclick=()=>applyIndustry(key);bar.appendChild(btn);
+  });
+}
+
+function buildSecondaryRows(){
+  const fc=+document.getElementById('fc').value;
+  while(secondaries.length<fc) secondaries.push({pct:0,name:'Secondary Käufer:in '+(secondaries.length+1)});
+  secondaries=secondaries.slice(0,fc);
+  const wrap=document.getElementById('secondary-rows');wrap.innerHTML='';
+  for(let i=0;i<fc;i++){
+    const row=document.createElement('div');row.className='nd-row';
+    row.innerHTML=`
+      <span class="ndl">Founder ${i+1} verkauft</span>
+      <input type="number" min="0" max="30" step="0.5" value="${secondaries[i].pct}" style="width:64px;text-align:right;" oninput="secondaries[${i}].pct=+this.value;render();">
+      <span style="font-size:12px;color:var(--text2);">% ihrer Anteile</span>
+      <span style="font-size:12px;color:var(--text2);margin-left:8px;">an</span>
+      <input type="text" value="${secondaries[i].name}" style="width:180px;" oninput="secondaries[${i}].name=this.value;render();">
+    `;
+    wrap.appendChild(row);
+  }
+}
+
+function setLP(mode){
+  lpMode=mode;
+  ['lpOff','lpNonPart','lpPart','lp2x'].forEach(id=>document.getElementById(id).className='lpb');
+  document.getElementById({none:'lpOff',nonpart:'lpNonPart',part:'lpPart','2x':'lp2x'}[mode]).className='lpb on';
+  document.getElementById('lpResults').style.display=mode==='none'?'none':'block';
+  render();
+}
+
+function getSF(){
+  if(!linked)return 1;const lp=getLastPostM();if(!lp)return 1;
+  const d=parseFloat(document.getElementById('exitDirect').value);
+  const m=parseFloat(document.getElementById('exitMultiple').value)||1;
+  return(isFinite(d)&&d>0?d:lp*m)/lp;
+}
+function toggleLink(){
+  linked=!linked;
+  document.getElementById('linkBtn').className='lb'+(linked?' on':'');
+  document.getElementById('linkIcon').textContent=linked?'●':'○';
+  document.getElementById('linkTxt').textContent=linked?'Linked':'Link to last round';
+  if(linked){const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitDirect').value=Math.round(lp);document.getElementById('exitMultiple').value='1.0';suppressSync=false;}}
+  render();
+}
+function toggleValuation(){showVal=!showVal;document.getElementById('btnVal').className='ctb'+(showVal?' on':'');render();}
+function toggleInvestment(){showInv=!showInv;document.getElementById('btnInv').className='ctb'+(showInv?' on':'');render();}
+
+function calcExitM(){
+  const m=parseFloat(document.getElementById('exitMultiple').value)||1;
+  const d=parseFloat(document.getElementById('exitDirect').value);
+  const lp=getLastPostM();if(!lp)return null;
+  if(linked)return lp*getSF();
+  if(isFinite(d)&&d>0)return d;
+  return lp*m;
+}
+
+function getConvertibleEffect(firstActivePostM){
+  const convAmt=parseFloat(document.getElementById('convAmt').value)||0;
+  if(convAmt<=0)return{shares:0,pct:0};
+  const discount=(parseFloat(document.getElementById('convDiscount').value)||20)/100;
+  const cap=parseFloat(document.getElementById('convCap').value)||0;
+  let effectiveVal=firstActivePostM*(1-discount);
+  if(cap>0) effectiveVal=Math.min(effectiveVal,cap);
+  const convPct=convAmt/Math.max(effectiveVal,0.001);
+  return{pct:Math.min(convPct*100,50),amt:convAmt,effectiveVal,discount,cap};
+}
+
+function calc(){
+  const fc=+document.getElementById('fc').value;
+  const esopPct=+document.getElementById('esop').value/100;
+  const grantAmt=parseFloat(document.getElementById('grantAmt').value)||0;
+  const totalInit=10000000;let totalShares=totalInit;
+  const sf=getSF();
+  let founders=[];
+  for(let i=0;i<fc;i++)founders.push({name:'Founder '+(i+1),origShares:Math.round(totalInit*(1-esopPct)/fc),shares:Math.round(totalInit*(1-esopPct)/fc),type:'founder',idx:i});
+  let esopEntry={name:'ESOP Pool',shares:Math.round(totalInit*esopPct),type:'esop'};
+  let roundEntries=[];
+  let secEntries=[];
+  const active=getActive();
+
+  const firstActive=active[0];
+  const convEffect=firstActive?getConvertibleEffect(firstActive.invest*sf/firstActive.dilPct*100):{pct:0};
+  let convEntry=null;
+
+  const snaps={};const initRP={};active.forEach(r=>initRP[r.name]=0);
+  snaps['Founding']={founderPct:(1-esopPct)*100,esopPct:esopPct*100,roundPcts:{...initRP},postM:null,cumInvest:0};
+  let lastPostM=null,lastSnap=snaps['Founding'],cumInvest=0;
+
+  for(let ri=0;ri<active.length;ri++){
+    const r=active[ri];
+    const si=r.invest*sf,sp=si/r.dilPct*100;
+    let dilFrac=r.dilPct/100;
+
+    if(ri===0&&convEffect.pct>0){
+      const convDilFrac=convEffect.pct/100;
+      const convShares=Math.round(totalShares*convDilFrac/(1-convDilFrac));
+      totalShares+=convShares;
+      convEntry={name:'Convertible Loan',shares:convShares,type:'conv',color:'#BA7517'};
+    }
+
+    const newShares=Math.round(totalShares*dilFrac/(1-dilFrac));
+    totalShares+=newShares;cumInvest+=si;
+    roundEntries.push({name:r.name+' Investors',shares:newShares,type:'investor',rnd:r.name,color:r.color});
+    lastPostM=sp;
+
+    const rp={};active.forEach(ar=>{const re=roundEntries.find(e=>e.rnd===ar.name);rp[ar.name]=re?re.shares/totalShares*100:0;});
+    const fp=founders.reduce((a,s)=>a+s.shares,0)/totalShares*100;
+    const ep=esopEntry.shares/totalShares*100;
+    lastSnap={founderPct:fp,esopPct:ep,roundPcts:rp,postM:sp,cumInvest};
+    snaps[r.name]=lastSnap;
+  }
+
+  secondaries.forEach((sec,i)=>{
+    if(sec.pct>0&&i<founders.length){
+      const secShares=Math.round(founders[i].origShares*(sec.pct/100));
+      founders[i].shares=Math.max(0,founders[i].shares-secShares);
+      secEntries.push({name:sec.name,shares:secShares,type:'secondary',color:'#1D9E75'});
+    }
+  });
+
+  const allStakeholders=[
+    ...founders.map(f=>({...f,pct:f.shares/totalShares*100})),
+    {...esopEntry,pct:esopEntry.shares/totalShares*100},
+    ...(convEntry?[{...convEntry,pct:convEntry.shares/totalShares*100}]:[]),
+    ...roundEntries.map(e=>({...e,pct:e.shares/totalShares*100})),
+    ...secEntries.map(e=>({...e,pct:e.shares/totalShares*100})),
+  ];
+
+  const exitM=calcExitM();
+  const totalInvested=active.reduce((a,r)=>a+r.invest*sf,0);
+  const totalNonDilutive=grantAmt+(parseFloat(document.getElementById('convAmt').value)||0);
+
+  if(convEffect.pct>0){
+    const box=document.getElementById('convInfo');
+    box.style.display='block';
+    box.innerHTML=`Convertible note of ${fmtM(convEffect.amt)} converts at effective valuation of ${fmtM(convEffect.effectiveVal)} (${Math.round(convEffect.discount*100)}% discount${convEffect.cap>0?', cap '+fmtM(convEffect.cap):''}) ~${convEffect.pct.toFixed(1)}% dilution at first round.`;
+  } else {
+    document.getElementById('convInfo').style.display='none';
+  }
+
+  return{allStakeholders,snaps,exitM,fc,active,lastPostM,sf,totalShares,totalInvested,totalNonDilutive,grantAmt,convEffect};
+}
+
+function calcLPScenario(allStakeholders,exitM,totalInvested,mode){
+  if(!exitM||mode==='none')return null;
+  const invPct=allStakeholders.filter(s=>s.type==='investor'||s.type==='conv').reduce((a,s)=>a+s.pct,0)/100;
+  const founderPct=1-invPct;
+  const noLP={inv:exitM*invPct,founder:exitM*founderPct};
+  let withLP={};
+  if(mode==='nonpart'){const lb=Math.min(totalInvested,exitM),rem=Math.max(0,exitM-lb);withLP={inv:lb+rem*invPct,founder:rem*founderPct,lb,rem};}
+  else if(mode==='part'){const lb=Math.min(totalInvested,exitM),rem=Math.max(0,exitM-lb);withLP={inv:lb+rem*invPct,founder:rem*founderPct,lb,rem,part:true};}
+  else if(mode==='2x'){const lb=Math.min(totalInvested*2,exitM),rem=Math.max(0,exitM-lb);withLP={inv:lb+rem*invPct,founder:rem*founderPct,lb,rem,twoX:true};}
+  return{noLP,withLP,invPct,founderPct};
+}
+
+let chartInst=null;
+function buildLegend(active){
+  const row=document.getElementById('legend-row');row.innerHTML='';
+  [{color:'#7F77DD',label:'Founders'},{color:'#EF9F27',label:'ESOP'},...active.map(r=>({color:r.color,label:r.name}))].forEach(it=>{
+    const el=document.createElement('span');el.className='li';
+    el.innerHTML=`<span class="ls" style="background:${it.color};opacity:.85;"></span>${it.label}`;row.appendChild(el);
+  });
+}
+
+function renderChart(snaps,active){
+  const labels=['Founding',...active.map(r=>r.name)];
+  const fd=labels.map(l=>+(snaps[l]?snaps[l].founderPct:0).toFixed(1));
+  const ed=labels.map(l=>+(snaps[l]?snaps[l].esopPct:0).toFixed(1));
+  const inv=active.map(r=>({label:r.name,data:labels.map(l=>+(snaps[l]&&snaps[l].roundPcts&&snaps[l].roundPcts[r.name]?snaps[l].roundPcts[r.name]:0).toFixed(1)),backgroundColor:r.bg,borderColor:r.color,borderWidth:2,fill:'stack',tension:0.15,pointRadius:5,pointBackgroundColor:r.color,spanGaps:true,yAxisID:'y'}));
+  const datasets=[
+    {label:'Founders',data:fd,backgroundColor:'rgba(127,119,221,0.18)',borderColor:'#7F77DD',borderWidth:2,fill:'stack',tension:0.15,pointRadius:5,pointBackgroundColor:'#7F77DD',spanGaps:true,yAxisID:'y'},
+    {label:'ESOP',data:ed,backgroundColor:'rgba(239,159,39,0.12)',borderColor:'#EF9F27',borderWidth:1.5,borderDash:[4,3],fill:'stack',tension:0,pointRadius:4,pointBackgroundColor:'#EF9F27',spanGaps:true,yAxisID:'y'},
+    ...inv,
+  ];
+  if(showVal)datasets.push({label:'Valuation',data:labels.map(l=>snaps[l]&&snaps[l].postM!=null?+snaps[l].postM.toFixed(1):null),borderColor:'#E24B4A',borderWidth:2,backgroundColor:'transparent',fill:false,tension:0.2,pointRadius:5,pointBackgroundColor:'#E24B4A',spanGaps:false,yAxisID:'y2',order:0});
+  if(showInv)datasets.push({label:'Cum. Investment',data:labels.map(l=>snaps[l]&&snaps[l].cumInvest!=null?+snaps[l].cumInvest.toFixed(2):null),borderColor:'#639922',borderWidth:2,borderDash:[6,4],backgroundColor:'transparent',fill:false,tension:0.2,pointRadius:5,pointBackgroundColor:'#639922',spanGaps:false,yAxisID:'y2',order:0});
+  const hasY2=showVal||showInv;
+  document.getElementById('chart-axis-note').textContent=hasY2?'Left axis: Ownership % — Right axis: M€':'';
+  if(chartInst)chartInst.destroy();
+  chartInst=new Chart(document.getElementById('mainChart'),{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.yAxisID==='y2'?ctx.dataset.label+': '+fmtM(ctx.parsed.y):ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%'}}},scales:{x:{ticks:{font:{size:11},autoSkip:false},grid:{display:false}},y:{stacked:true,min:0,max:100,position:'left',ticks:{callback:v=>v+'%',font:{size:11}},grid:{color:'rgba(128,128,128,0.07)'}},y2:{display:hasY2,position:'right',ticks:{callback:v=>fmtM(v),font:{size:10}},grid:{display:false},beginAtZero:true}}}});
+}
+
+function renderRoundsTable(sf){
+  const body=document.getElementById('rounds-body');body.innerHTML='';
+  const isSc=linked&&Math.abs(sf-1)>0.01;
+  ROUNDS.forEach((r,i)=>{
+    const si=r.invest*sf,sp=si/r.dilPct*100,spre=sp-si;
+    const bp=r.invest/r.dilPct*100,bpre=bp-r.invest;
+    const tr=document.createElement('tr');tr.className=r.active?'':'inactive';
+    tr.innerHTML=`<td style="padding-left:14px;white-space:nowrap;"><span class="dot" style="background:${r.color};"></span><span style="font-size:12px;font-weight:500;">${r.name}</span></td>
+      <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="0.1" max="${r.investMax}" step="${r.investStep}" value="${r.invest}" oninput="ROUNDS[${i}].invest=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:56px;">${isSc?fmtM(si):fmtM(r.invest)}</span></div></td>
+      <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="3" max="40" step="1" value="${r.dilPct}" oninput="ROUNDS[${i}].dilPct=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:28px;">${r.dilPct}%</span></div></td>
+      <td style="text-align:right;padding-right:14px;"><span class="vp${isSc?' sc':''}">${isSc?fmtM(spre)+' / '+fmtM(sp):fmtM(bpre)+' / '+fmtM(bp)}</span></td>
+      <td style="padding-right:10px;"><button class="tog ${r.active?'on':''}" onclick="ROUNDS[${i}].active=!ROUNDS[${i}].active;render();">${r.active?'Aktiv':'Aus'}</button></td>`;
+    body.appendChild(tr);
+  });
+}
+
+function syncExit(lp){
+  if(suppressSync||!lp)return;
+  if(linked){const dv=parseFloat(document.getElementById('exitDirect').value);if(isFinite(dv)&&dv>0){suppressSync=true;document.getElementById('exitMultiple').value=(dv/lp).toFixed(2);suppressSync=false;}else{suppressSync=true;document.getElementById('exitDirect').value=Math.round(lp*(parseFloat(document.getElementById('exitMultiple').value)||1));suppressSync=false;}}
+}
+
+function renderLP(allSH,exitM,ti){
+  if(lpMode==='none')return;
+  const s=calcLPScenario(allSH,exitM,ti,lpMode);
+  if(!s){document.getElementById('lpGrid').innerHTML='';document.getElementById('lpWarn').innerHTML='';return;}
+  const ml={nonpart:'1× non-participating LP',part:'1× participating LP','2x':'2× non-participating LP'}[lpMode];
+  document.getElementById('lpGrid').innerHTML=`
+    <div class="lps"><div class="lpst">Ohne LP — pro-rata</div>
+      <div class="lpr"><span style="color:var(--text2);">Investors (${pct(s.invPct*100)})</span><span style="font-weight:500;">${fmtM(s.noLP.inv)}</span></div>
+      <div class="lpr"><span style="color:var(--text2);">Foundernen + ESOP (${pct(s.founderPct*100)})</span><span style="font-weight:500;">${fmtM(s.noLP.founder)}</span></div>
+      <div class="lpr tot"><span>Exit gesamt</span><span>${fmtM(exitM)}</span></div></div>
+    <div class="lps"><div class="lpst">${ml}</div>
+      <div class="lpr"><span style="color:var(--text2);">LP-Rückzahlung${s.withLP.twoX?' (2×)':''}</span><span style="font-weight:500;">${fmtM(s.withLP.lb)}</span></div>
+      ${s.withLP.part?`<div class="lpr"><span style="color:var(--text2);">+ pro-rata Anteil</span><span style="font-weight:500;">${fmtM(s.withLP.rem*s.invPct)}</span></div>`:''}
+      <div class="lpr"><span style="color:var(--text2);">Investors gesamt</span><span style="font-weight:500;">${fmtM(s.withLP.inv)}</span></div>
+      <div class="lpr"><span style="color:var(--text2);">Foundernen + ESOP</span><span style="font-weight:500;${s.withLP.founder<s.noLP.founder-0.5?'color:#dc2626;':''}">${fmtM(s.withLP.founder)}</span></div>
+      <div class="lpr tot"><span>Exit gesamt</span><span>${fmtM(exitM)}</span></div></div>`;
+  const diff=s.noLP.founder-s.withLP.founder;
+  const w=document.getElementById('lpWarn');
+  if(s.withLP.founder<=0.01)w.innerHTML=`<div class="wb">Bei diesem Exit gehen Foundernen mit dieser LP-Klausel komplett leer aus.</div>`;
+  else if(diff>0.5)w.innerHTML=`<div class="wb">Mit LP verlieren Foundernen ${fmtM(diff)} im Vergleich zu pro-rata — das sind ${(diff/exitM*100).toFixed(1)}% des Exit-Erlöses.</div>`;
+  else w.innerHTML=`<div class="ok">Bei diesem Exit ist der LP-Effekt minimal — Bewertung liegt deutlich über dem investierten Kapital.</div>`;
+}
+
+function renderMetrics({allStakeholders,exitM,fc,active,lastPostM,sf,totalNonDilutive,grantAmt}){
+  const fp=allStakeholders.filter(s=>s.type==='founder').reduce((a,s)=>a+s.pct,0);
+  const ti=active.reduce((a,r)=>a+r.invest*sf,0);
+  const mult=parseFloat(document.getElementById('exitMultiple').value)||1;
+  const ndLine=totalNonDilutive>0?`<br><span style="font-size:10px;color:var(--text3);">+ ${fmtM(totalNonDilutive)} non-dilutive</span>`:'';
+  document.getElementById('metrics-row').innerHTML=`
+    <div class="mc"><div class="ml">Founder je (${pct(fp/fc)})</div><div class="mv">${exitM?fmtM(exitM*fp/100/fc):'—'}</div><div class="ms">${exitM?'bei '+fmtM(exitM)+' Exit':'keine Runde aktiv'}</div></div>
+    <div class="mc"><div class="ml">Equity-Kapital${sf!==1?' (skaliert)':''}</div><div class="mv">${fmtM(ti)}</div><div class="ms">${active.length} Runde(n)${ndLine}</div></div>
+    <div class="mc"><div class="ml">Exit Valuation</div><div class="mv">${exitM?fmtM(exitM):'—'}</div><div class="ms">${lastPostM?mult.toFixed(1)+'x auf '+fmtM(lastPostM)+' Post-M':'—'}</div></div>`;
+  const note=document.getElementById('exit-note');
+  if(!active.length){note.textContent='Keine aktive Runde.';return;}
+  if(linked&&Math.abs(sf-1)>0.01)note.textContent='Rückwärts-Modus: Alle Beträge skaliert → '+fmtM(exitM||0)+' Exit-Ziel.';
+  else if(lastPostM&&exitM)note.textContent='Post-Money letzte Runde: '+fmtM(lastPostM)+' → Exit: '+fmtM(exitM);
+  else note.textContent='—';
+}
+
+function renderCapTable({allStakeholders,exitM}){
+  const cm={founder:'#7F77DD',esop:'#EF9F27',conv:'#BA7517',secondary:'#1D9E75'};
+  const badgeCls={founder:'bf',esop:'be',investor:'bi',conv:'bcv',secondary:'bsec'};
+  const badgeTxt={founder:'Founder',esop:'ESOP',investor:'Investors',conv:'Convertible',secondary:'Secondary'};
+  const rows=allStakeholders.map(s=>{
+    const bc=cm[s.type]||(s.color||'#888');
+    const bc2=badgeCls[s.type]||'bi';
+    const bl=badgeTxt[s.type]||s.type;
+    return `<tr><td style="padding-left:12px;"><span class="badge ${bc2}" style="margin-right:6px;">${bl}</span><span style="font-size:12px;">${s.name}</span></td><td><div style="display:flex;align-items:center;gap:8px;"><div class="bw"><div class="bf2" style="width:${Math.min(100,s.pct*2.2).toFixed(1)}%;background:${bc};"></div></div><span style="font-size:12px;font-weight:500;">${pct(s.pct)}</span></div></td><td style="font-size:12px;opacity:.7;">${s.pct.toFixed(1)}%</td><td style="font-size:12px;font-weight:500;">${exitM?fmtM(exitM*s.pct/100):'—'}</td></tr>`;
+  }).join('');
+  document.getElementById('cap-tbl').innerHTML=`<thead><tr><th style="padding-left:12px;">Stakeholder:in</th><th>Ownership</th><th>Anteil</th><th>Exit-Erlös</th></tr></thead><tbody>${rows}<tr style="border-top:0.5px solid var(--border2);"><td colspan="2" style="font-weight:500;font-size:12px;padding:9px 10px;">Gesamt</td><td style="font-size:12px;font-weight:500;">100%</td><td style="font-size:12px;font-weight:500;">${exitM?fmtM(exitM):'—'}</td></tr></tbody>`;
+}
+
+function render(){
+  const data=calc();
+  syncExit(data.lastPostM);
+  buildLegend(data.active);
+  renderChart(data.snaps,data.active);
+  renderRoundsTable(data.sf);
+  renderMetrics(data);
+  renderCapTable(data);
+  renderLP(data.allStakeholders,data.exitM,data.totalInvested);
+}
+
+document.getElementById('fc').addEventListener('input',function(){document.getElementById('fc-v').textContent=this.value;buildSecondaryRows();render();});
+document.getElementById('esop').addEventListener('input',function(){document.getElementById('esop-v').textContent=this.value+'%';currentIndustry='custom';buildIndustryBar();render();});
+document.getElementById('exitDirect').addEventListener('input',function(){if(suppressSync)return;if(linked){const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitMultiple').value=(parseFloat(this.value)/lp).toFixed(2);suppressSync=false;}}render();});
+document.getElementById('exitMultiple').addEventListener('input',function(){if(suppressSync)return;if(linked){const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitDirect').value=Math.round(lp*(parseFloat(this.value)||1));suppressSync=false;}}render();});
+['grantAmt','convAmt','convDiscount','convCap'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+
+buildIndustryBar();
+buildSecondaryRows();
+render();
+
+var invD={};
+ROUNDS.forEach(function(r){invD[r.id]=[];});
+var ITYPES=[
+  {id:'fff',label:'FFF',cls:'t-fff'},
+  {id:'angel',label:'Angel',cls:'t-angel'},
+  {id:'vc',label:'VC',cls:'t-vc'},
+  {id:'other',label:'Other',cls:'t-other'}
+];
+function itype(id){return ITYPES.find(function(x){return x.id===id;})||ITYPES[3];}
+function addInv(rid,tid){invD[rid].push({type:tid,name:'',amt:''});drawInv();}
+function delInv(rid,i){invD[rid].splice(i,1);drawInv();}
+function setInv(rid,i,k,v){invD[rid][i][k]=v;drawInv();}
+function drawInv(){
+  var c=document.getElementById('inv-c');if(!c)return;
+  var active=getActive();
+  if(!active.length){c.innerHTML='<p style="font-size:12px;color:var(--text2);">Enable at least one round above.</p>';return;}
+  var out='';
+  active.forEach(function(r,ri){
+    var inv=invD[r.id]||[];
+    var tot=inv.reduce(function(s,x){return s+(parseFloat(x.amt)||0);},0);
+    var rem=r.invest-tot;
+    var rows=inv.map(function(x,i){
+      var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest*100).toFixed(1):'0.0',tm=itype(x.type);
+      var opts=ITYPES.map(function(t){return '<option value="'+t.id+'"'+(t.id===x.type?' selected':'')+'>'+t.label+'</option>';}).join('');
+      return '<div class="inv-row">'
+        +'<select class="inv-sel '+tm.cls+'" onchange="invD[\''+r.id+'\']['+i+'].type=this.value;this.className=\'inv-sel \'+itype(this.value).cls;drawInv();">'+opts+'</select>'
+        +'<input class="inv-ni" type="text" placeholder="Investor name" value="'+(x.name||'')+'" oninput="setInv(\''+r.id+'\','+i+',\'name\',this.value)">'
+        +'<input class="inv-ai" type="number" min="0" step="0.05" placeholder="M€" value="'+(x.amt===''?'':x.amt)+'" oninput="setInv(\''+r.id+'\','+i+',\'amt\',this.value===\'\'?\'\':(parseFloat(this.value)||0))">'
+        +'<span style="font-size:11px;color:var(--text2);">M€</span>'
+        +'<span class="inv-pct" style="color:'+r.color+'">'+p+'% of round</span>'
+        +'<button class="inv-del" onclick="delInv(\''+r.id+'\','+i+')">&#x2715;</button>'
+        +'</div>';
+    }).join('');
+    var note='';
+    if(inv.length){
+      var st=Math.abs(rem)<0.005?'<span style="color:#085041;font-weight:500;">&#10003; fully assigned</span>':rem>0?'<span style="color:var(--warn-text);">'+rem.toFixed(2)+' M&#8364; unassigned</span>':'<span style="color:#991b1b;">&#9888; '+Math.abs(rem).toFixed(2)+' M&#8364; over-assigned</span>';
+      note='<div class="inv-note">Assigned: <strong>'+tot.toFixed(2)+' M&#8364;</strong> / '+r.invest+' M&#8364; &mdash; '+st+'</div>';
+    }
+    var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="addInv(\''+r.id+'\',\''+t.id+'\')">+ '+t.label+'</button>';}).join('');
+    out+='<div class="inv-block"><div class="inv-rtitle"><span class="dot" style="background:'+r.color+';width:10px;height:10px;"></span>'+r.name+' &nbsp;&middot;&nbsp; '+fmtM(r.invest)+'</div>'+rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div></div>';
+    if(ri<active.length-1)out+='<hr class="inv-sep">';
+  });
+  c.innerHTML=out;
+}
+function augCap(){
+  var tbl=document.getElementById('cap-tbl');if(!tbl)return;
+  tbl.querySelectorAll('.inv-detail').forEach(function(r){r.remove();});
+  var active=getActive();
+  Array.from(tbl.querySelectorAll('tr')).forEach(function(row){
+    if(row.classList.contains('inv-detail'))return;
+    var cells=row.querySelectorAll('td');if(!cells.length)return;
+    var nm=(cells[0]&&cells[0].textContent)||'';
+    active.forEach(function(r){
+      var inv=invD[r.id]||[];if(!inv.length)return;
+      if(nm.indexOf(r.name)>=0&&nm.toLowerCase().indexOf('investor')>=0){
+        var rp=parseFloat((cells[1]&&cells[1].textContent)||0)||0;
+        var after=row;
+        inv.forEach(function(x){
+          var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest)*rp:0,tm=itype(x.type);
+          var nr=document.createElement('tr');nr.className='inv-detail';
+          nr.innerHTML='<td style="padding-left:28px;"><span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-right:4px;font-weight:600;background:'+(tm.id==='fff'?'#FDE8FE':tm.id==='angel'?'#E8F4FF':tm.id==='vc'?'#E1F5EE':'var(--surface2)')+';color:'+(tm.id==='fff'?'#7B0F8C':tm.id==='angel'?'#0A5EA8':tm.id==='vc'?'#085041':'var(--text2)')+';">'+tm.label+'</span>'+(x.name||'<em>Unnamed</em>')+'</td><td>'+p.toFixed(2)+'%</td><td>'+fmtM(a)+'</td><td colspan="10"></td>';
+          after.parentNode.insertBefore(nr,after.nextSibling);after=nr;
+        });
+      }
+    });
+  });
+}
+
+</script>
+</body>
 </html>
