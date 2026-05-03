@@ -52,6 +52,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   will-change:transform;
   user-select:none;
 }
+.hero-grid span.empty{
+  opacity:0;
+  animation:none;
+  pointer-events:none;
+}
 @keyframes wiggle{
   0%,100%{transform:rotate(-9deg) scale(1);}
   25%{transform:rotate(9deg) scale(1.10);}
@@ -247,6 +252,9 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 .inv-unassigned{font-size:11px;font-weight:500;color:var(--warn-text);margin-top:6px;}
 .inv-unassigned.ok{color:#085041;}
 .inv-unassigned.over{color:#991b1b;}
+/* investor count tip */
+.inv-count-tip{font-size:11px;color:var(--text3);margin-bottom:10px;padding:5px 8px;background:var(--surface);border-radius:var(--rsm);border:0.5px solid var(--border);}
+.inv-count-tip strong{color:var(--text2);font-weight:500;}
 
 /* ── PRINT / PDF ── */
 @media print{
@@ -425,18 +433,29 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 </div>
 
 <script>
-// ── Hero grid (8×6 = 48 cells, emoji only, no text) ──
+// ── Hero grid: emojis only at edges/corners, center cells are empty ──
 (function(){
+  var COLS=8,ROWS=6;
+  // Edge thickness: 2 rows/cols from border are "edge", rest is center
+  var EDGE=2;
+  var emojis=['💸','🚀','📈','💡','🦄','🌱','⚡','🎯','💎','🔥'];
   var g=document.getElementById('heroGrid');
   var dur=[2.0,2.3,2.7,3.1,2.5,1.9,3.4,2.8];
   var delay=[0,-0.4,-0.9,-1.5,-0.2,-0.7,-1.2,-0.3];
-  for(var r=0;r<6;r++){
-    for(var c=0;c<8;c++){
+  var idx=0;
+  for(var r=0;r<ROWS;r++){
+    for(var c=0;c<COLS;c++){
       var s=document.createElement('span');
-      s.textContent='💸';
-      var di=dur[(r*8+c)%dur.length].toFixed(1);
-      var dl=delay[(r*8+c)%delay.length].toFixed(1);
-      s.style.cssText='--d:'+di+'s;--dl:'+dl+'s;';
+      var isEdge=(r<EDGE||r>=ROWS-EDGE||c<EDGE||c>=COLS-EDGE);
+      if(isEdge){
+        s.textContent=emojis[idx%emojis.length];
+        var di=dur[(r*COLS+c)%dur.length].toFixed(1);
+        var dl=delay[(r*COLS+c)%delay.length].toFixed(1);
+        s.style.cssText='--d:'+di+'s;--dl:'+dl+'s;';
+        idx++;
+      } else {
+        s.className='empty';
+      }
       g.appendChild(s);
     }
   }
@@ -535,6 +554,16 @@ const ROUNDS=[
   {id:'serC',   name:'Series C',invest:60, dilPct:15,active:false,color:'#D4537E',bg:'rgba(212,83,126,0.20)',investMax:300,investStep:10},
   {id:'serD',   name:'Series D',invest:150,dilPct:13,active:false,color:'#378ADD',bg:'rgba(55,138,221,0.20)',investMax:600,investStep:25},
 ];
+
+// Typical investor count ranges per round
+const INV_COUNT_TIPS={
+  preSeed:{min:1,max:5,label:'Typically 1–5 investors (FFF, angels, micro-VCs)'},
+  seed:{min:3,max:10,label:'Typically 3–10 investors (angels, syndicates, seed funds)'},
+  serA:{min:1,max:3,label:'Typically 1–3 lead VCs, often with 2–4 co-investors'},
+  serB:{min:1,max:4,label:'Typically 1–2 lead VCs plus 2–3 follow-on investors'},
+  serC:{min:1,max:5,label:'Typically institutional VCs + growth equity, 2–5 investors'},
+  serD:{min:1,max:4,label:'Late-stage funds, crossover investors, 1–4 participants'},
+};
 
 // Ticket sizes per round (in k€)
 const TICKET_SIZES={
@@ -796,6 +825,10 @@ function buildInvPanelHTML(r){
       +'</div>';
   }).join('');
 
+  // Investor count tip
+  var tip=INV_COUNT_TIPS[r.id];
+  var tipHTML=tip?'<div class="inv-count-tip">💡 <strong>'+r.name+':</strong> '+tip.label+'</div>':'';
+
   // unassigned indicator
   var note='';
   if(inv.length){
@@ -809,7 +842,7 @@ function buildInvPanelHTML(r){
   }
 
   var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="invD[\''+r.id+'\'].push({type:\''+t.id+'\',name:\'\',amt:\'\'});openPanels[\''+r.id+'\']=true;renderRoundsTable(getSF());">+ '+t.label+'</button>';}).join('');
-  return rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div>';
+  return tipHTML+rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div>';
 }
 
 function setInvAmt(rid,i,k){
@@ -907,6 +940,7 @@ function augCap(){
   var tbl=document.getElementById('cap-tbl');if(!tbl)return;
   tbl.querySelectorAll('.inv-detail').forEach(function(r){r.remove();});
   var active=getActive();
+  var exitM=calcExitM();
   Array.from(tbl.querySelectorAll('tr')).forEach(function(row){
     if(row.classList.contains('inv-detail'))return;
     var cells=row.querySelectorAll('td');if(!cells.length)return;
@@ -921,8 +955,10 @@ function augCap(){
           var aM=a/1000; // M€
           var p=r.invest>0?(aM/r.invest)*rp:0;
           var tm=itype(x.type);
+          // Individual exit proceeds: investor's fraction of round's equity × exit
+          var exitProceeds=exitM?(exitM*p/100):null;
           var nr=document.createElement('tr');nr.className='inv-detail';
-          nr.innerHTML='<td style="padding-left:28px;"><span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-right:4px;font-weight:600;background:'+(tm.id==='fff'?'#FDE8FE':tm.id==='angel'?'#E8F4FF':tm.id==='vc'?'#E1F5EE':'var(--surface2)')+';color:'+(tm.id==='fff'?'#7B0F8C':tm.id==='angel'?'#0A5EA8':tm.id==='vc'?'#085041':'var(--text2)')+';">'+tm.label+'</span>'+(x.name||'<em>Unnamed</em>')+'</td><td>'+p.toFixed(2)+'%</td><td>'+fmtKeur(a)+'</td><td colspan="10"></td>';
+          nr.innerHTML='<td style="padding-left:28px;"><span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-right:4px;font-weight:600;background:'+(tm.id==='fff'?'#FDE8FE':tm.id==='angel'?'#E8F4FF':tm.id==='vc'?'#E1F5EE':'var(--surface2)')+';color:'+(tm.id==='fff'?'#7B0F8C':tm.id==='angel'?'#0A5EA8':tm.id==='vc'?'#085041':'var(--text2)')+';">'+tm.label+'</span>'+(x.name||'<em>Unnamed</em>')+'</td><td>'+p.toFixed(2)+'%</td><td>'+fmtKeur(a)+'</td><td style="font-size:11px;font-weight:500;color:var(--text);">'+(exitProceeds!==null?fmtM(exitProceeds):'—')+'</td>';
           after.parentNode.insertBefore(nr,after.nextSibling);after=nr;
         });
       }
