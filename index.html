@@ -4,76 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Startup Funding & Dilution Planner</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
-var invD={};
-ROUNDS.forEach(function(r){invD[r.id]=[];});
-var ITYPES=[
-  {id:'fff',label:'FFF',cls:'t-fff'},
-  {id:'angel',label:'Angel',cls:'t-angel'},
-  {id:'vc',label:'VC',cls:'t-vc'},
-  {id:'other',label:'Other',cls:'t-other'}
-];
-function itype(id){return ITYPES.find(function(x){return x.id===id;})||ITYPES[3];}
-function addInv(rid,tid){invD[rid].push({type:tid,name:'',amt:''});drawInv();}
-function delInv(rid,i){invD[rid].splice(i,1);drawInv();}
-function setInv(rid,i,k,v){invD[rid][i][k]=v;drawInv();}
-function drawInv(){
-  var c=document.getElementById('inv-c');if(!c)return;
-  var active=getActive();
-  if(!active.length){c.innerHTML='<p style="font-size:12px;color:var(--text2);">Enable at least one round above.</p>';return;}
-  var out='';
-  active.forEach(function(r,ri){
-    var inv=invD[r.id]||[];
-    var tot=inv.reduce(function(s,x){return s+(parseFloat(x.amt)||0);},0);
-    var rem=r.invest-tot;
-    var rows=inv.map(function(x,i){
-      var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest*100).toFixed(1):'0.0',tm=itype(x.type);
-      var opts=ITYPES.map(function(t){return '<option value="'+t.id+'"'+(t.id===x.type?' selected':'')+'>'+t.label+'</option>';}).join('');
-      return '<div class="inv-row">'
-        +'<select class="inv-sel '+tm.cls+'" onchange="invD[\''+r.id+'\']['+i+'].type=this.value;this.className=\'inv-sel \'+itype(this.value).cls;drawInv();">'+opts+'</select>'
-        +'<input class="inv-ni" type="text" placeholder="Investor name" value="'+(x.name||'')+'" oninput="setInv(\''+r.id+'\','+i+',\'name\',this.value)">'
-        +'<input class="inv-ai" type="number" min="0" step="0.05" placeholder="M€" value="'+(x.amt===''?'':x.amt)+'" oninput="setInv(\''+r.id+'\','+i+',\'amt\',this.value===\'\'?\'\':(parseFloat(this.value)||0))">'
-        +'<span style="font-size:11px;color:var(--text2);">M€</span>'
-        +'<span class="inv-pct" style="color:'+r.color+'">'+p+'% of round</span>'
-        +'<button class="inv-del" onclick="delInv(\''+r.id+'\','+i+')">&#x2715;</button>'
-        +'</div>';
-    }).join('');
-    var note='';
-    if(inv.length){
-      var st=Math.abs(rem)<0.005?'<span style="color:#085041;font-weight:500;">&#10003; fully assigned</span>':rem>0?'<span style="color:var(--warn-text);">'+rem.toFixed(2)+' M&#8364; unassigned</span>':'<span style="color:#991b1b;">&#9888; '+Math.abs(rem).toFixed(2)+' M&#8364; over-assigned</span>';
-      note='<div class="inv-note">Assigned: <strong>'+tot.toFixed(2)+' M&#8364;</strong> / '+r.invest+' M&#8364; &mdash; '+st+'</div>';
-    }
-    var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="addInv(\''+r.id+'\',\''+t.id+'\')">+ '+t.label+'</button>';}).join('');
-    out+='<div class="inv-block"><div class="inv-rtitle"><span class="dot" style="background:'+r.color+';width:10px;height:10px;"></span>'+r.name+' &nbsp;&middot;&nbsp; '+fmtM(r.invest)+'</div>'+rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div></div>';
-    if(ri<active.length-1)out+='<hr class="inv-sep">';
-  });
-  c.innerHTML=out;
-}
-function augCap(){
-  var tbl=document.getElementById('cap-tbl');if(!tbl)return;
-  tbl.querySelectorAll('.inv-detail').forEach(function(r){r.remove();});
-  var active=getActive();
-  Array.from(tbl.querySelectorAll('tr')).forEach(function(row){
-    if(row.classList.contains('inv-detail'))return;
-    var cells=row.querySelectorAll('td');if(!cells.length)return;
-    var nm=(cells[0]&&cells[0].textContent)||'';
-    active.forEach(function(r){
-      var inv=invD[r.id]||[];if(!inv.length)return;
-      if(nm.indexOf(r.name)>=0&&nm.toLowerCase().indexOf('investor')>=0){
-        var rp=parseFloat((cells[1]&&cells[1].textContent)||0)||0;
-        var after=row;
-        inv.forEach(function(x){
-          var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest)*rp:0,tm=itype(x.type);
-          var nr=document.createElement('tr');nr.className='inv-detail';
-          nr.innerHTML='<td style="padding-left:28px;"><span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-right:4px;font-weight:600;background:'+(tm.id==='fff'?'#FDE8FE':tm.id==='angel'?'#E8F4FF':tm.id==='vc'?'#E1F5EE':'var(--surface2)')+';color:'+(tm.id==='fff'?'#7B0F8C':tm.id==='angel'?'#0A5EA8':tm.id==='vc'?'#085041':'var(--text2)')+';">'+tm.label+'</span>'+(x.name||'<em>Unnamed</em>')+'</td><td>'+p.toFixed(2)+'%</td><td>'+fmtM(a)+'</td><td colspan="10"></td>';
-          after.parentNode.insertBefore(nr,after.nextSibling);after=nr;
-        });
-      }
-    });
-  });
-}
-
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -94,6 +25,75 @@ function augCap(){
   --accent:#AFA9EC;
 }}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
+
+/* ── HERO ── */
+.hero{
+  width:100%;min-height:92vh;position:relative;
+  background:#6EE7A0;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  padding:2rem;
+}
+.hero-emojis{
+  position:absolute;inset:0;pointer-events:none;
+  overflow:hidden;
+}
+.money-emoji{
+  position:absolute;
+  font-size:clamp(28px,4vw,52px);
+  user-select:none;
+  animation:wiggle var(--dur,2.4s) ease-in-out infinite;
+  animation-delay:var(--delay,0s);
+  opacity:0.82;
+  will-change:transform;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,0.10));
+}
+@keyframes wiggle{
+  0%,100%{transform:rotate(-8deg) scale(1);}
+  25%{transform:rotate(8deg) scale(1.08);}
+  50%{transform:rotate(-5deg) scale(0.96);}
+  75%{transform:rotate(6deg) scale(1.04);}
+}
+.hero-content{
+  position:relative;z-index:2;
+  text-align:center;
+  max-width:620px;
+}
+.hero-eyebrow{
+  display:inline-block;
+  font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  background:rgba(0,0,0,0.10);color:#0d4a2a;
+  padding:4px 14px;border-radius:20px;
+  margin-bottom:20px;
+}
+.hero-headline{
+  font-size:clamp(32px,6vw,60px);
+  font-weight:700;
+  color:#0d2e1a;
+  line-height:1.12;
+  letter-spacing:-0.02em;
+  margin-bottom:16px;
+}
+.hero-sub{
+  font-size:clamp(14px,2vw,18px);
+  color:#1a5c35;
+  line-height:1.6;
+  margin-bottom:36px;
+  font-weight:400;
+}
+.hero-cta{
+  display:inline-flex;align-items:center;gap:8px;
+  background:#0d2e1a;color:#6EE7A0;
+  font-size:14px;font-weight:600;
+  padding:12px 28px;border-radius:100px;
+  cursor:pointer;border:none;
+  transition:transform .15s,background .15s;
+  text-decoration:none;
+  box-shadow:0 4px 20px rgba(13,46,26,0.25);
+}
+.hero-cta:hover{transform:translateY(-2px);background:#163d24;}
+.hero-cta svg{width:16px;height:16px;fill:none;stroke:#6EE7A0;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+
 .page{max-width:980px;margin:0 auto;padding:2rem 1.5rem 4rem;}
 h1{font-size:22px;font-weight:500;margin-bottom:4px;}
 .subtitle{font-size:13px;color:var(--text2);margin-bottom:2rem;}
@@ -165,7 +165,6 @@ input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--
 .info-box{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6;}
 .info-box strong{color:var(--text);font-weight:500;}
 footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
-
 .inv-block{margin-bottom:20px;}
 .inv-rtitle{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 .inv-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
@@ -185,7 +184,23 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 </style>
 </head>
 <body>
-<div class="page">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-emojis" id="heroEmojis"></div>
+  <div class="hero-content">
+    <span class="hero-eyebrow">Free Tool for Founders</span>
+    <h2 class="hero-headline">Plan Your<br>Funding Round.</h2>
+    <p class="hero-sub">Model dilution across FFF, Angels &amp; VCs.<br>Build your cap table. Simulate exits.</p>
+    <a class="hero-cta" href="#planner">
+      Start Planning
+      <svg viewBox="0 0 16 16"><polyline points="8 3 13 8 8 13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+    </a>
+  </div>
+</section>
+
+<!-- PLANNER -->
+<div class="page" id="planner">
 <h1>&#x1F680; Startup Funding &amp; Dilution Planner</h1>
 <p class="subtitle">Plan your financing rounds — model FFF, Angels &amp; VCs, track dilution, build your cap table, and simulate exit scenarios.</p>
 
@@ -236,19 +251,10 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
   </table>
 </div>
 
-
 <div class="sec-label">Investor Breakdown by Round</div>
 <div class="card">
   <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Add individual investors to each round — <strong style="color:#7B0F8C;">FFF</strong> (Friends, Family &amp; Fools), <strong style="color:#0A5EA8;">Angels</strong>, or <strong style="color:#085041;">VCs</strong>. Enter their name and investment amount. Ownership % is calculated automatically and shown in the Cap Table below.</p>
   <div id="inv-c"></div>
-</div>
-
-<div class="sec-label">Secondary Sales</div>
-<div class="card">
-  <div id="secondary-rows"></div>
-  <div class="info-box" style="margin-top:10px;">
-    <strong>Secondary Sale:</strong> A founder sells existing shares directly to a buyer — no new capital, no dilution. Shares simply change hands. Common in later rounds to give founders liquidity before a full exit.
-  </div>
 </div>
 
 <div class="sec-label">Exit Scenario</div>
@@ -257,7 +263,7 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
     <span style="font-size:12px;color:var(--text2);min-width:110px;">Exit Valuation</span>
     <input type="number" id="exitDirect" min="1" step="1" style="width:105px;text-align:right;" placeholder="Mio €">
     <span style="font-size:12px;color:var(--text2);">Mio €</span>
-    <span style="font-size:12px;color:var(--text2);padding:0 4px;">oder</span>
+    <span style="font-size:12px;color:var(--text2);padding:0 4px;">or</span>
     <input type="number" id="exitMultiple" min="0.1" step="0.1" value="3" style="width:64px;text-align:right;">
     <span style="font-size:12px;color:var(--text2);">× Post-Money</span>
     <button class="lb" id="linkBtn" onclick="toggleLink()"><span id="linkIcon">○</span> <span id="linkTxt">Link to last round</span></button>
@@ -278,7 +284,7 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
     <div id="lpWarn"></div>
     <div class="lpe">
       <div class="lpet">What do the variants mean?</div>
-      <div class="lpv"><span class="lpvt tf">Keine (pro-rata)</span><span class="lpvx">Everyone receives exactly their ownership % of exit proceeds. No priority, no waterfall — fairest distribution.</span></div>
+      <div class="lpv"><span class="lpvt tf">None (pro-rata)</span><span class="lpvx">Everyone receives exactly their ownership % of exit proceeds. No priority, no waterfall — fairest distribution.</span></div>
       <div class="lpv"><span class="lpvt tf">1× non-participating</span><span class="lpvx">Investors first get their capital back, then forfeit their pro-rata share of the remainder. Today's standard for reputable VCs.</span></div>
       <div class="lpv"><span class="lpvt tm">1× participating</span><span class="lpvx">Investors get their capital back AND keep their full share of the remainder. "Double dip" — unfavorable for founders at mid-range exits.</span></div>
       <div class="lpv"><span class="lpvt th">2× non-participating</span><span class="lpvx">Investors receive 2x their capital before founders see anything. Occurs in down-rounds or tough negotiations.</span></div>
@@ -310,6 +316,23 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 </div>
 
 <script>
+// ── Hero emoji scatter ──
+(function(){
+  var emojis=['💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸'];
+  var container=document.getElementById('heroEmojis');
+  emojis.forEach(function(e,i){
+    var el=document.createElement('span');
+    el.className='money-emoji';
+    el.textContent=e;
+    var top=Math.random()*92;
+    var left=Math.random()*97;
+    var dur=(2.0+Math.random()*2.0).toFixed(2);
+    var delay=(-Math.random()*2.5).toFixed(2);
+    el.style.cssText='top:'+top+'%;left:'+left+'%;--dur:'+dur+'s;--delay:'+delay+'s;';
+    container.appendChild(el);
+  });
+})();
+
 const INDUSTRIES={
   custom:{label:'Custom',emoji:'',rounds:[{invest:0.5,dilPct:15},{invest:2,dilPct:20},{invest:8,dilPct:20},{invest:25,dilPct:18},{invest:60,dilPct:15},{invest:150,dilPct:13}],exitMultiple:5,esop:10},
   saas:{label:'SaaS / B2B',emoji:'💻',rounds:[{invest:0.5,dilPct:12},{invest:2.5,dilPct:18},{invest:10,dilPct:20},{invest:30,dilPct:18},{invest:75,dilPct:15},{invest:200,dilPct:12}],exitMultiple:8,esop:12},
@@ -331,7 +354,6 @@ const ROUNDS=[
 ];
 
 let linked=false,suppressSync=false,lpMode='none',showVal=false,showInv=false;
-let secondaries=[];
 
 function fmtM(v){if(!isFinite(v))return '—';if(v>=1000)return (v/1000).toFixed(1).replace('.0','')+'Mrd €';if(v<1)return Math.round(v*1000)+' Tsd €';if(v<10)return v.toFixed(1)+' Mio €';return Math.round(v)+' Mio €';}
 function pct(v){return v.toFixed(1)+'%';}
@@ -354,24 +376,6 @@ function buildIndustryBar(){
     const btn=document.createElement('button');btn.className='ib'+(currentIndustry===key?' active':'');
     btn.textContent=(ind.emoji?ind.emoji+' ':'')+ind.label;btn.onclick=()=>applyIndustry(key);bar.appendChild(btn);
   });
-}
-
-function buildSecondaryRows(){
-  const fc=+document.getElementById('fc').value;
-  while(secondaries.length<fc) secondaries.push({pct:0,name:'Secondary Käufer:in '+(secondaries.length+1)});
-  secondaries=secondaries.slice(0,fc);
-  const wrap=document.getElementById('secondary-rows');wrap.innerHTML='';
-  for(let i=0;i<fc;i++){
-    const row=document.createElement('div');row.className='nd-row';
-    row.innerHTML=`
-      <span class="ndl">Founder ${i+1} verkauft</span>
-      <input type="number" min="0" max="30" step="0.5" value="${secondaries[i].pct}" style="width:64px;text-align:right;" oninput="secondaries[${i}].pct=+this.value;render();">
-      <span style="font-size:12px;color:var(--text2);">% ihrer Anteile</span>
-      <span style="font-size:12px;color:var(--text2);margin-left:8px;">an</span>
-      <input type="text" value="${secondaries[i].name}" style="width:180px;" oninput="secondaries[${i}].name=this.value;render();">
-    `;
-    wrap.appendChild(row);
-  }
 }
 
 function setLP(mode){
@@ -429,7 +433,6 @@ function calc(){
   for(let i=0;i<fc;i++)founders.push({name:'Founder '+(i+1),origShares:Math.round(totalInit*(1-esopPct)/fc),shares:Math.round(totalInit*(1-esopPct)/fc),type:'founder',idx:i});
   let esopEntry={name:'ESOP Pool',shares:Math.round(totalInit*esopPct),type:'esop'};
   let roundEntries=[];
-  let secEntries=[];
   const active=getActive();
 
   const firstActive=active[0];
@@ -444,19 +447,16 @@ function calc(){
     const r=active[ri];
     const si=r.invest*sf,sp=si/r.dilPct*100;
     let dilFrac=r.dilPct/100;
-
     if(ri===0&&convEffect.pct>0){
       const convDilFrac=convEffect.pct/100;
       const convShares=Math.round(totalShares*convDilFrac/(1-convDilFrac));
       totalShares+=convShares;
       convEntry={name:'Convertible Loan',shares:convShares,type:'conv',color:'#BA7517'};
     }
-
     const newShares=Math.round(totalShares*dilFrac/(1-dilFrac));
     totalShares+=newShares;cumInvest+=si;
     roundEntries.push({name:r.name+' Investors',shares:newShares,type:'investor',rnd:r.name,color:r.color});
     lastPostM=sp;
-
     const rp={};active.forEach(ar=>{const re=roundEntries.find(e=>e.rnd===ar.name);rp[ar.name]=re?re.shares/totalShares*100:0;});
     const fp=founders.reduce((a,s)=>a+s.shares,0)/totalShares*100;
     const ep=esopEntry.shares/totalShares*100;
@@ -464,20 +464,11 @@ function calc(){
     snaps[r.name]=lastSnap;
   }
 
-  secondaries.forEach((sec,i)=>{
-    if(sec.pct>0&&i<founders.length){
-      const secShares=Math.round(founders[i].origShares*(sec.pct/100));
-      founders[i].shares=Math.max(0,founders[i].shares-secShares);
-      secEntries.push({name:sec.name,shares:secShares,type:'secondary',color:'#1D9E75'});
-    }
-  });
-
   const allStakeholders=[
     ...founders.map(f=>({...f,pct:f.shares/totalShares*100})),
     {...esopEntry,pct:esopEntry.shares/totalShares*100},
     ...(convEntry?[{...convEntry,pct:convEntry.shares/totalShares*100}]:[]),
     ...roundEntries.map(e=>({...e,pct:e.shares/totalShares*100})),
-    ...secEntries.map(e=>({...e,pct:e.shares/totalShares*100})),
   ];
 
   const exitM=calcExitM();
@@ -545,7 +536,7 @@ function renderRoundsTable(sf){
       <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="0.1" max="${r.investMax}" step="${r.investStep}" value="${r.invest}" oninput="ROUNDS[${i}].invest=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:56px;">${isSc?fmtM(si):fmtM(r.invest)}</span></div></td>
       <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="3" max="40" step="1" value="${r.dilPct}" oninput="ROUNDS[${i}].dilPct=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:28px;">${r.dilPct}%</span></div></td>
       <td style="text-align:right;padding-right:14px;"><span class="vp${isSc?' sc':''}">${isSc?fmtM(spre)+' / '+fmtM(sp):fmtM(bpre)+' / '+fmtM(bp)}</span></td>
-      <td style="padding-right:10px;"><button class="tog ${r.active?'on':''}" onclick="ROUNDS[${i}].active=!ROUNDS[${i}].active;render();">${r.active?'Aktiv':'Aus'}</button></td>`;
+      <td style="padding-right:10px;"><button class="tog ${r.active?'on':''}" onclick="ROUNDS[${i}].active=!ROUNDS[${i}].active;render();">${r.active?'Active':'Off'}</button></td>`;
     body.appendChild(tr);
   });
 }
@@ -561,21 +552,21 @@ function renderLP(allSH,exitM,ti){
   if(!s){document.getElementById('lpGrid').innerHTML='';document.getElementById('lpWarn').innerHTML='';return;}
   const ml={nonpart:'1× non-participating LP',part:'1× participating LP','2x':'2× non-participating LP'}[lpMode];
   document.getElementById('lpGrid').innerHTML=`
-    <div class="lps"><div class="lpst">Ohne LP — pro-rata</div>
+    <div class="lps"><div class="lpst">No LP — pro-rata</div>
       <div class="lpr"><span style="color:var(--text2);">Investors (${pct(s.invPct*100)})</span><span style="font-weight:500;">${fmtM(s.noLP.inv)}</span></div>
-      <div class="lpr"><span style="color:var(--text2);">Foundernen + ESOP (${pct(s.founderPct*100)})</span><span style="font-weight:500;">${fmtM(s.noLP.founder)}</span></div>
-      <div class="lpr tot"><span>Exit gesamt</span><span>${fmtM(exitM)}</span></div></div>
+      <div class="lpr"><span style="color:var(--text2);">Founders + ESOP (${pct(s.founderPct*100)})</span><span style="font-weight:500;">${fmtM(s.noLP.founder)}</span></div>
+      <div class="lpr tot"><span>Total Exit</span><span>${fmtM(exitM)}</span></div></div>
     <div class="lps"><div class="lpst">${ml}</div>
-      <div class="lpr"><span style="color:var(--text2);">LP-Rückzahlung${s.withLP.twoX?' (2×)':''}</span><span style="font-weight:500;">${fmtM(s.withLP.lb)}</span></div>
-      ${s.withLP.part?`<div class="lpr"><span style="color:var(--text2);">+ pro-rata Anteil</span><span style="font-weight:500;">${fmtM(s.withLP.rem*s.invPct)}</span></div>`:''}
-      <div class="lpr"><span style="color:var(--text2);">Investors gesamt</span><span style="font-weight:500;">${fmtM(s.withLP.inv)}</span></div>
-      <div class="lpr"><span style="color:var(--text2);">Foundernen + ESOP</span><span style="font-weight:500;${s.withLP.founder<s.noLP.founder-0.5?'color:#dc2626;':''}">${fmtM(s.withLP.founder)}</span></div>
-      <div class="lpr tot"><span>Exit gesamt</span><span>${fmtM(exitM)}</span></div></div>`;
+      <div class="lpr"><span style="color:var(--text2);">LP repayment${s.withLP.twoX?' (2×)':''}</span><span style="font-weight:500;">${fmtM(s.withLP.lb)}</span></div>
+      ${s.withLP.part?`<div class="lpr"><span style="color:var(--text2);">+ pro-rata share</span><span style="font-weight:500;">${fmtM(s.withLP.rem*s.invPct)}</span></div>`:''}
+      <div class="lpr"><span style="color:var(--text2);">Investors total</span><span style="font-weight:500;">${fmtM(s.withLP.inv)}</span></div>
+      <div class="lpr"><span style="color:var(--text2);">Founders + ESOP</span><span style="font-weight:500;${s.withLP.founder<s.noLP.founder-0.5?'color:#dc2626;':''}">${fmtM(s.withLP.founder)}</span></div>
+      <div class="lpr tot"><span>Total Exit</span><span>${fmtM(exitM)}</span></div></div>`;
   const diff=s.noLP.founder-s.withLP.founder;
   const w=document.getElementById('lpWarn');
-  if(s.withLP.founder<=0.01)w.innerHTML=`<div class="wb">Bei diesem Exit gehen Foundernen mit dieser LP-Klausel komplett leer aus.</div>`;
-  else if(diff>0.5)w.innerHTML=`<div class="wb">Mit LP verlieren Foundernen ${fmtM(diff)} im Vergleich zu pro-rata — das sind ${(diff/exitM*100).toFixed(1)}% des Exit-Erlöses.</div>`;
-  else w.innerHTML=`<div class="ok">Bei diesem Exit ist der LP-Effekt minimal — Bewertung liegt deutlich über dem investierten Kapital.</div>`;
+  if(s.withLP.founder<=0.01)w.innerHTML=`<div class="wb">At this exit, founders receive nothing with this LP clause.</div>`;
+  else if(diff>0.5)w.innerHTML=`<div class="wb">With LP, founders lose ${fmtM(diff)} vs. pro-rata — that's ${(diff/exitM*100).toFixed(1)}% of exit proceeds.</div>`;
+  else w.innerHTML=`<div class="ok">At this exit the LP effect is minimal — valuation is well above invested capital.</div>`;
 }
 
 function renderMetrics({allStakeholders,exitM,fc,active,lastPostM,sf,totalNonDilutive,grantAmt}){
@@ -584,27 +575,27 @@ function renderMetrics({allStakeholders,exitM,fc,active,lastPostM,sf,totalNonDil
   const mult=parseFloat(document.getElementById('exitMultiple').value)||1;
   const ndLine=totalNonDilutive>0?`<br><span style="font-size:10px;color:var(--text3);">+ ${fmtM(totalNonDilutive)} non-dilutive</span>`:'';
   document.getElementById('metrics-row').innerHTML=`
-    <div class="mc"><div class="ml">Founder je (${pct(fp/fc)})</div><div class="mv">${exitM?fmtM(exitM*fp/100/fc):'—'}</div><div class="ms">${exitM?'bei '+fmtM(exitM)+' Exit':'keine Runde aktiv'}</div></div>
-    <div class="mc"><div class="ml">Equity-Kapital${sf!==1?' (skaliert)':''}</div><div class="mv">${fmtM(ti)}</div><div class="ms">${active.length} Runde(n)${ndLine}</div></div>
-    <div class="mc"><div class="ml">Exit Valuation</div><div class="mv">${exitM?fmtM(exitM):'—'}</div><div class="ms">${lastPostM?mult.toFixed(1)+'x auf '+fmtM(lastPostM)+' Post-M':'—'}</div></div>`;
+    <div class="mc"><div class="ml">Per Founder (${pct(fp/fc)})</div><div class="mv">${exitM?fmtM(exitM*fp/100/fc):'—'}</div><div class="ms">${exitM?'at '+fmtM(exitM)+' exit':'no active round'}</div></div>
+    <div class="mc"><div class="ml">Equity Capital${sf!==1?' (scaled)':''}</div><div class="mv">${fmtM(ti)}</div><div class="ms">${active.length} round(s)${ndLine}</div></div>
+    <div class="mc"><div class="ml">Exit Valuation</div><div class="mv">${exitM?fmtM(exitM):'—'}</div><div class="ms">${lastPostM?mult.toFixed(1)+'x on '+fmtM(lastPostM)+' post-M':'—'}</div></div>`;
   const note=document.getElementById('exit-note');
-  if(!active.length){note.textContent='Keine aktive Runde.';return;}
-  if(linked&&Math.abs(sf-1)>0.01)note.textContent='Rückwärts-Modus: Alle Beträge skaliert → '+fmtM(exitM||0)+' Exit-Ziel.';
-  else if(lastPostM&&exitM)note.textContent='Post-Money letzte Runde: '+fmtM(lastPostM)+' → Exit: '+fmtM(exitM);
+  if(!active.length){note.textContent='No active round.';return;}
+  if(linked&&Math.abs(sf-1)>0.01)note.textContent='Reverse mode: all amounts scaled → '+fmtM(exitM||0)+' exit target.';
+  else if(lastPostM&&exitM)note.textContent='Post-money last round: '+fmtM(lastPostM)+' → Exit: '+fmtM(exitM);
   else note.textContent='—';
 }
 
 function renderCapTable({allStakeholders,exitM}){
   const cm={founder:'#7F77DD',esop:'#EF9F27',conv:'#BA7517',secondary:'#1D9E75'};
   const badgeCls={founder:'bf',esop:'be',investor:'bi',conv:'bcv',secondary:'bsec'};
-  const badgeTxt={founder:'Founder',esop:'ESOP',investor:'Investors',conv:'Convertible',secondary:'Secondary'};
+  const badgeTxt={founder:'Founder',esop:'ESOP',investor:'Investor',conv:'Convertible',secondary:'Secondary'};
   const rows=allStakeholders.map(s=>{
     const bc=cm[s.type]||(s.color||'#888');
     const bc2=badgeCls[s.type]||'bi';
     const bl=badgeTxt[s.type]||s.type;
     return `<tr><td style="padding-left:12px;"><span class="badge ${bc2}" style="margin-right:6px;">${bl}</span><span style="font-size:12px;">${s.name}</span></td><td><div style="display:flex;align-items:center;gap:8px;"><div class="bw"><div class="bf2" style="width:${Math.min(100,s.pct*2.2).toFixed(1)}%;background:${bc};"></div></div><span style="font-size:12px;font-weight:500;">${pct(s.pct)}</span></div></td><td style="font-size:12px;opacity:.7;">${s.pct.toFixed(1)}%</td><td style="font-size:12px;font-weight:500;">${exitM?fmtM(exitM*s.pct/100):'—'}</td></tr>`;
   }).join('');
-  document.getElementById('cap-tbl').innerHTML=`<thead><tr><th style="padding-left:12px;">Stakeholder:in</th><th>Ownership</th><th>Anteil</th><th>Exit-Erlös</th></tr></thead><tbody>${rows}<tr style="border-top:0.5px solid var(--border2);"><td colspan="2" style="font-weight:500;font-size:12px;padding:9px 10px;">Gesamt</td><td style="font-size:12px;font-weight:500;">100%</td><td style="font-size:12px;font-weight:500;">${exitM?fmtM(exitM):'—'}</td></tr></tbody>`;
+  document.getElementById('cap-tbl').innerHTML=`<thead><tr><th style="padding-left:12px;">Stakeholder</th><th>Ownership</th><th>Share</th><th>Exit Proceeds</th></tr></thead><tbody>${rows}<tr style="border-top:0.5px solid var(--border2);"><td colspan="2" style="font-weight:500;font-size:12px;padding:9px 10px;">Total</td><td style="font-size:12px;font-weight:500;">100%</td><td style="font-size:12px;font-weight:500;">${exitM?fmtM(exitM):'—'}</td></tr></tbody>`;
 }
 
 function render(){
@@ -616,18 +607,17 @@ function render(){
   renderMetrics(data);
   renderCapTable(data);
   renderLP(data.allStakeholders,data.exitM,data.totalInvested);
+  // augment cap table with investor details
+  augCap();
 }
 
-document.getElementById('fc').addEventListener('input',function(){document.getElementById('fc-v').textContent=this.value;buildSecondaryRows();render();});
+document.getElementById('fc').addEventListener('input',function(){document.getElementById('fc-v').textContent=this.value;render();});
 document.getElementById('esop').addEventListener('input',function(){document.getElementById('esop-v').textContent=this.value+'%';currentIndustry='custom';buildIndustryBar();render();});
 document.getElementById('exitDirect').addEventListener('input',function(){if(suppressSync)return;if(linked){const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitMultiple').value=(parseFloat(this.value)/lp).toFixed(2);suppressSync=false;}}render();});
 document.getElementById('exitMultiple').addEventListener('input',function(){if(suppressSync)return;if(linked){const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitDirect').value=Math.round(lp*(parseFloat(this.value)||1));suppressSync=false;}}render();});
 ['grantAmt','convAmt','convDiscount','convCap'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 
-buildIndustryBar();
-buildSecondaryRows();
-render();
-
+// ── Investor tracking ──
 var invD={};
 ROUNDS.forEach(function(r){invD[r.id]=[];});
 var ITYPES=[
@@ -696,6 +686,8 @@ function augCap(){
   });
 }
 
+buildIndustryBar();
+render();
 </script>
 </body>
 </html>
