@@ -35,7 +35,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
 }
-/* grid of emojis via CSS grid + pseudo-random wiggle per cell */
 .hero-grid{
   position:absolute;inset:0;
   display:grid;
@@ -102,13 +101,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* ── PDF export button ── */
 .pdf-btn{
   display:inline-flex;align-items:center;gap:7px;
-  font-size:12px;font-weight:500;
-  padding:7px 16px;border-radius:20px;
-  background:var(--surface2);border:0.5px solid var(--border2);
-  color:var(--text2);cursor:pointer;
-  transition:background .15s;
+  font-size:13px;font-weight:500;
+  padding:10px 22px;border-radius:100px;
+  background:var(--accent);border:none;
+  color:#fff;cursor:pointer;
+  transition:background .15s,transform .15s;
+  box-shadow:0 2px 12px rgba(83,74,183,0.25);
 }
-.pdf-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pdf-btn:hover{background:#3f37a0;transform:translateY(-1px);}
 
 /* ── VENTURE INFO ── */
 .venture-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:1rem;}
@@ -118,6 +118,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .venture-input{flex:1;padding:7px 10px;font-size:14px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);}
 .venture-textarea{flex:1;padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);resize:vertical;min-height:56px;font-family:inherit;}
 .venture-input:focus,.venture-textarea:focus{outline:none;border-color:var(--accent);}
+
+/* venture inline selects */
+.venture-select{padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);cursor:pointer;}
+.venture-select:focus{outline:none;border-color:var(--accent);}
+.venture-seg{display:flex;gap:6px;flex-wrap:wrap;}
+.vsb{font-size:12px;padding:5px 13px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;}
+.vsb.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 
 /* ── MILESTONES ── */
 .milestone-wrap{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;margin-top:10px;}
@@ -132,7 +139,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .milestone-empty{font-size:12px;color:var(--text3);font-style:italic;}
 
 /* ── PAGE ── */
-.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px;}
 .page{max-width:980px;margin:0 auto;padding:2rem 1.5rem 4rem;}
 h1{font-size:22px;font-weight:500;}
 .subtitle{font-size:13px;color:var(--text2);margin-bottom:2rem;}
@@ -175,9 +181,6 @@ input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--
 .bsec{background:#E1F5EE;color:#085041;}.bnd{background:#EAF3DE;color:#27500A;}.bcv{background:#FAEEDA;color:#633806;}
 .bw{background:var(--surface2);border-radius:var(--rsm);height:6px;overflow:hidden;width:90px;}
 .bf2{height:6px;border-radius:3px;}
-.ind-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem;}
-.ib{font-size:12px;padding:5px 13px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;}
-.ib.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .lp-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
 .lpb{font-size:11px;padding:4px 11px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;}
 .lpb.on{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);}
@@ -204,24 +207,30 @@ input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--
 .info-box{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6;}
 .info-box strong{color:var(--text);font-weight:500;}
 footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
+.pdf-footer{margin-top:2.5rem;display:flex;justify-content:center;}
 
-/* ── Investor blocks ── */
+/* ── Investor blocks (standalone section - REMOVED but keeping styles for inline use) ── */
 .inv-block{margin-bottom:20px;}
 .inv-rtitle{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 .inv-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
-.inv-sel{font-size:11px;padding:3px 8px;border-radius:20px;cursor:pointer;font-weight:600;border:1px solid;}
+.inv-sel{font-size:11px;padding:3px 8px;border-radius:20px;cursor:pointer;font-weight:600;border:0.5px solid;background:var(--surface);}
 .inv-ni{padding:4px 8px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);width:150px;}
 .inv-ai{padding:4px 8px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);width:80px;text-align:right;}
+.inv-unit{font-size:11px;color:var(--text2);white-space:nowrap;}
 .inv-pct{font-size:11px;color:var(--text2);min-width:90px;}
 .inv-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px;}
 .inv-addbtn{font-size:11px;padding:3px 11px;border-radius:20px;background:transparent;cursor:pointer;font-weight:500;}
-.t-fff{background:#FDE8FE;color:#7B0F8C;border-color:#7B0F8C;}
-.t-angel{background:#E8F4FF;color:#0A5EA8;border-color:#0A5EA8;}
-.t-vc{background:#E1F5EE;color:#085041;border-color:#085041;}
+.t-fff{background:#FDE8FE;color:#7B0F8C;border-color:#D07AE0;}
+.t-angel{background:#E8F4FF;color:#0A5EA8;border-color:#6AAEE0;}
+.t-vc{background:#E1F5EE;color:#085041;border-color:#5ABFA0;}
 .t-other{background:var(--surface2);color:var(--text2);border-color:var(--border2);}
 .inv-note{font-size:11px;color:var(--text3);margin-top:6px;}
 .inv-sep{border:none;border-top:0.5px solid var(--border);margin:16px 0;}
 .inv-detail td{font-size:11px;color:var(--text2);padding:3px 8px;background:var(--surface2);}
+/* ticket size quick-pick buttons */
+.ticket-btns{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+.tkt{font-size:10px;padding:2px 8px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;white-space:nowrap;}
+.tkt:hover{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);}
 
 /* ── Inline investor dropdown in rounds table ── */
 .inv-dropdown-toggle{
@@ -231,14 +240,17 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 }
 .inv-dropdown-toggle.has-inv{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);}
 .inv-dropdown-panel{
-  display:none;padding:10px 14px 10px;background:var(--surface2);
+  display:none;padding:12px 14px 12px;background:var(--surface2);
   border-top:0.5px solid var(--border);
 }
 .inv-dropdown-panel.open{display:block;}
+.inv-unassigned{font-size:11px;font-weight:500;color:var(--warn-text);margin-top:6px;}
+.inv-unassigned.ok{color:#085041;}
+.inv-unassigned.over{color:#991b1b;}
 
 /* ── PRINT / PDF ── */
 @media print{
-  .hero,.pdf-btn,.hero-cta,.ind-bar,.tog,.lb,.lpb,.ctb,.inv-addbtn,.inv-del,.inv-dropdown-toggle,.milestone-gen-btn{display:none!important;}
+  .hero,.pdf-btn,.pdf-footer,.hero-cta,.vsb,.tog,.lb,.lpb,.ctb,.inv-addbtn,.inv-del,.inv-dropdown-toggle,.milestone-gen-btn,.ticket-btns{display:none!important;}
   body{background:#fff;color:#000;}
   .page{max-width:100%;padding:1rem;}
   .card,.cf,.mc,.lps,.venture-card,.milestone-wrap{border:0.5px solid #ccc!important;break-inside:avoid;}
@@ -264,15 +276,9 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 
 <!-- PLANNER -->
 <div class="page" id="planner">
-<div class="page-header">
-  <div>
-    <h1>&#x1F680; Startup Funding &amp; Dilution Planner</h1>
-    <p class="subtitle">Plan your financing rounds — model FFF, Angels &amp; VCs, track dilution, build your cap table, and simulate exit scenarios.</p>
-  </div>
-  <button class="pdf-btn" onclick="window.print()">
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1h8v4H4z"/><path d="M4 11H2a1 1 0 01-1-1V6a1 1 0 011-1h12a1 1 0 011 1v4a1 1 0 01-1 1h-2"/><path d="M4 8h8v7H4z"/></svg>
-    Download PDF
-  </button>
+<div style="margin-bottom:4px;">
+  <h1>Startup Funding &amp; Dilution Planner</h1>
+  <p class="subtitle">Plan your financing rounds — model FFF, Angels &amp; VCs, track dilution, build your cap table, and simulate exit scenarios.</p>
 </div>
 
 <!-- VENTURE INFO -->
@@ -286,6 +292,23 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
     <span class="venture-label" style="margin-top:6px;">What it does</span>
     <textarea class="venture-textarea" id="ventureDesc" placeholder="Brief description — e.g. AI-powered carbon accounting platform for SMEs..." oninput="onVentureChange()"></textarea>
   </div>
+  <div class="venture-row">
+    <span class="venture-label">Industry</span>
+    <div class="venture-seg" id="ventureIndustryBar"></div>
+  </div>
+  <div class="venture-row">
+    <span class="venture-label">Founders</span>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <input type="range" id="fc" min="1" max="5" value="2" step="1" style="width:160px;accent-color:var(--accent);" oninput="document.getElementById('fc-v').textContent=this.value;render();">
+      <span id="fc-v" style="font-size:13px;font-weight:500;min-width:24px;">2</span>
+    </div>
+    <span style="font-size:12px;color:var(--text3);margin-left:4px;">founders</span>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:24px;">
+      <span style="font-size:12px;color:var(--text2);">ESOP Pool</span>
+      <input type="range" id="esop" min="0" max="20" value="10" step="1" style="width:120px;accent-color:var(--accent);" oninput="document.getElementById('esop-v').textContent=this.value+'%';currentIndustry='custom';buildIndustryBar();render();">
+      <span id="esop-v" style="font-size:13px;font-weight:500;min-width:30px;">10%</span>
+    </div>
+  </div>
   <div class="milestone-wrap" id="milestoneWrap">
     <div class="milestone-header">
       <span class="milestone-title">&#127919; Milestones &amp; KPIs per Round</span>
@@ -295,15 +318,6 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
       <span class="milestone-empty">Enter your venture name and description, then click "Suggest with AI".</span>
     </div>
   </div>
-</div>
-
-<div class="sec-label">Industry</div>
-<div class="ind-bar" id="industryBar"></div>
-
-<div class="sec-label">Founding Structure</div>
-<div class="card">
-  <div class="irow"><span class="il">Number of Founders</span><input type="range" id="fc" min="1" max="5" value="2" step="1"><span class="iv" id="fc-v">2</span></div>
-  <div class="irow"><span class="il">ESOP Pool</span><input type="range" id="esop" min="0" max="20" value="10" step="1"><span class="iv" id="esop-v">10%</span></div>
 </div>
 
 <div class="sec-label">Non-Dilutive Funding &amp; Convertibles</div>
@@ -343,12 +357,6 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
     </tr></thead>
     <tbody id="rounds-body"></tbody>
   </table>
-</div>
-
-<div class="sec-label">Investor Breakdown by Round</div>
-<div class="card">
-  <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Add individual investors to each round — <strong style="color:#7B0F8C;">FFF</strong> (Friends, Family &amp; Fools), <strong style="color:#0A5EA8;">Angels</strong>, or <strong style="color:#085041;">VCs</strong>. Enter their name and investment amount. Ownership % is calculated automatically and shown in the Cap Table below.</p>
-  <div id="inv-c"></div>
 </div>
 
 <div class="sec-label">Exit Scenario</div>
@@ -406,11 +414,18 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
   <table class="tbl" id="cap-tbl"></table>
 </div>
 
-<footer>All values are approximations based on industry benchmarks. Not a substitute for legal or tax advice.</footer>
+<div class="pdf-footer">
+  <button class="pdf-btn" onclick="window.print()">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1h8v4H4z"/><path d="M4 11H2a1 1 0 01-1-1V6a1 1 0 011-1h12a1 1 0 011 1v4a1 1 0 01-1 1h-2"/><path d="M4 8h8v7H4z"/></svg>
+    Download PDF Report
+  </button>
+</div>
+
+<footer style="margin-top:1.5rem;">All values are approximations based on industry benchmarks. Not a substitute for legal or tax advice.</footer>
 </div>
 
 <script>
-// ── Hero grid (8×6 = 48 cells, uniform) ──
+// ── Hero grid (8×6 = 48 cells, emoji only, no text) ──
 (function(){
   var g=document.getElementById('heroGrid');
   var dur=[2.0,2.3,2.7,3.1,2.5,1.9,3.4,2.8];
@@ -453,11 +468,8 @@ function generateMilestones(){
   }
   var btn=document.getElementById('milestoneBtn');
   btn.disabled=true;btn.textContent='Generating…';
-
-  // Build prompt
   var roundNames=active.map(function(r){return r.name;}).join(', ');
   var prompt='You are a startup advisor. Given the startup below, suggest 2 concrete milestones or KPIs a founder must hit BEFORE each financing round to make it fundable. Be specific, use real metrics.\n\nStartup name: '+(name||'(unnamed)')+'\nDescription: '+(desc||'(not provided)')+'\nRounds to cover: '+roundNames+'\n\nRespond ONLY with a JSON array, no markdown, no explanation. Format:\n[{"round":"Pre-Seed","milestones":["milestone 1","milestone 2"]},...]';
-
   fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer OPENAI_KEY_PLACEHOLDER'},
@@ -471,7 +483,6 @@ function generateMilestones(){
     renderMilestones(arr);
   })
   .catch(function(){
-    // Fallback: smart built-in suggestions
     var fallback=active.map(function(r){
       var ms=FALLBACK_MILESTONES[r.id]||['Validated product-market fit','Demonstrated traction with early users'];
       return{round:r.name,milestones:ms};
@@ -525,6 +536,23 @@ const ROUNDS=[
   {id:'serD',   name:'Series D',invest:150,dilPct:13,active:false,color:'#378ADD',bg:'rgba(55,138,221,0.20)',investMax:600,investStep:25},
 ];
 
+// Ticket sizes per round (in k€)
+const TICKET_SIZES={
+  preSeed:[10,25,50,100,250],
+  seed:[50,100,250,500,1000],
+  serA:[250,500,1000,2000,5000],
+  serB:[500,1000,2500,5000,10000],
+  serC:[1000,2500,5000,10000,25000],
+  serD:[2500,5000,10000,25000,50000],
+};
+
+function fmtKeur(v){
+  if(!isFinite(v)||v===''||v===null)return '';
+  var k=parseFloat(v);
+  if(k>=1000)return (k/1000).toFixed(k%1000===0?0:1)+' M€';
+  return k+' k€';
+}
+
 let linked=false,suppressSync=false,lpMode='none',showVal=false,showInv=false;
 
 function fmtM(v){if(!isFinite(v))return '—';if(v>=1000)return (v/1000).toFixed(1).replace('.0','')+'Mrd €';if(v<1)return Math.round(v*1000)+' Tsd €';if(v<10)return v.toFixed(1)+' Mio €';return Math.round(v)+' Mio €';}
@@ -540,13 +568,22 @@ function applyIndustry(key){
     document.getElementById('exitMultiple').value=ind.exitMultiple;
     const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitDirect').value=Math.round(lp*ind.exitMultiple);suppressSync=false;}
   }
-  buildIndustryBar();renderRoundsTable(getSF());render();
+  buildIndustryBar();buildVentureIndustryBar();renderRoundsTable(getSF());render();
 }
+
 function buildIndustryBar(){
-  const bar=document.getElementById('industryBar');bar.innerHTML='';
+  // kept for compatibility but now industry is inside venture card
+}
+
+function buildVentureIndustryBar(){
+  const bar=document.getElementById('ventureIndustryBar');if(!bar)return;
+  bar.innerHTML='';
   Object.entries(INDUSTRIES).forEach(([key,ind])=>{
-    const btn=document.createElement('button');btn.className='ib'+(currentIndustry===key?' active':'');
-    btn.textContent=(ind.emoji?ind.emoji+' ':'')+ind.label;btn.onclick=()=>applyIndustry(key);bar.appendChild(btn);
+    const btn=document.createElement('button');
+    btn.className='vsb'+(currentIndustry===key?' active':'');
+    btn.textContent=(ind.emoji?ind.emoji+' ':'')+ind.label;
+    btn.onclick=()=>applyIndustry(key);
+    bar.appendChild(btn);
   });
 }
 
@@ -706,12 +743,10 @@ function renderRoundsTable(sf){
     const inv=invD[r.id]||[];
     const hasInv=inv.length>0;
     const panelId='invpanel-'+r.id;
-
-    // Main row
     const tr=document.createElement('tr');tr.className=r.active?'':'inactive';
     tr.innerHTML=`<td style="padding-left:14px;white-space:nowrap;"><span class="dot" style="background:${r.color};"></span><span style="font-size:12px;font-weight:500;">${r.name}</span></td>
-      <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="0.1" max="${r.investMax}" step="${r.investStep}" value="${r.invest}" oninput="ROUNDS[${i}].invest=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:56px;">${isSc?fmtM(si):fmtM(r.invest)}</span></div></td>
-      <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="3" max="40" step="1" value="${r.dilPct}" oninput="ROUNDS[${i}].dilPct=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:28px;">${r.dilPct}%</span></div></td>
+      <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="0.1" max="${r.investMax}" step="${r.investStep}" value="${r.invest}" oninput="ROUNDS[${i}].invest=+this.value;currentIndustry='custom';buildVentureIndustryBar();render();"><span style="font-size:11px;min-width:56px;">${isSc?fmtM(si):fmtM(r.invest)}</span></div></td>
+      <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="3" max="40" step="1" value="${r.dilPct}" oninput="ROUNDS[${i}].dilPct=+this.value;currentIndustry='custom';buildVentureIndustryBar();render();"><span style="font-size:11px;min-width:28px;">${r.dilPct}%</span></div></td>
       <td style="text-align:right;padding-right:14px;"><span class="vp${isSc?' sc':''}">${isSc?fmtM(spre)+' / '+fmtM(sp):fmtM(bpre)+' / '+fmtM(bp)}</span></td>
       <td><button class="inv-dropdown-toggle${hasInv?' has-inv':''}" onclick="toggleInvPanel('${r.id}')">&#9660; Investors${hasInv?' ('+inv.length+')':''}</button></td>
       <td style="padding-right:10px;"><button class="tog ${r.active?'on':''}" onclick="ROUNDS[${i}].active=!ROUNDS[${i}].active;render();">${r.active?'Active':'Off'}</button></td>`;
@@ -737,26 +772,49 @@ function toggleInvPanel(rid){
 function buildInvPanelHTML(r){
   var inv=invD[r.id]||[];
   var tot=inv.reduce(function(s,x){return s+(parseFloat(x.amt)||0);},0);
-  var rem=r.invest-tot;
+  var totM=tot/1000; // convert k€ to M€ for comparison
+  var rem=r.invest-totM;
   var rows=inv.map(function(x,i){
-    var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest*100).toFixed(1):'0.0',tm=itype(x.type);
+    var a=parseFloat(x.amt)||0; // in k€
+    var aM=a/1000; // in M€
+    var p=r.invest>0?(aM/r.invest*100).toFixed(1):'0.0';
+    var tm=itype(x.type);
     var opts=ITYPES.map(function(t){return '<option value="'+t.id+'"'+(t.id===x.type?' selected':'')+'>'+t.label+'</option>';}).join('');
-    return '<div class="inv-row">'
-      +'<select class="inv-sel '+tm.cls+'" onchange="invD[\''+r.id+'\']['+i+'].type=this.value;this.className=\'inv-sel \'+itype(this.value).cls;renderRoundsTable(getSF());drawInv();">'+opts+'</select>'
-      +'<input class="inv-ni" type="text" placeholder="Investor name" value="'+(x.name||'')+'" oninput="invD[\''+r.id+'\']['+i+'].name=this.value;drawInv();">'
-      +'<input class="inv-ai" type="number" min="0" step="0.05" placeholder="M€" value="'+(x.amt===''?'':x.amt)+'" oninput="invD[\''+r.id+'\']['+i+'].amt=this.value===\'\'?\'\':(parseFloat(this.value)||0);renderRoundsTable(getSF());drawInv();">'
-      +'<span style="font-size:11px;color:var(--text2);">M€</span>'
+    var tickets=(TICKET_SIZES[r.id]||[25,50,100,250,500]).map(function(k){
+      return '<button class="tkt" onclick="setInvAmt(\''+r.id+'\','+i+','+k+')">'+fmtKeur(k)+'</button>';
+    }).join('');
+    return '<div style="margin-bottom:10px;">'
+      +'<div class="inv-row">'
+      +'<select class="inv-sel '+tm.cls+'" onchange="invD[\''+r.id+'\']['+i+'].type=this.value;this.className=\'inv-sel \'+itype(this.value).cls;renderRoundsTable(getSF());">'+opts+'</select>'
+      +'<input class="inv-ni" type="text" placeholder="Investor name" value="'+(x.name||'')+'" oninput="invD[\''+r.id+'\']['+i+'].name=this.value;">'
+      +'<input class="inv-ai" id="inv-amt-'+r.id+'-'+i+'" type="number" min="0" step="5" placeholder="k€" value="'+(x.amt===''?'':x.amt)+'" oninput="invD[\''+r.id+'\']['+i+'].amt=this.value===\'\'?\'\':(parseFloat(this.value)||0);renderRoundsTable(getSF());">'
+      +'<span class="inv-unit">k€</span>'
       +'<span class="inv-pct" style="color:'+r.color+'">'+p+'% of round</span>'
-      +'<button class="inv-del" onclick="invD[\''+r.id+'\'].splice('+i+',1);renderRoundsTable(getSF());drawInv();">&#x2715;</button>'
+      +'<button class="inv-del" onclick="invD[\''+r.id+'\'].splice('+i+',1);renderRoundsTable(getSF());">&#x2715;</button>'
+      +'</div>'
+      +'<div class="ticket-btns">'+tickets+'</div>'
       +'</div>';
   }).join('');
+
+  // unassigned indicator
   var note='';
   if(inv.length){
-    var st=Math.abs(rem)<0.005?'<span style="color:#085041;font-weight:500;">&#10003; fully assigned</span>':rem>0?'<span style="color:var(--warn-text);">'+rem.toFixed(2)+' M&#8364; unassigned</span>':'<span style="color:#991b1b;">&#9888; '+Math.abs(rem).toFixed(2)+' M&#8364; over-assigned</span>';
-    note='<div class="inv-note">Assigned: <strong>'+tot.toFixed(2)+' M&#8364;</strong> / '+r.invest+' M&#8364; &mdash; '+st+'</div>';
+    var remK=rem*1000;
+    var absRemK=Math.abs(remK);
+    var st,cls;
+    if(absRemK<0.1){st='&#10003; Round fully closed';cls='ok';}
+    else if(rem>0){st=Math.round(remK)+' k€ still needed to close round';cls='';}
+    else{st='&#9888; '+Math.round(absRemK)+' k€ over-assigned';cls='over';}
+    note='<div class="inv-unassigned '+cls+'">'+st+'</div>';
   }
-  var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="invD[\''+r.id+'\'].push({type:\''+t.id+'\',name:\'\',amt:\'\'});openPanels[\''+r.id+'\']=true;renderRoundsTable(getSF());drawInv();">+ '+t.label+'</button>';}).join('');
+
+  var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="invD[\''+r.id+'\'].push({type:\''+t.id+'\',name:\'\',amt:\'\'});openPanels[\''+r.id+'\']=true;renderRoundsTable(getSF());">+ '+t.label+'</button>';}).join('');
   return rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div>';
+}
+
+function setInvAmt(rid,i,k){
+  invD[rid][i].amt=k;
+  renderRoundsTable(getSF());
 }
 
 function syncExit(lp){
@@ -826,11 +884,10 @@ function render(){
   renderCapTable(data);
   renderLP(data.allStakeholders,data.exitM,data.totalInvested);
   augCap();
-  drawInv();
 }
 
 document.getElementById('fc').addEventListener('input',function(){document.getElementById('fc-v').textContent=this.value;render();});
-document.getElementById('esop').addEventListener('input',function(){document.getElementById('esop-v').textContent=this.value+'%';currentIndustry='custom';buildIndustryBar();render();});
+document.getElementById('esop').addEventListener('input',function(){document.getElementById('esop-v').textContent=this.value+'%';currentIndustry='custom';buildVentureIndustryBar();render();});
 document.getElementById('exitDirect').addEventListener('input',function(){if(suppressSync)return;if(linked){const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitMultiple').value=(parseFloat(this.value)/lp).toFixed(2);suppressSync=false;}}render();});
 document.getElementById('exitMultiple').addEventListener('input',function(){if(suppressSync)return;if(linked){const lp=getLastPostM();if(lp){suppressSync=true;document.getElementById('exitDirect').value=Math.round(lp*(parseFloat(this.value)||1));suppressSync=false;}}render();});
 ['grantAmt','convAmt','convDiscount','convCap'].forEach(id=>document.getElementById(id).addEventListener('input',render));
@@ -846,42 +903,6 @@ var ITYPES=[
 ];
 function itype(id){return ITYPES.find(function(x){return x.id===id;})||ITYPES[3];}
 
-function drawInv(){
-  var c=document.getElementById('inv-c');if(!c)return;
-  var active=getActive();
-  if(!active.length){c.innerHTML='<p style="font-size:12px;color:var(--text2);">Enable at least one round above.</p>';return;}
-  var out='';
-  active.forEach(function(r,ri){
-    var inv=invD[r.id]||[];
-    var tot=inv.reduce(function(s,x){return s+(parseFloat(x.amt)||0);},0);
-    var rem=r.invest-tot;
-    var rows=inv.map(function(x,i){
-      var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest*100).toFixed(1):'0.0',tm=itype(x.type);
-      var opts=ITYPES.map(function(t){return '<option value="'+t.id+'"'+(t.id===x.type?' selected':'')+'>'+t.label+'</option>';}).join('');
-      return '<div class="inv-row">'
-        +'<select class="inv-sel '+tm.cls+'" onchange="invD[\''+r.id+'\']['+i+'].type=this.value;this.className=\'inv-sel \'+itype(this.value).cls;drawInv();">'+opts+'</select>'
-        +'<input class="inv-ni" type="text" placeholder="Investor name" value="'+(x.name||'')+'" oninput="setInv(\''+r.id+'\','+i+',\'name\',this.value)">'
-        +'<input class="inv-ai" type="number" min="0" step="0.05" placeholder="M€" value="'+(x.amt===''?'':x.amt)+'" oninput="setInv(\''+r.id+'\','+i+',\'amt\',this.value===\'\'?\'\':(parseFloat(this.value)||0))">'
-        +'<span style="font-size:11px;color:var(--text2);">M€</span>'
-        +'<span class="inv-pct" style="color:'+r.color+'">'+p+'% of round</span>'
-        +'<button class="inv-del" onclick="delInv(\''+r.id+'\','+i+')">&#x2715;</button>'
-        +'</div>';
-    }).join('');
-    var note='';
-    if(inv.length){
-      var st=Math.abs(rem)<0.005?'<span style="color:#085041;font-weight:500;">&#10003; fully assigned</span>':rem>0?'<span style="color:var(--warn-text);">'+rem.toFixed(2)+' M&#8364; unassigned</span>':'<span style="color:#991b1b;">&#9888; '+Math.abs(rem).toFixed(2)+' M&#8364; over-assigned</span>';
-      note='<div class="inv-note">Assigned: <strong>'+tot.toFixed(2)+' M&#8364;</strong> / '+r.invest+' M&#8364; &mdash; '+st+'</div>';
-    }
-    var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="addInv(\''+r.id+'\',\''+t.id+'\')">+ '+t.label+'</button>';}).join('');
-    out+='<div class="inv-block"><div class="inv-rtitle"><span class="dot" style="background:'+r.color+';width:10px;height:10px;"></span>'+r.name+' &nbsp;&middot;&nbsp; '+fmtM(r.invest)+'</div>'+rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div></div>';
-    if(ri<active.length-1)out+='<hr class="inv-sep">';
-  });
-  c.innerHTML=out;
-}
-function addInv(rid,tid){invD[rid].push({type:tid,name:'',amt:''});renderRoundsTable(getSF());drawInv();}
-function delInv(rid,i){invD[rid].splice(i,1);renderRoundsTable(getSF());drawInv();}
-function setInv(rid,i,k,v){invD[rid][i][k]=v;drawInv();}
-
 function augCap(){
   var tbl=document.getElementById('cap-tbl');if(!tbl)return;
   tbl.querySelectorAll('.inv-detail').forEach(function(r){r.remove();});
@@ -896,9 +917,12 @@ function augCap(){
         var rp=parseFloat((cells[1]&&cells[1].textContent)||0)||0;
         var after=row;
         inv.forEach(function(x){
-          var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest)*rp:0,tm=itype(x.type);
+          var a=parseFloat(x.amt)||0; // k€
+          var aM=a/1000; // M€
+          var p=r.invest>0?(aM/r.invest)*rp:0;
+          var tm=itype(x.type);
           var nr=document.createElement('tr');nr.className='inv-detail';
-          nr.innerHTML='<td style="padding-left:28px;"><span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-right:4px;font-weight:600;background:'+(tm.id==='fff'?'#FDE8FE':tm.id==='angel'?'#E8F4FF':tm.id==='vc'?'#E1F5EE':'var(--surface2)')+';color:'+(tm.id==='fff'?'#7B0F8C':tm.id==='angel'?'#0A5EA8':tm.id==='vc'?'#085041':'var(--text2)')+';">'+tm.label+'</span>'+(x.name||'<em>Unnamed</em>')+'</td><td>'+p.toFixed(2)+'%</td><td>'+fmtM(a)+'</td><td colspan="10"></td>';
+          nr.innerHTML='<td style="padding-left:28px;"><span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-right:4px;font-weight:600;background:'+(tm.id==='fff'?'#FDE8FE':tm.id==='angel'?'#E8F4FF':tm.id==='vc'?'#E1F5EE':'var(--surface2)')+';color:'+(tm.id==='fff'?'#7B0F8C':tm.id==='angel'?'#0A5EA8':tm.id==='vc'?'#085041':'var(--text2)')+';">'+tm.label+'</span>'+(x.name||'<em>Unnamed</em>')+'</td><td>'+p.toFixed(2)+'%</td><td>'+fmtKeur(a)+'</td><td colspan="10"></td>';
           after.parentNode.insertBefore(nr,after.nextSibling);after=nr;
         });
       }
@@ -906,7 +930,7 @@ function augCap(){
   });
 }
 
-buildIndustryBar();
+buildVentureIndustryBar();
 render();
 </script>
 </body>
