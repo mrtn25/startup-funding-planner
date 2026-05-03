@@ -15,6 +15,7 @@
   --info-bg:#e8f0fe;--info-text:#1a56db;--info-border:#93b4f8;
   --warn-bg:#fef3c7;--warn-text:#92400e;--warn-border:#fcd34d;
   --accent:#534AB7;
+  --hero:#52d98a;
 }
 @media(prefers-color-scheme:dark){:root{
   --bg:#111110;--surface:#1c1c1a;--surface2:#252522;
@@ -28,74 +29,112 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* ── HERO ── */
 .hero{
-  width:100%;min-height:92vh;position:relative;
-  background:#6EE7A0;
+  width:100%;height:100vh;min-height:560px;
+  position:relative;
+  background:var(--hero);
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
-  padding:2rem;
 }
-.hero-emojis{
-  position:absolute;inset:0;pointer-events:none;
-  overflow:hidden;
+/* grid of emojis via CSS grid + pseudo-random wiggle per cell */
+.hero-grid{
+  position:absolute;inset:0;
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  grid-template-rows:repeat(6,1fr);
+  pointer-events:none;
+  padding:10px;
 }
-.money-emoji{
-  position:absolute;
-  font-size:clamp(28px,4vw,52px);
-  user-select:none;
-  animation:wiggle var(--dur,2.4s) ease-in-out infinite;
-  animation-delay:var(--delay,0s);
-  opacity:0.82;
+.hero-grid span{
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(22px,3vw,42px);
+  opacity:0.78;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,0.08));
+  animation:wiggle var(--d,2.4s) ease-in-out infinite var(--dl,0s);
   will-change:transform;
-  filter:drop-shadow(0 2px 6px rgba(0,0,0,0.10));
+  user-select:none;
 }
 @keyframes wiggle{
-  0%,100%{transform:rotate(-8deg) scale(1);}
-  25%{transform:rotate(8deg) scale(1.08);}
-  50%{transform:rotate(-5deg) scale(0.96);}
-  75%{transform:rotate(6deg) scale(1.04);}
+  0%,100%{transform:rotate(-9deg) scale(1);}
+  25%{transform:rotate(9deg) scale(1.10);}
+  50%{transform:rotate(-5deg) scale(0.95);}
+  75%{transform:rotate(7deg) scale(1.06);}
 }
 .hero-content{
   position:relative;z-index:2;
   text-align:center;
-  max-width:620px;
+  max-width:600px;
+  padding:2rem;
 }
 .hero-eyebrow{
   display:inline-block;
   font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
   background:rgba(0,0,0,0.10);color:#0d4a2a;
   padding:4px 14px;border-radius:20px;
-  margin-bottom:20px;
+  margin-bottom:22px;
 }
 .hero-headline{
-  font-size:clamp(32px,6vw,60px);
-  font-weight:700;
+  font-size:clamp(34px,6vw,64px);
+  font-weight:800;
   color:#0d2e1a;
-  line-height:1.12;
-  letter-spacing:-0.02em;
-  margin-bottom:16px;
+  line-height:1.08;
+  letter-spacing:-0.03em;
+  margin-bottom:18px;
 }
 .hero-sub{
   font-size:clamp(14px,2vw,18px);
   color:#1a5c35;
-  line-height:1.6;
-  margin-bottom:36px;
-  font-weight:400;
+  line-height:1.65;
+  margin-bottom:38px;
 }
 .hero-cta{
   display:inline-flex;align-items:center;gap:8px;
-  background:#0d2e1a;color:#6EE7A0;
+  background:#0d2e1a;color:var(--hero);
   font-size:14px;font-weight:600;
-  padding:12px 28px;border-radius:100px;
+  padding:13px 30px;border-radius:100px;
   cursor:pointer;border:none;
   transition:transform .15s,background .15s;
   text-decoration:none;
-  box-shadow:0 4px 20px rgba(13,46,26,0.25);
+  box-shadow:0 4px 22px rgba(13,46,26,0.28);
 }
 .hero-cta:hover{transform:translateY(-2px);background:#163d24;}
-.hero-cta svg{width:16px;height:16px;fill:none;stroke:#6EE7A0;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.hero-cta svg{width:16px;height:16px;fill:none;stroke:var(--hero);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
 
+/* ── PDF export button ── */
+.pdf-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:12px;font-weight:500;
+  padding:7px 16px;border-radius:20px;
+  background:var(--surface2);border:0.5px solid var(--border2);
+  color:var(--text2);cursor:pointer;
+  transition:background .15s;
+}
+.pdf-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* ── VENTURE INFO ── */
+.venture-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:1rem;}
+.venture-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.venture-row:last-child{margin-bottom:0;}
+.venture-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;min-width:110px;}
+.venture-input{flex:1;padding:7px 10px;font-size:14px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);}
+.venture-textarea{flex:1;padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);resize:vertical;min-height:56px;font-family:inherit;}
+.venture-input:focus,.venture-textarea:focus{outline:none;border-color:var(--accent);}
+
+/* ── MILESTONES ── */
+.milestone-wrap{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;margin-top:10px;}
+.milestone-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.milestone-title{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
+.milestone-gen-btn{font-size:11px;padding:4px 12px;border-radius:20px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:500;}
+.milestone-gen-btn:disabled{opacity:.5;cursor:default;}
+.milestone-list{display:flex;flex-direction:column;gap:7px;}
+.milestone-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;}
+.milestone-round{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.milestone-text{color:var(--text2);line-height:1.5;}
+.milestone-empty{font-size:12px;color:var(--text3);font-style:italic;}
+
+/* ── PAGE ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px;}
 .page{max-width:980px;margin:0 auto;padding:2rem 1.5rem 4rem;}
-h1{font-size:22px;font-weight:500;margin-bottom:4px;}
+h1{font-size:22px;font-weight:500;}
 .subtitle{font-size:13px;color:var(--text2);margin-bottom:2rem;}
 .sec-label{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;margin-top:1.75rem;}
 .card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:1rem;}
@@ -165,6 +204,8 @@ input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--
 .info-box{background:var(--surface2);border-radius:var(--rsm);padding:.875rem 1rem;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.6;}
 .info-box strong{color:var(--text);font-weight:500;}
 footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
+
+/* ── Investor blocks ── */
 .inv-block{margin-bottom:20px;}
 .inv-rtitle{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 .inv-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
@@ -181,13 +222,35 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 .inv-note{font-size:11px;color:var(--text3);margin-top:6px;}
 .inv-sep{border:none;border-top:0.5px solid var(--border);margin:16px 0;}
 .inv-detail td{font-size:11px;color:var(--text2);padding:3px 8px;background:var(--surface2);}
+
+/* ── Inline investor dropdown in rounds table ── */
+.inv-dropdown-toggle{
+  font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);
+  border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;
+  white-space:nowrap;
+}
+.inv-dropdown-toggle.has-inv{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);}
+.inv-dropdown-panel{
+  display:none;padding:10px 14px 10px;background:var(--surface2);
+  border-top:0.5px solid var(--border);
+}
+.inv-dropdown-panel.open{display:block;}
+
+/* ── PRINT / PDF ── */
+@media print{
+  .hero,.pdf-btn,.hero-cta,.ind-bar,.tog,.lb,.lpb,.ctb,.inv-addbtn,.inv-del,.inv-dropdown-toggle,.milestone-gen-btn{display:none!important;}
+  body{background:#fff;color:#000;}
+  .page{max-width:100%;padding:1rem;}
+  .card,.cf,.mc,.lps,.venture-card,.milestone-wrap{border:0.5px solid #ccc!important;break-inside:avoid;}
+  canvas{max-width:100%!important;height:auto!important;}
+}
 </style>
 </head>
 <body>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-emojis" id="heroEmojis"></div>
+  <div class="hero-grid" id="heroGrid"></div>
   <div class="hero-content">
     <span class="hero-eyebrow">Free Tool for Founders</span>
     <h2 class="hero-headline">Plan Your<br>Funding Round.</h2>
@@ -201,8 +264,38 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 
 <!-- PLANNER -->
 <div class="page" id="planner">
-<h1>&#x1F680; Startup Funding &amp; Dilution Planner</h1>
-<p class="subtitle">Plan your financing rounds — model FFF, Angels &amp; VCs, track dilution, build your cap table, and simulate exit scenarios.</p>
+<div class="page-header">
+  <div>
+    <h1>&#x1F680; Startup Funding &amp; Dilution Planner</h1>
+    <p class="subtitle">Plan your financing rounds — model FFF, Angels &amp; VCs, track dilution, build your cap table, and simulate exit scenarios.</p>
+  </div>
+  <button class="pdf-btn" onclick="window.print()">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1h8v4H4z"/><path d="M4 11H2a1 1 0 01-1-1V6a1 1 0 011-1h12a1 1 0 011 1v4a1 1 0 01-1 1h-2"/><path d="M4 8h8v7H4z"/></svg>
+    Download PDF
+  </button>
+</div>
+
+<!-- VENTURE INFO -->
+<div class="sec-label">Your Venture</div>
+<div class="venture-card">
+  <div class="venture-row">
+    <span class="venture-label">Venture Name</span>
+    <input class="venture-input" id="ventureName" type="text" placeholder="e.g. GreenShift AI" oninput="onVentureChange()">
+  </div>
+  <div class="venture-row" style="align-items:flex-start;">
+    <span class="venture-label" style="margin-top:6px;">What it does</span>
+    <textarea class="venture-textarea" id="ventureDesc" placeholder="Brief description — e.g. AI-powered carbon accounting platform for SMEs..." oninput="onVentureChange()"></textarea>
+  </div>
+  <div class="milestone-wrap" id="milestoneWrap">
+    <div class="milestone-header">
+      <span class="milestone-title">&#127919; Milestones &amp; KPIs per Round</span>
+      <button class="milestone-gen-btn" id="milestoneBtn" onclick="generateMilestones()">✦ Suggest with AI</button>
+    </div>
+    <div class="milestone-list" id="milestoneList">
+      <span class="milestone-empty">Enter your venture name and description, then click "Suggest with AI".</span>
+    </div>
+  </div>
+</div>
 
 <div class="sec-label">Industry</div>
 <div class="ind-bar" id="industryBar"></div>
@@ -245,7 +338,8 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
       <th style="width:100px;padding-left:14px;">Round</th>
       <th>Investment</th><th>Dilution %</th>
       <th style="text-align:right;padding-right:14px;">Pre / Post-Money</th>
-      <th style="width:70px;"></th>
+      <th style="width:90px;"></th>
+      <th style="width:110px;"></th>
     </tr></thead>
     <tbody id="rounds-body"></tbody>
   </table>
@@ -316,22 +410,100 @@ footer{margin-top:3rem;font-size:11px;color:var(--text3);text-align:center;}
 </div>
 
 <script>
-// ── Hero emoji scatter ──
+// ── Hero grid (8×6 = 48 cells, uniform) ──
 (function(){
-  var emojis=['💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸','💸'];
-  var container=document.getElementById('heroEmojis');
-  emojis.forEach(function(e,i){
-    var el=document.createElement('span');
-    el.className='money-emoji';
-    el.textContent=e;
-    var top=Math.random()*92;
-    var left=Math.random()*97;
-    var dur=(2.0+Math.random()*2.0).toFixed(2);
-    var delay=(-Math.random()*2.5).toFixed(2);
-    el.style.cssText='top:'+top+'%;left:'+left+'%;--dur:'+dur+'s;--delay:'+delay+'s;';
-    container.appendChild(el);
-  });
+  var g=document.getElementById('heroGrid');
+  var dur=[2.0,2.3,2.7,3.1,2.5,1.9,3.4,2.8];
+  var delay=[0,-0.4,-0.9,-1.5,-0.2,-0.7,-1.2,-0.3];
+  for(var r=0;r<6;r++){
+    for(var c=0;c<8;c++){
+      var s=document.createElement('span');
+      s.textContent='💸';
+      var di=dur[(r*8+c)%dur.length].toFixed(1);
+      var dl=delay[(r*8+c)%delay.length].toFixed(1);
+      s.style.cssText='--d:'+di+'s;--dl:'+dl+'s;';
+      g.appendChild(s);
+    }
+  }
 })();
+
+// ── Venture info ──
+var ventureChangeTimer=null;
+function onVentureChange(){
+  clearTimeout(ventureChangeTimer);
+  document.getElementById('milestoneList').innerHTML='<span class="milestone-empty">Click "Suggest with AI" to generate milestones for your current description.</span>';
+}
+
+var MILESTONE_COLORS={
+  'Pre-Seed':{bg:'#EEEDFE',c:'#3C3489'},
+  'Seed':{bg:'#E1F5EE',c:'#085041'},
+  'Series A':{bg:'#FAEEDA',c:'#633806'},
+  'Series B':{bg:'#fee2e2',c:'#991b1b'},
+  'Series C':{bg:'#E8F4FF',c:'#0A5EA8'},
+  'Series D':{bg:'#EAF3DE',c:'#27500A'},
+};
+
+function generateMilestones(){
+  var name=document.getElementById('ventureName').value.trim();
+  var desc=document.getElementById('ventureDesc').value.trim();
+  var active=getActive();
+  if(!active.length){
+    document.getElementById('milestoneList').innerHTML='<span class="milestone-empty">Enable at least one financing round first.</span>';
+    return;
+  }
+  var btn=document.getElementById('milestoneBtn');
+  btn.disabled=true;btn.textContent='Generating…';
+
+  // Build prompt
+  var roundNames=active.map(function(r){return r.name;}).join(', ');
+  var prompt='You are a startup advisor. Given the startup below, suggest 2 concrete milestones or KPIs a founder must hit BEFORE each financing round to make it fundable. Be specific, use real metrics.\n\nStartup name: '+(name||'(unnamed)')+'\nDescription: '+(desc||'(not provided)')+'\nRounds to cover: '+roundNames+'\n\nRespond ONLY with a JSON array, no markdown, no explanation. Format:\n[{"round":"Pre-Seed","milestones":["milestone 1","milestone 2"]},...]';
+
+  fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer OPENAI_KEY_PLACEHOLDER'},
+    body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'user',content:prompt}],max_tokens:600,temperature:0.7})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var text=data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content;
+    if(!text)throw new Error('no content');
+    var arr=JSON.parse(text.replace(/```json|```/g,'').trim());
+    renderMilestones(arr);
+  })
+  .catch(function(){
+    // Fallback: smart built-in suggestions
+    var fallback=active.map(function(r){
+      var ms=FALLBACK_MILESTONES[r.id]||['Validated product-market fit','Demonstrated traction with early users'];
+      return{round:r.name,milestones:ms};
+    });
+    renderMilestones(fallback);
+  })
+  .finally(function(){
+    btn.disabled=false;btn.textContent='✦ Suggest with AI';
+  });
+}
+
+var FALLBACK_MILESTONES={
+  preSeed:['MVP launched & tested with 10+ users','Clear problem-solution fit documented with user interviews'],
+  seed:['€10k–50k MRR or 1,000+ active users','Repeatable customer acquisition channel identified'],
+  serA:['€500k+ ARR with <10% monthly churn','Unit economics positive (CAC payback < 18 months)'],
+  serB:['€3M+ ARR, proven scalable GTM motion','Expansion to 2nd market or product line underway'],
+  serC:['€15M+ ARR, market leadership in core segment','Clear path to profitability within 24 months'],
+  serD:['€50M+ ARR, profitability or near-breakeven','IPO readiness or strategic M&A pipeline active'],
+};
+
+function renderMilestones(arr){
+  var list=document.getElementById('milestoneList');
+  list.innerHTML='';
+  arr.forEach(function(item){
+    var col=MILESTONE_COLORS[item.round]||{bg:'var(--surface2)',c:'var(--text2)'};
+    item.milestones.forEach(function(m){
+      var div=document.createElement('div');div.className='milestone-item';
+      div.innerHTML='<span class="milestone-round" style="background:'+col.bg+';color:'+col.c+';">'+item.round+'</span><span class="milestone-text">'+m+'</span>';
+      list.appendChild(div);
+    });
+  });
+}
 
 const INDUSTRIES={
   custom:{label:'Custom',emoji:'',rounds:[{invest:0.5,dilPct:15},{invest:2,dilPct:20},{invest:8,dilPct:20},{invest:25,dilPct:18},{invest:60,dilPct:15},{invest:150,dilPct:13}],exitMultiple:5,esop:10},
@@ -531,14 +703,60 @@ function renderRoundsTable(sf){
   ROUNDS.forEach((r,i)=>{
     const si=r.invest*sf,sp=si/r.dilPct*100,spre=sp-si;
     const bp=r.invest/r.dilPct*100,bpre=bp-r.invest;
+    const inv=invD[r.id]||[];
+    const hasInv=inv.length>0;
+    const panelId='invpanel-'+r.id;
+
+    // Main row
     const tr=document.createElement('tr');tr.className=r.active?'':'inactive';
     tr.innerHTML=`<td style="padding-left:14px;white-space:nowrap;"><span class="dot" style="background:${r.color};"></span><span style="font-size:12px;font-weight:500;">${r.name}</span></td>
       <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="0.1" max="${r.investMax}" step="${r.investStep}" value="${r.invest}" oninput="ROUNDS[${i}].invest=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:56px;">${isSc?fmtM(si):fmtM(r.invest)}</span></div></td>
       <td style="min-width:160px;"><div style="display:flex;align-items:center;gap:8px;"><input type="range" min="3" max="40" step="1" value="${r.dilPct}" oninput="ROUNDS[${i}].dilPct=+this.value;currentIndustry='custom';buildIndustryBar();render();"><span style="font-size:11px;min-width:28px;">${r.dilPct}%</span></div></td>
       <td style="text-align:right;padding-right:14px;"><span class="vp${isSc?' sc':''}">${isSc?fmtM(spre)+' / '+fmtM(sp):fmtM(bpre)+' / '+fmtM(bp)}</span></td>
+      <td><button class="inv-dropdown-toggle${hasInv?' has-inv':''}" onclick="toggleInvPanel('${r.id}')">&#9660; Investors${hasInv?' ('+inv.length+')':''}</button></td>
       <td style="padding-right:10px;"><button class="tog ${r.active?'on':''}" onclick="ROUNDS[${i}].active=!ROUNDS[${i}].active;render();">${r.active?'Active':'Off'}</button></td>`;
     body.appendChild(tr);
+
+    // Dropdown panel row
+    const tr2=document.createElement('tr');tr2.id='panelrow-'+r.id;tr2.className=r.active?'':'inactive';
+    const td=document.createElement('td');td.colSpan=6;td.style.padding='0';
+    const panel=document.createElement('div');
+    panel.className='inv-dropdown-panel'+(openPanels[r.id]?' open':'');
+    panel.id=panelId;
+    panel.innerHTML=buildInvPanelHTML(r);
+    td.appendChild(panel);tr2.appendChild(td);body.appendChild(tr2);
   });
+}
+
+var openPanels={};
+function toggleInvPanel(rid){
+  openPanels[rid]=!openPanels[rid];
+  renderRoundsTable(getSF());
+}
+
+function buildInvPanelHTML(r){
+  var inv=invD[r.id]||[];
+  var tot=inv.reduce(function(s,x){return s+(parseFloat(x.amt)||0);},0);
+  var rem=r.invest-tot;
+  var rows=inv.map(function(x,i){
+    var a=parseFloat(x.amt)||0,p=r.invest>0?(a/r.invest*100).toFixed(1):'0.0',tm=itype(x.type);
+    var opts=ITYPES.map(function(t){return '<option value="'+t.id+'"'+(t.id===x.type?' selected':'')+'>'+t.label+'</option>';}).join('');
+    return '<div class="inv-row">'
+      +'<select class="inv-sel '+tm.cls+'" onchange="invD[\''+r.id+'\']['+i+'].type=this.value;this.className=\'inv-sel \'+itype(this.value).cls;renderRoundsTable(getSF());drawInv();">'+opts+'</select>'
+      +'<input class="inv-ni" type="text" placeholder="Investor name" value="'+(x.name||'')+'" oninput="invD[\''+r.id+'\']['+i+'].name=this.value;drawInv();">'
+      +'<input class="inv-ai" type="number" min="0" step="0.05" placeholder="M€" value="'+(x.amt===''?'':x.amt)+'" oninput="invD[\''+r.id+'\']['+i+'].amt=this.value===\'\'?\'\':(parseFloat(this.value)||0);renderRoundsTable(getSF());drawInv();">'
+      +'<span style="font-size:11px;color:var(--text2);">M€</span>'
+      +'<span class="inv-pct" style="color:'+r.color+'">'+p+'% of round</span>'
+      +'<button class="inv-del" onclick="invD[\''+r.id+'\'].splice('+i+',1);renderRoundsTable(getSF());drawInv();">&#x2715;</button>'
+      +'</div>';
+  }).join('');
+  var note='';
+  if(inv.length){
+    var st=Math.abs(rem)<0.005?'<span style="color:#085041;font-weight:500;">&#10003; fully assigned</span>':rem>0?'<span style="color:var(--warn-text);">'+rem.toFixed(2)+' M&#8364; unassigned</span>':'<span style="color:#991b1b;">&#9888; '+Math.abs(rem).toFixed(2)+' M&#8364; over-assigned</span>';
+    note='<div class="inv-note">Assigned: <strong>'+tot.toFixed(2)+' M&#8364;</strong> / '+r.invest+' M&#8364; &mdash; '+st+'</div>';
+  }
+  var btns=ITYPES.map(function(t){return '<button class="inv-addbtn '+t.cls+'" onclick="invD[\''+r.id+'\'].push({type:\''+t.id+'\',name:\'\',amt:\'\'});openPanels[\''+r.id+'\']=true;renderRoundsTable(getSF());drawInv();">+ '+t.label+'</button>';}).join('');
+  return rows+note+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+btns+'</div>';
 }
 
 function syncExit(lp){
@@ -607,8 +825,8 @@ function render(){
   renderMetrics(data);
   renderCapTable(data);
   renderLP(data.allStakeholders,data.exitM,data.totalInvested);
-  // augment cap table with investor details
   augCap();
+  drawInv();
 }
 
 document.getElementById('fc').addEventListener('input',function(){document.getElementById('fc-v').textContent=this.value;render();});
@@ -627,9 +845,7 @@ var ITYPES=[
   {id:'other',label:'Other',cls:'t-other'}
 ];
 function itype(id){return ITYPES.find(function(x){return x.id===id;})||ITYPES[3];}
-function addInv(rid,tid){invD[rid].push({type:tid,name:'',amt:''});drawInv();}
-function delInv(rid,i){invD[rid].splice(i,1);drawInv();}
-function setInv(rid,i,k,v){invD[rid][i][k]=v;drawInv();}
+
 function drawInv(){
   var c=document.getElementById('inv-c');if(!c)return;
   var active=getActive();
@@ -662,6 +878,10 @@ function drawInv(){
   });
   c.innerHTML=out;
 }
+function addInv(rid,tid){invD[rid].push({type:tid,name:'',amt:''});renderRoundsTable(getSF());drawInv();}
+function delInv(rid,i){invD[rid].splice(i,1);renderRoundsTable(getSF());drawInv();}
+function setInv(rid,i,k,v){invD[rid][i][k]=v;drawInv();}
+
 function augCap(){
   var tbl=document.getElementById('cap-tbl');if(!tbl)return;
   tbl.querySelectorAll('.inv-detail').forEach(function(r){r.remove();});
