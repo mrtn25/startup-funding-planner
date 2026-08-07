@@ -2,9 +2,10 @@
 
 import styles from "./PillNav.module.css";
 
-export type ToolId = "planner" | "network";
+export type ToolId = "planner" | "network" | "ready";
 
 export const TOOLS: { id: ToolId; label: string }[] = [
+  { id: "ready", label: "Ready to Raise" },
   { id: "planner", label: "Funding Planner" },
   { id: "network", label: "Network Strategy" },
 ];

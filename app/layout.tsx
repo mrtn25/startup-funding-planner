@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Startup Funding & Dilution Planner",
   description:
-    "Model dilution across FFF, Angels & VCs, build your cap table, simulate exits — and find the network strategy that fits your founder profile.",
+    "Check whether you're ready to raise, model dilution across FFF, Angels & VCs, build your cap table and simulate exits — and find the network strategy that fits your founder profile.",
 };
 
 export const viewport: Viewport = {
