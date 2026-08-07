@@ -1,0 +1,896 @@
+/* ══════════════════════════════════════════════════════════════
+   Design tokens + shared component styles.
+   Carried over from the original single-file build so the visual
+   language of the planner is unchanged.
+   ══════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #f9f8f6;
+  --surface: #fff;
+  --surface2: #f3f2ef;
+  --border: rgba(0, 0, 0, 0.1);
+  --border2: rgba(0, 0, 0, 0.18);
+  --text: #1a1a1a;
+  --text2: #6b6b6b;
+  --text3: #999;
+  --r: 10px;
+  --rsm: 6px;
+  --info-bg: #e8f0fe;
+  --info-text: #1a56db;
+  --info-border: #93b4f8;
+  --warn-bg: #fef3c7;
+  --warn-text: #92400e;
+  --warn-border: #fcd34d;
+  --accent: #534ab7;
+
+  /* Hero: the highlight hue matches --accent so the scroll hero and the
+     tools below read as one system.
+
+     The closing panel inverts against the page, so it needs the *opposite*
+     accent lightness to stay readable — hence --hero-accent-on-panel. */
+  --hue: 248;
+  --hero-accent: hsl(var(--hue) 100% 50%);
+  --hero-panel: #000;
+  --hero-panel-text: #fff;
+  --hero-accent-on-panel: hsl(var(--hue) 90% 75%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111110;
+    --surface: #1c1c1a;
+    --surface2: #252522;
+    --border: rgba(255, 255, 255, 0.1);
+    --border2: rgba(255, 255, 255, 0.2);
+    --text: #f0ede8;
+    --text2: #999892;
+    --text3: #666;
+    --info-bg: #1e2a4a;
+    --info-text: #93b4f8;
+    --info-border: #2d3f6a;
+    --warn-bg: #3a2e0a;
+    --warn-text: #fbbf24;
+    --warn-border: #78530a;
+    --accent: #afa9ec;
+
+    --hero-accent: hsl(var(--hue) 90% 75%);
+    --hero-panel: #fff;
+    --hero-panel-text: #111110;
+    --hero-accent-on-panel: hsl(var(--hue) 100% 50%);
+  }
+}
+
+html {
+  scrollbar-color: var(--hero-accent) transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Screen-wide grid backdrop, faded out toward the top-left.
+   Sits behind everything; the hero reads against it. */
+body::before {
+  --size: 45px;
+  --line: color-mix(in hsl, var(--text), transparent 88%);
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, var(--line) 1px, transparent 1px var(--size)) calc(var(--size) * 0.36) 50% /
+      var(--size) var(--size),
+    linear-gradient(var(--line) 1px, transparent 1px var(--size)) 0% calc(var(--size) * 0.32) / var(--size)
+      var(--size);
+  mask: linear-gradient(-20deg, transparent 50%, white);
+  pointer-events: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── PDF export button ── */
+.pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 22px;
+  border-radius: 100px;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  box-shadow: 0 2px 12px rgba(83, 74, 183, 0.25);
+}
+.pdf-btn:hover {
+  background: #3f37a0;
+  transform: translateY(-1px);
+}
+
+/* ── VENTURE INFO ── */
+.venture-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.venture-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.venture-row:last-child {
+  margin-bottom: 0;
+}
+.venture-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 110px;
+}
+.venture-input {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rsm);
+  background: var(--surface);
+  color: var(--text);
+}
+.venture-textarea {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 13px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rsm);
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+  min-height: 56px;
+  font-family: inherit;
+}
+.venture-input:focus,
+.venture-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.venture-seg {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.vsb {
+  font-size: 12px;
+  padding: 5px 13px;
+  border: 0.5px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+}
+.vsb.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ── MILESTONES ── */
+.milestone-wrap {
+  background: var(--surface2);
+  border-radius: var(--rsm);
+  padding: 0.875rem 1rem;
+  margin-top: 10px;
+}
+.milestone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.milestone-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.milestone-gen-btn {
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+.milestone-gen-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.milestone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.milestone-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+}
+.milestone-round {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.milestone-text {
+  color: var(--text2);
+  line-height: 1.5;
+}
+.milestone-empty {
+  font-size: 12px;
+  color: var(--text3);
+  font-style: italic;
+}
+
+/* ── PAGE ── */
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+h1 {
+  font-size: 22px;
+  font-weight: 500;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 2rem;
+}
+.sec-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  margin-top: 1.75rem;
+}
+.card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.cf {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  /* The rounds table has a ~730px intrinsic minimum. The original clipped it
+     with overflow:hidden, which put the Active and Investors controls out of
+     reach on a phone — scroll it instead. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-bottom: 1rem;
+}
+.mc {
+  background: var(--surface2);
+  border-radius: var(--rsm);
+  padding: 0.875rem 1rem;
+}
+.ml {
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 3px;
+}
+.mv {
+  font-size: 18px;
+  font-weight: 500;
+}
+.ms {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+.g3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 1rem;
+}
+.g2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+input[type="number"],
+input[type="text"] {
+  padding: 5px 8px;
+  font-size: 13px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rsm);
+  background: var(--surface);
+  color: var(--text);
+}
+input[type="number"]:focus,
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tbl th {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 0.5px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.tbl td {
+  padding: 6px 8px;
+  border-bottom: 0.5px solid var(--border);
+  vertical-align: middle;
+}
+.tbl tr:last-child td {
+  border-bottom: none;
+}
+.tbl tr.inactive td {
+  opacity: 0.35;
+}
+.tbl input[type="range"] {
+  width: 100%;
+}
+.tog {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+}
+.tog.on {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+.vp {
+  background: var(--surface2);
+  border-radius: var(--rsm);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.vp.sc {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.er {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.en {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 4px;
+}
+.lb {
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+}
+.lb.on {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+.lr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.ls {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+.bf {
+  background: #eeedfe;
+  color: #3c3489;
+}
+.bi {
+  background: #e1f5ee;
+  color: #085041;
+}
+.be {
+  background: #faeeda;
+  color: #633806;
+}
+.bsec {
+  background: #e1f5ee;
+  color: #085041;
+}
+.bnd {
+  background: #eaf3de;
+  color: #27500a;
+}
+.bcv {
+  background: #faeeda;
+  color: #633806;
+}
+.bw {
+  background: var(--surface2);
+  border-radius: var(--rsm);
+  height: 6px;
+  overflow: hidden;
+  width: 90px;
+}
+.bf2 {
+  height: 6px;
+  border-radius: 3px;
+}
+.lp-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.lpb {
+  font-size: 11px;
+  padding: 4px 11px;
+  border: 0.5px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+}
+.lpb.on {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+.lps {
+  background: var(--surface2);
+  border-radius: var(--rsm);
+  padding: 0.875rem 1rem;
+}
+.lpst {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+.lpr {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+.lpr.tot {
+  font-weight: 500;
+  border-top: 0.5px solid var(--border);
+  padding-top: 6px;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+.wb {
+  background: var(--warn-bg);
+  border: 0.5px solid var(--warn-border);
+  border-radius: var(--rsm);
+  padding: 0.75rem 1rem;
+  font-size: 12px;
+  color: var(--warn-text);
+  margin-top: 8px;
+}
+.ok {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 8px;
+}
+.lpe {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+}
+.lpet {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+.lpv {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 7px;
+  align-items: flex-start;
+}
+.lpv:last-child {
+  margin-bottom: 0;
+}
+.lpvt {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.tf {
+  background: #e1f5ee;
+  color: #085041;
+}
+.tm {
+  background: #faeeda;
+  color: #633806;
+}
+.th {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.lpvx {
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.55;
+}
+.ch {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cts {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ctb {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text2);
+}
+.ctb.on {
+  font-weight: 500;
+  border-color: currentColor;
+}
+.nd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.nd-row:last-child {
+  margin-bottom: 0;
+}
+.ndl {
+  font-size: 12px;
+  color: var(--text2);
+  min-width: 130px;
+}
+.info-box {
+  background: var(--surface2);
+  border-radius: var(--rsm);
+  padding: 0.875rem 1rem;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+.info-box strong {
+  color: var(--text);
+  font-weight: 500;
+}
+footer {
+  margin-top: 3rem;
+  font-size: 11px;
+  color: var(--text3);
+  text-align: center;
+}
+.pdf-footer {
+  margin-top: 2.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Investor rows ── */
+.inv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  flex-wrap: wrap;
+}
+.inv-sel {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  border: 0.5px solid;
+  background: var(--surface);
+}
+.inv-ni {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rsm);
+  background: var(--surface);
+  color: var(--text);
+  width: 150px;
+}
+.inv-ai {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rsm);
+  background: var(--surface);
+  color: var(--text);
+  width: 80px;
+  text-align: right;
+}
+.inv-unit {
+  font-size: 11px;
+  color: var(--text2);
+  white-space: nowrap;
+}
+.inv-pct {
+  font-size: 11px;
+  color: var(--text2);
+  min-width: 90px;
+}
+.inv-del {
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+.inv-addbtn {
+  font-size: 11px;
+  padding: 3px 11px;
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 500;
+  border: 0.5px solid;
+}
+.t-fff {
+  background: #fde8fe;
+  color: #7b0f8c;
+  border-color: #d07ae0;
+}
+.t-angel {
+  background: #e8f4ff;
+  color: #0a5ea8;
+  border-color: #6aaee0;
+}
+.t-vc {
+  background: #e1f5ee;
+  color: #085041;
+  border-color: #5abfa0;
+}
+.t-other {
+  background: var(--surface2);
+  color: var(--text2);
+  border-color: var(--border2);
+}
+.inv-detail td {
+  font-size: 11px;
+  color: var(--text2);
+  padding: 3px 8px;
+  background: var(--surface2);
+}
+.inv-detail-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  margin-right: 4px;
+  font-weight: 600;
+}
+
+/* ticket size quick-pick buttons */
+.ticket-btns {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.tkt {
+  font-size: 10px;
+  padding: 2px 8px;
+  border: 0.5px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tkt:hover {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+
+/* ── Inline investor dropdown in rounds table ── */
+.inv-dropdown-toggle {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.inv-dropdown-toggle.has-inv {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+.inv-dropdown-panel {
+  padding: 12px 14px;
+  background: var(--surface2);
+  border-top: 0.5px solid var(--border);
+}
+.inv-unassigned {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--warn-text);
+  margin-top: 6px;
+}
+.inv-unassigned.ok {
+  color: #085041;
+}
+.inv-unassigned.over {
+  color: #991b1b;
+}
+.inv-count-tip {
+  font-size: 11px;
+  color: var(--text3);
+  margin-bottom: 10px;
+  padding: 5px 8px;
+  background: var(--surface);
+  border-radius: var(--rsm);
+  border: 0.5px solid var(--border);
+}
+.inv-count-tip strong {
+  color: var(--text2);
+  font-weight: 500;
+}
+
+/* ── PRINT / PDF ── */
+/* Applied to hero / nav chrome. Those live in CSS Modules with hashed class
+   names, so they opt into print-hiding through this global utility. */
+@media print {
+  .no-print,
+  body::before,
+  .pdf-btn,
+  .pdf-footer,
+  .vsb,
+  .tog,
+  .lb,
+  .lpb,
+  .ctb,
+  .inv-addbtn,
+  .inv-del,
+  .inv-dropdown-toggle,
+  .milestone-gen-btn,
+  .ticket-btns {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .page {
+    max-width: 100%;
+    padding: 1rem;
+  }
+  .card,
+  .cf,
+  .mc,
+  .lps,
+  .venture-card,
+  .milestone-wrap {
+    border: 0.5px solid #ccc !important;
+    break-inside: avoid;
+  }
+  canvas {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}

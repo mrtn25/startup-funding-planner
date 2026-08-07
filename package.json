@@ -1,0 +1,25 @@
+{
+  "name": "startup-funding-planner",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Startup Funding & Dilution Planner — model FFF, Angels & VCs across financing rounds, track dilution, cap table and exit scenarios",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "next": "^16.3.0",
+    "react": "^19.2.0",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.0"
+  }
+}
