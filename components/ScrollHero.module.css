@@ -1,0 +1,220 @@
+/* ══════════════════════════════════════════════════════════════
+   Scroll hero.
+
+   The word highlighting is pure CSS — no scroll listeners, no
+   IntersectionObserver, no animation library.
+
+   Two ideas do all the work:
+
+   1. The header is sticky with a NEGATIVE top offset of
+      (count - 1) line-heights. So as you scroll, the header pins
+      and the word list slides up through the viewport one line at
+      a time until the last word reaches the reading line.
+
+   2. Every word paints itself with the SAME `background-attachment:
+      fixed` gradient — dimmed, with an accent band at --start —
+      clipped to the glyphs. Because the gradient is fixed to the
+      viewport rather than the element, a word turns accent-coloured
+      exactly while it crosses that band. No per-word state at all.
+   ══════════════════════════════════════════════════════════════ */
+
+.root {
+  --start: 50vh;
+  --space: 50vh;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* ── Sticky word stack ── */
+
+.header {
+  position: sticky;
+  top: calc((var(--count) - 1) * -1lh);
+  line-height: 1.2;
+  display: flex;
+  align-items: start;
+  width: 100%;
+  margin-bottom: var(--space);
+  font-size: clamp(2.5rem, 9vw, 6.5rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.section {
+  display: flex;
+  width: 100%;
+  align-items: start;
+  justify-content: center;
+  gap: 0.3em;
+  padding-top: calc(var(--start) - 0.5lh);
+}
+
+.headline {
+  position: sticky;
+  top: calc(var(--start) - 0.5lh);
+  margin: 0;
+  /* Beat the global `h1 { font-size: 22px }` — the headline has to match
+     the word list exactly or the reading line won't line up. */
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 600;
+  color: var(--text);
+  white-space: pre;
+}
+
+.list {
+  font-weight: 600;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.word {
+  --dimmed: color-mix(in oklch, var(--text), transparent 80%);
+  background: linear-gradient(
+    180deg,
+    var(--dimmed) 0 calc(var(--start) - 0.5lh),
+    var(--hero-accent) calc(var(--start) - 0.55lh) calc(var(--start) + 0.55lh),
+    var(--dimmed) calc(var(--start) + 0.5lh)
+  );
+  background-attachment: fixed;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+/* ── Closing panel ── */
+
+.outro {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  z-index: 2;
+  color: var(--hero-panel-text);
+}
+
+.outro::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--hero-panel);
+  border-radius: 1rem 1rem 0 0;
+}
+
+.outroInner {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.75rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.tagline {
+  margin: 0;
+  font-weight: 600;
+  font-size: clamp(1.75rem, 6vw, 4rem);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.taglineAccent {
+  color: var(--hero-accent-on-panel);
+}
+
+.blurb {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(0.9375rem, 2vw, 1.125rem);
+  line-height: 1.6;
+  color: var(--hero-panel-muted);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--hero-accent-on-panel);
+  color: hsl(var(--hue) 58% 13%);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s;
+}
+
+.cta:hover {
+  transform: translateY(-2px);
+}
+
+.cta svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Progressive enhancement ──
+   Scroll-driven animations where supported. Everything above already
+   works without these; this only adds the panel grow + text reveal. */
+
+@supports (animation-timeline: view()) {
+  .animate .outro {
+    view-timeline: --outro;
+  }
+  .animate .outro::before {
+    transform-origin: 50% 100%;
+    scale: 0.9;
+    animation: grow both ease-in-out;
+    animation-timeline: --outro;
+    animation-range: entry 50%;
+  }
+  .animate .outroInner {
+    animation: reveal both ease-in-out;
+    animation-timeline: --outro;
+    animation-range: entry 50%;
+  }
+
+  @keyframes grow {
+    to {
+      scale: 1;
+      border-radius: 0;
+    }
+  }
+  @keyframes reveal {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate .outro::before,
+  .animate .outroInner {
+    animation: none;
+    scale: 1;
+    opacity: 1;
+  }
+}
+
+/* On narrow screens the headline + list side by side gets cramped,
+   so stack the reading line tighter. */
+@media (max-width: 640px) {
+  .section {
+    padding-top: calc(var(--start) - 0.5lh);
+    gap: 0.25em;
+  }
+}
