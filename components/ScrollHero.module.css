@@ -131,7 +131,7 @@
   max-width: 34ch;
   font-size: clamp(0.9375rem, 2vw, 1.125rem);
   line-height: 1.6;
-  opacity: 0.72;
+  color: var(--hero-panel-muted);
 }
 
 .cta {
@@ -139,7 +139,7 @@
   align-items: center;
   gap: 8px;
   background: var(--hero-accent-on-panel);
-  color: var(--hero-panel);
+  color: hsl(var(--hue) 58% 13%);
   font-size: 15px;
   font-weight: 600;
   padding: 14px 32px;

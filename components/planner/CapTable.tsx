@@ -58,7 +58,7 @@ export default function CapTable({ data, state }: Props) {
               s.type === "investor"
                 ? (state.rounds.find((r) => roundName(r.id) === s.rnd)?.id as RoundId | undefined)
                 : undefined;
-            const details = roundId ? investorDetailRows(state, roundId, s.pct, exitM) : [];
+            const details = roundId ? investorDetailRows(state, roundId, s.pct, exitM, data.sf) : [];
 
             return (
               <Fragment key={`${s.type}-${s.name}-${i}`}>

@@ -126,6 +126,7 @@ export default function RoundsTable({
                       <InvestorPanel
                         round={r}
                         investors={investors}
+                        sf={sf}
                         onChange={(next) => onPatchInvestors(r.id, next)}
                       />
                     </td>

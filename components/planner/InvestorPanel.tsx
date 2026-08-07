@@ -17,18 +17,21 @@ import {
 type Props = {
   round: RoundState;
   investors: Investor[];
+  /** Reverse-mode scale factor — the round's real total is invest × sf. */
+  sf: number;
   onChange: (next: Investor[]) => void;
 };
 
-export default function InvestorPanel({ round, investors, onChange }: Props) {
+export default function InvestorPanel({ round, investors, sf, onChange }: Props) {
   const id: RoundId = round.id;
+  const roundTotal = round.invest * sf;
 
   const update = (i: number, patch: Partial<Investor>) =>
     onChange(investors.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const remove = (i: number) => onChange(investors.filter((_, j) => j !== i));
   const add = (type: Investor["type"]) => onChange([...investors, { type, name: "", amt: "" }]);
 
-  const remainingM = round.invest - assignedM(investors);
+  const remainingM = roundTotal - assignedM(investors);
   const remainingK = remainingM * 1000;
 
   let status: { text: string; cls: string } | null = null;
@@ -46,7 +49,7 @@ export default function InvestorPanel({ round, investors, onChange }: Props) {
 
       {investors.map((x, i) => {
         const amtK = typeof x.amt === "number" ? x.amt : 0;
-        const shareOfRound = round.invest > 0 ? ((amtK / 1000 / round.invest) * 100).toFixed(1) : "0.0";
+        const shareOfRound = roundTotal > 0 ? ((amtK / 1000 / roundTotal) * 100).toFixed(1) : "0.0";
         return (
           <div key={i} style={{ marginBottom: 10 }}>
             <div className="inv-row">

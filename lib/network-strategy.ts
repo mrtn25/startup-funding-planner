@@ -204,7 +204,15 @@ export const NAMES: Record<string, string> = {
   cold: "Cold, open platform",
 };
 
-export type NodeInfo = { k: string; t: string; b: string; i: string; s: string[] };
+export type NodeInfo = {
+  k: string;
+  t: string;
+  b: string;
+  i: string;
+  s: string[];
+  /** Concrete steps to actually run this strategy. Strategy nodes only. */
+  do?: string[];
+};
 
 export const INFO: Record<NodeId, NodeInfo> = {
   "in:fem": {
@@ -327,6 +335,14 @@ export const INFO: Record<NodeId, NodeInfo> = {
     b: "<p>An introduction from someone whose judgement the partner already trusts. The dominant channel by volume &mdash; over 30% of deal flow comes through professional networks and another ~20% through co-investor referral.</p><p>Warm is a spectrum, not a switch: an intro from someone the partner barely knows transfers almost no trust.</p>",
     i: "Rank possible referrers by <em>their</em> credibility with the target partner, not by how well you know them. One strong referrer beats five weak ones.",
     s: ["gompers20", "shane02"],
+    do: [
+      "Build a target list of 25–40 funds, and for each one name the <strong>specific partner</strong> who leads your stage and sector. Never target a firm — partners have individual mandates.",
+      "For each partner, find shared connections on LinkedIn and rank them by how well <em>the partner</em> knows them, not how well you know them. A founder that partner has backed outranks your close friend who met them once.",
+      "Ask for a <strong>double opt-in</strong>: send your referrer a five-line forwardable blurb (what you do, the one number that matters, round size, why this partner specifically) and let them check the partner wants it before the intro goes out.",
+      "Never ask for “an intro to someone at Fund X”. Ask for one named person. Vague asks die in inboxes.",
+      "If your strongest available referrer for a fund is weak, don't spend it — move that fund to the catalyzing list instead and keep the referrer in reserve.",
+      "Log which referrer produced which meeting. Two or three people will account for most of your access, and they are the ones to keep warm between rounds.",
+    ],
   },
   "st:brok": {
     k: "Strategy",
@@ -334,6 +350,13 @@ export const INFO: Record<NodeId, NodeInfo> = {
     b: "<p>Reaching investors through non-redundant bridging contacts rather than your dense inner circle. Hochberg, Ljungqvist &amp; Lu show the same logic on the investor side: better-networked VC firms have significantly better fund performance, and their portfolio companies are more likely to survive to the next round and to exit.</p>",
     i: "Optimise for a short, credible path &mdash; not for degree count. Targeting a well-networked lead also imports their syndicate access, which is a measurable performance channel in itself.",
     s: ["hochberg07", "shane02"],
+    do: [
+      "Stop mining first-degree contacts and map <strong>second-degree</strong> ones: former colleagues, angels already on your cap table, your lawyer and accountant (they work with funds daily), and founders inside your target fund's portfolio.",
+      "Portfolio founders are the highest-yield brokers. Pick 2–3 per target fund and ask for 20 minutes about <em>their</em> experience with that investor first. The intro offer usually comes unprompted — and if it doesn't, you've earned the right to ask.",
+      "Prefer a well-connected lead over a better-known one. Check the fund's co-investment history on Crunchbase or Dealroom: you are buying access to their whole syndicate for the next round.",
+      "Angels who already wrote you a cheque are obligated brokers. Send each a list of five named target funds and ask which ones they can reach — a list gets answers, “know anyone?” doesn't.",
+      "Keep chains to two hops. Three-hop introductions arrive with no trust attached and read as cold.",
+    ],
   },
   "st:iden": {
     k: "Strategy",
@@ -341,6 +364,14 @@ export const INFO: Record<NodeId, NodeInfo> = {
     b: "<p>Deliberately targeting investors who share an identity dimension with you. The strongest single door-opener in the data: co-ethnicity roughly doubles match probability, and female investors express more interest in female founders.</p><p>It also carries the clearest documented cost &mdash; worse exit rates for affinity-matched pairs, and a halved follow-on rate for female founders first backed by female VCs.</p>",
     i: "Treat this as an entry strategy with an explicit exit plan: use it for the first conversation, then broaden the syndicate before the next round.",
     s: ["bengtsson15", "ewens20", "snellman23", "friendship"],
+    do: [
+      "Build a separate door-opener list of funds and partners who share the dimension — co-ethnic partners, women-led funds, your alumni network, first-generation or immigrant founder funds. Treat it as a list of <em>first conversations</em>, not a cap table plan.",
+      "Go where they already gather: identity-specific demo days, founder communities, angel collectives and scout programmes. The match is the reason you get the meeting; it is not the pitch.",
+      "Set the exit plan before you start. Concretely: by the next round, at least half your active investor conversations should be outside the affinity group.",
+      "Make broadening part of the deal. Ask every affinity-matched investor to introduce you to two investors <strong>outside</strong> the group — a reasonable ask, and it converts a door-opener into a broker.",
+      "Watch the follow-on risk deliberately. If your seed syndicate is entirely affinity-matched, start building relationships with generalist Series A funds 9–12 months before you need them.",
+      "Never let it become the whole story. The same mechanism that produces the first cheque is the one associated with worse exits — use it to get in the room, then compete on the business.",
+    ],
   },
   "st:cred": {
     k: "Strategy",
@@ -348,6 +379,13 @@ export const INFO: Record<NodeId, NodeInfo> = {
     b: "<p>Leading with institutional affiliation &mdash; school, employer, accelerator, prior exit &mdash; so the investor can price you without a personal referral. Works because VCs rate the team above the product and credentials are the cheapest team signal to verify.</p><p>Weaker at seed than in later rounds.</p>",
     i: "Front-load the affiliation in the first two lines of any outreach. If your own credentials are thin, borrowed ones &mdash; advisors, angels, design partners &mdash; carry a similar signal.",
     s: ["gompers20", "degrees", "alumni"],
+    do: [
+      "Put the affiliation in the <strong>first two lines</strong> of every cold email and on the first slide of the deck: “ex-[Employer], [University], previously founded [Exit]”. Below the fold it does no work.",
+      "If your own credentials are thin, borrow them: two or three advisors with recognisable affiliations, one angel who is a known operator in your space, one design partner with a logo people know.",
+      "At seed, a named customer beats a degree. A logo slide of real design partners is the strongest borrowed credential you can build, and unlike a CV you can go and earn it this quarter.",
+      "Make every claim checkable in one click — current LinkedIn, a personal site, advisors listed publicly. An unverifiable credential is worse than none.",
+      "Don't lead with credentials at pre-seed. The funding premium for elite education shows up in <em>later</em> rounds; early investors discount it. Lead with traction and let the credential break the tie.",
+    ],
   },
   "st:cat": {
     k: "Strategy",
@@ -355,6 +393,14 @@ export const INFO: Record<NodeId, NodeInfo> = {
     b: "<p>Hallen &amp; Eisenhardt's fieldwork identifies a second, <strong>equally efficient</strong> path to investor ties that does not depend on pre-existing strong ties: shaping timing, attention and inducements so that investors come to you.</p><p>In practice: sequencing meetings to create momentum, timing outreach to a proof point, and manufacturing competitive attention.</p>",
     i: "This is the only strategy in the model whose largest weight sits on access friction rather than tie stock &mdash; which is exactly why it is the route for founders without inherited access.",
     s: ["hallen12"],
+    do: [
+      "Don't open the raise until you have a <strong>dated proof point</strong> four to six weeks out — a launch, a signed contract, a milestone. Time all outreach so first meetings land just after it.",
+      "Compress every first meeting into a two-week window. The same twenty meetings spread over three months read as a stalled raise; in two weeks they read as momentum.",
+      "Manufacture a real reason to decide: a lead term sheet, a stated closing date, a genuinely limited allocation. Real ones only — investors talk to each other and a bluff ends the round.",
+      "Be visible where investors already look. Publish the thing only you could write — your own data, a teardown, a benchmark — and speak at the one niche event your buyers attend. Inbound built this way costs no social capital.",
+      "Sequence meetings from least- to most-wanted fund. You'll be sharper by the time you reach your first choice, and you'll have signal to reference.",
+      "Track time-to-second-meeting, not meetings booked. Catalyzing works by creating urgency, and urgency shows up in how fast the second conversation happens.",
+    ],
   },
   "st:cold": {
     k: "Strategy",
@@ -362,6 +408,14 @@ export const INFO: Record<NodeId, NodeInfo> = {
     b: "<p>Direct approach with no intermediary, or platform-mediated channels. Only about 10% of VC deal flow arrives inbound from company management, so the base rate is low &mdash; but open platforms partially bypass geographic and referral gatekeeping.</p>",
     i: "Best used for discovery rather than conversion: cold outreach to learn which framing lands and to map a market, then spend scarce social capital on warm routes to the targets that actually matter.",
     s: ["gompers20", "localbias"],
+    do: [
+      "Use cold to <strong>learn, not to close</strong>. Twenty cold emails will tell you which framing gets replies before you spend a warm introduction on the fund you actually want.",
+      "Five sentences, no deck attached: what you do, the one number that matters, why <em>this</em> partner (name a portfolio company or something they wrote), the ask, one link.",
+      "Personalise on something only that partner would recognise. “I saw you led [Company]'s Series A” works; praising the firm's “thesis” does not.",
+      "Send two framings to two halves of your cold list, measure reply rates, then carry the winner into your warm channel. This is the only cheap way to A/B test your pitch.",
+      "If you're outside a VC hub, open platforms (AngelList, syndicate lists, accelerator demo days) are worth real effort — they partially bypass the geographic gatekeeping that keeps you out of the referral flow.",
+      "Budget accordingly: only about 10% of deal flow arrives inbound from founders. Cap the time you give this and spend the rest on warm and catalyzing routes.",
+    ],
   },
 };
 

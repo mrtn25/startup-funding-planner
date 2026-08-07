@@ -41,9 +41,10 @@ type Anchor = { left: number; right: number; mid: number };
 const DEFAULT_PANEL = {
   k: "How to read this",
   t: "Three layers, not a black box",
-  b: "<p>Nothing on the left acts directly on a strategy. Every attribute works through one of five <strong>mechanisms</strong> the research literature actually identifies &mdash; that middle column is the explanation, not decoration.</p><p>Click any node to see what the evidence says, which papers it comes from, and what it implies for how you should approach investors.</p>",
+  b: "<p>Nothing on the left acts directly on a strategy. Every attribute works through one of five <strong>mechanisms</strong> the research literature actually identifies &mdash; that middle column is the explanation, not decoration.</p><p>Click any node to see what the evidence says, which papers it comes from, and what it implies for how you should approach investors.</p><p><strong>Click a strategy on the right</strong> for a step-by-step playbook of what to actually do.</p>",
   i: null as string | null,
   s: [] as string[],
+  do: undefined as string[] | undefined,
 };
 
 export default function NetworkStrategy() {
@@ -312,6 +313,17 @@ export default function NetworkStrategy() {
               </div>
             )}
           </div>
+
+          {panel.do && panel.do.length > 0 && (
+            <div className={styles.playbook}>
+              <div className={styles.kicker}>Playbook — do this</div>
+              <ol className={styles.steps}>
+                {panel.do.map((step, i) => (
+                  <li key={i} dangerouslySetInnerHTML={{ __html: step }} />
+                ))}
+              </ol>
+            </div>
+          )}
           {panel.s.length > 0 && (
             <div className={styles.sources}>
               <div className={styles.kicker}>Sources</div>

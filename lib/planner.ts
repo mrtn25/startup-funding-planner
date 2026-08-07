@@ -512,9 +512,23 @@ export function calc(state: PlannerState): CalcResult {
 
 /* ── Liquidation preference ──────────────────────────────────── */
 
+/** Which branch the investors ended up taking under the chosen clause. */
+export type LPOutcome = "preference" | "prorata" | "participating";
+
 export type LPScenario = {
   noLP: { inv: number; founder: number };
-  withLP: { inv: number; founder: number; lb: number; rem: number; part?: boolean; twoX?: boolean };
+  withLP: {
+    inv: number;
+    founder: number;
+    outcome: LPOutcome;
+    /** The liquidation claim, capped at what the exit can actually pay. */
+    preference: number;
+    /** Left over after the preference is paid — only split under participating. */
+    remainder: number;
+    /** What investors would get by simply converting and taking their ownership share. */
+    proRata: number;
+    multiple: number;
+  };
   invPct: number;
   founderPct: number;
 };
@@ -532,21 +546,35 @@ export function calcLPScenario(
   const founderPct = 1 - invPct;
   const noLP = { inv: exitM * invPct, founder: exitM * founderPct };
 
-  // Every mode pays a liquidation preference off the top, then splits the
-  // remainder pro-rata. They differ only in the size of that preference.
   const multiple = mode === "2x" ? 2 : 1;
-  const lb = Math.min(totalInvested * multiple, exitM);
-  const rem = Math.max(0, exitM - lb);
-  const withLP = {
-    inv: lb + rem * invPct,
-    founder: rem * founderPct,
-    lb,
-    rem,
-    ...(mode === "part" ? { part: true } : {}),
-    ...(mode === "2x" ? { twoX: true } : {}),
-  };
+  const preference = Math.min(totalInvested * multiple, exitM);
+  const remainder = Math.max(0, exitM - preference);
+  const proRata = exitM * invPct;
 
-  return { noLP, withLP, invPct, founderPct };
+  let inv: number;
+  let outcome: LPOutcome;
+  if (mode === "part") {
+    // Participating: take the preference AND still share the remainder.
+    inv = preference + remainder * invPct;
+    outcome = "participating";
+  } else {
+    // Non-participating: take the preference OR convert and take the
+    // pro-rata share — whichever pays more. Never both.
+    if (proRata > preference) {
+      inv = proRata;
+      outcome = "prorata";
+    } else {
+      inv = preference;
+      outcome = "preference";
+    }
+  }
+
+  return {
+    noLP,
+    withLP: { inv, founder: exitM - inv, outcome, preference, remainder, proRata, multiple },
+    invPct,
+    founderPct,
+  };
 }
 
 /* ── Cap-table investor detail rows ──────────────────────────── */
@@ -574,17 +602,21 @@ export function investorDetailRows(
   roundId: RoundId,
   roundPctOfCompany: number,
   exitM: number | null,
+  sf = 1,
 ): InvestorDetailRow[] {
   const round = state.rounds.find((r) => r.id === roundId);
   const list = state.investors[roundId] ?? [];
   if (!round || !list.length) return [];
 
   const rp = Number(roundPctOfCompany.toFixed(1));
+  // In reverse mode the round total is scaled, so a fixed ticket buys a
+  // correspondingly smaller slice of it.
+  const roundTotal = round.invest * sf;
 
   return list.map((x, i) => {
     const amtK = typeof x.amt === "number" ? x.amt : 0;
     const amtM = amtK / 1000;
-    const p = round.invest > 0 ? (amtM / round.invest) * rp : 0;
+    const p = roundTotal > 0 ? (amtM / roundTotal) * rp : 0;
     return {
       key: `${roundId}-${i}`,
       type: x.type,

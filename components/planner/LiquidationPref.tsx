@@ -1,6 +1,6 @@
 "use client";
 
-import { calcLPScenario, fmtM, pct, type CalcResult, type LPMode } from "@/lib/planner";
+import { calcLPScenario, fmtM, pct, type CalcResult, type LPMode, type LPOutcome } from "@/lib/planner";
 
 const MODES: { id: LPMode; label: string }[] = [
   { id: "none", label: "None (pro-rata)" },
@@ -24,17 +24,17 @@ const EXPLAINERS: { cls: string; term: string; text: string }[] = [
   {
     cls: "tf",
     term: "1× non-participating",
-    text: "Investors first get their capital back, then forfeit their pro-rata share of the remainder. Today's standard for reputable VCs.",
+    text: "Investors take either their capital back or their ownership share of the exit — whichever is worth more, never both. Bites at low exits, has no effect at high ones. Today's standard for reputable VCs.",
   },
   {
     cls: "tm",
     term: "1× participating",
-    text: 'Investors get their capital back AND keep their full share of the remainder. "Double dip" — unfavorable for founders at mid-range exits.',
+    text: 'Investors get their capital back AND keep their full share of the remainder. "Double dip" — costs founders at every exit level, most painfully in the middle.',
   },
   {
     cls: "th",
     term: "2× non-participating",
-    text: "Investors receive 2x their capital before founders see anything. Occurs in down-rounds or tough negotiations.",
+    text: "Same either/or, but the claim is twice the capital invested — so it stays binding up to a much higher exit. Occurs in down-rounds or tough negotiations.",
   },
 ];
 
@@ -84,16 +84,35 @@ export default function LiquidationPref({ data, lpMode, onChange }: Props) {
 
                   <div className="lps">
                     <div className="lpst">{MODE_LABEL[lpMode as Exclude<LPMode, "none">]}</div>
-                    <div className="lpr">
-                      <span style={{ color: "var(--text2)" }}>LP repayment{s.withLP.twoX ? " (2×)" : ""}</span>
-                      <span style={{ fontWeight: 500 }}>{fmtM(s.withLP.lb)}</span>
-                    </div>
-                    {s.withLP.part && (
-                      <div className="lpr">
-                        <span style={{ color: "var(--text2)" }}>+ pro-rata share</span>
-                        <span style={{ fontWeight: 500 }}>{fmtM(s.withLP.rem * s.invPct)}</span>
-                      </div>
+
+                    {s.withLP.outcome === "participating" ? (
+                      <>
+                        <div className="lpr">
+                          <span style={{ color: "var(--text2)" }}>LP repayment</span>
+                          <span style={{ fontWeight: 500 }}>{fmtM(s.withLP.preference)}</span>
+                        </div>
+                        <div className="lpr">
+                          <span style={{ color: "var(--text2)" }}>+ pro-rata share</span>
+                          <span style={{ fontWeight: 500 }}>{fmtM(s.withLP.remainder * s.invPct)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      // Non-participating: investors pick the better of the two.
+                      // Show both so it's clear which one they took.
+                      <>
+                        <Option
+                          label={`Take preference${s.withLP.multiple === 2 ? " (2×)" : ""}`}
+                          value={s.withLP.preference}
+                          taken={s.withLP.outcome === "preference"}
+                        />
+                        <Option
+                          label="Convert, take pro-rata"
+                          value={s.withLP.proRata}
+                          taken={s.withLP.outcome === "prorata"}
+                        />
+                      </>
                     )}
+
                     <div className="lpr">
                       <span style={{ color: "var(--text2)" }}>Investors total</span>
                       <span style={{ fontWeight: 500 }}>{fmtM(s.withLP.inv)}</span>
@@ -116,7 +135,12 @@ export default function LiquidationPref({ data, lpMode, onChange }: Props) {
                   </div>
                 </div>
 
-                <LPWarning noLPFounder={s.noLP.founder} withLPFounder={s.withLP.founder} exitM={exitM} />
+                <LPWarning
+                  noLPFounder={s.noLP.founder}
+                  withLPFounder={s.withLP.founder}
+                  exitM={exitM}
+                  outcome={s.withLP.outcome}
+                />
               </>
             )}
 
@@ -136,18 +160,41 @@ export default function LiquidationPref({ data, lpMode, onChange }: Props) {
   );
 }
 
+/** One side of the non-participating either/or, dimmed when it isn't the one taken. */
+function Option({ label, value, taken }: { label: string; value: number; taken: boolean }) {
+  return (
+    <div className="lpr" style={taken ? undefined : { opacity: 0.45 }}>
+      <span style={{ color: "var(--text2)" }}>
+        {taken ? "→ " : ""}
+        {label}
+      </span>
+      <span style={{ fontWeight: taken ? 500 : 400 }}>{fmtM(value)}</span>
+    </div>
+  );
+}
+
 function LPWarning({
   noLPFounder,
   withLPFounder,
   exitM,
+  outcome,
 }: {
   noLPFounder: number;
   withLPFounder: number;
   exitM: number;
+  outcome: LPOutcome;
 }) {
   const diff = noLPFounder - withLPFounder;
   if (withLPFounder <= 0.01) {
     return <div className="wb">At this exit, founders receive nothing with this LP clause.</div>;
+  }
+  if (outcome === "prorata") {
+    return (
+      <div className="ok">
+        At this exit the clause costs you nothing — investors do better converting to their ownership share than
+        claiming the preference, so proceeds match pro-rata exactly.
+      </div>
+    );
   }
   if (diff > 0.5) {
     return (

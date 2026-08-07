@@ -34,13 +34,15 @@
   /* Hero: the highlight hue matches --accent so the scroll hero and the
      tools below read as one system.
 
-     The closing panel inverts against the page, so it needs the *opposite*
-     accent lightness to stay readable — hence --hero-accent-on-panel. */
+     The closing panel is a deep blue in the same hue and stays dark in both
+     themes, so it needs its own text and accent tokens rather than reusing
+     the page ones. */
   --hue: 248;
   --hero-accent: hsl(var(--hue) 100% 50%);
-  --hero-panel: #000;
-  --hero-panel-text: #fff;
-  --hero-accent-on-panel: hsl(var(--hue) 90% 75%);
+  --hero-panel: hsl(var(--hue) 58% 13%);
+  --hero-panel-text: hsl(var(--hue) 40% 96%);
+  --hero-panel-muted: hsl(var(--hue) 26% 78%);
+  --hero-accent-on-panel: hsl(var(--hue) 90% 76%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -62,9 +64,8 @@
     --accent: #afa9ec;
 
     --hero-accent: hsl(var(--hue) 90% 75%);
-    --hero-panel: #fff;
-    --hero-panel-text: #111110;
-    --hero-accent-on-panel: hsl(var(--hue) 100% 50%);
+    /* Panel keeps its deep blue in dark mode; only the page around it changes. */
+    --hero-panel: hsl(var(--hue) 55% 11%);
   }
 }
 

@@ -326,6 +326,33 @@
 .implic .kicker {
   margin-bottom: 5px;
 }
+.playbook {
+  border-top: 1px solid var(--ns-line);
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+}
+.steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  counter-reset: step;
+}
+.steps li {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ns-fg2);
+}
+.steps li::marker {
+  color: var(--ns-fg3);
+  font-variant-numeric: tabular-nums;
+}
+.steps strong {
+  color: var(--ns-fg);
+  font-weight: 500;
+}
+
 .sources {
   border-top: 1px solid var(--ns-line);
   margin-top: 1rem;

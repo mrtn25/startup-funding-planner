@@ -1,14 +1,18 @@
 "use client";
 
-import { fmtM, pct, type CalcResult, type PlannerState, num } from "@/lib/planner";
+import { fmtM, pct, type CalcResult, type PlannerState } from "@/lib/planner";
 
 type Props = { data: CalcResult; state: PlannerState };
 
 export default function MetricsRow({ data, state }: Props) {
-  const { allStakeholders, exitM, fc, active, lastPostM, sf, totalNonDilutive } = data;
+  const { allStakeholders, exitM, fc, active, lastPostM, sf, grantAmt, convEffect } = data;
   const founderPct = allStakeholders.filter((s) => s.type === "founder").reduce((a, s) => a + s.pct, 0);
   const totalInvested = active.reduce((a, r) => a + r.invest * sf, 0);
-  const mult = num(state.exitMultiple) || 1;
+
+  // Derive the multiple from the actual exit rather than the input field —
+  // the exit can come from the direct valuation, in which case the field is
+  // stale and would misstate the multiple.
+  const mult = exitM && lastPostM ? exitM / lastPostM : null;
 
   return (
     <div className="g3">
@@ -22,10 +26,20 @@ export default function MetricsRow({ data, state }: Props) {
         <div className="mv">{fmtM(totalInvested)}</div>
         <div className="ms">
           {active.length} round(s)
-          {totalNonDilutive > 0 && (
+          {grantAmt > 0 && (
             <>
               <br />
-              <span style={{ fontSize: 10, color: "var(--text3)" }}>+ {fmtM(totalNonDilutive)} non-dilutive</span>
+              <span style={{ fontSize: 10, color: "var(--text3)" }}>+ {fmtM(grantAmt)} non-dilutive</span>
+            </>
+          )}
+          {convEffect.amt > 0 && (
+            <>
+              <br />
+              {/* A convertible is extra capital but it *does* dilute once it
+                  converts, so it is called out separately from the grants. */}
+              <span style={{ fontSize: 10, color: "var(--text3)" }}>
+                + {fmtM(convEffect.amt)} convertible (converts to equity)
+              </span>
             </>
           )}
         </div>
@@ -33,7 +47,7 @@ export default function MetricsRow({ data, state }: Props) {
       <div className="mc">
         <div className="ml">Exit Valuation</div>
         <div className="mv">{exitM ? fmtM(exitM) : "—"}</div>
-        <div className="ms">{lastPostM ? `${mult.toFixed(1)}x on ${fmtM(lastPostM)} post-M` : "—"}</div>
+        <div className="ms">{mult && lastPostM ? `${mult.toFixed(1)}x on ${fmtM(lastPostM)} post-M` : "—"}</div>
       </div>
     </div>
   );
