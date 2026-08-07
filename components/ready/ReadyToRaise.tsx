@@ -64,6 +64,8 @@ export default function ReadyToRaise({ onOpenTool }: Props) {
   const [prio, setPrio] = useState(initialPriorities);
   const [openAction, setOpenAction] = useState<ActionKey | null>(null);
   const [openDim, setOpenDim] = useState<DimKey | null>(null);
+  /** Only meaningful on mobile, where the score panel docks to the bottom. */
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const result = useMemo(() => compute(state), [state]);
   const archetypes = useMemo(() => rankArchetypes(prio), [prio]);
@@ -87,6 +89,7 @@ export default function ReadyToRaise({ onOpenTool }: Props) {
         </p>
       </header>
 
+      <div className={styles.presetLabel}>Start from an example profile — then adjust</div>
       <div className={styles.presets}>
         {PRESETS.map((p) => (
           <button
@@ -162,25 +165,46 @@ export default function ReadyToRaise({ onOpenTool }: Props) {
           })}
         </div>
 
-        {/* ── Score ── */}
-        <aside className={styles.panel} aria-live="polite">
-          <div className={styles.kicker}>Readiness</div>
-          <div className={styles.scoreRow}>
-            <span className={styles.scoreNum}>{result.score}</span>
-            <span className={styles.scoreMax}>/ 100</span>
+        {/* ── Score ──
+            Desktop: a sticky aside next to the board.
+            Mobile: docked to the bottom of the viewport so the score stays
+            visible while you work down the board, collapsed to a summary
+            row that expands on tap. */}
+        <aside className={`${styles.panel}${panelOpen ? ` ${styles.panelOpen}` : ""} no-print`} aria-live="polite">
+          <div className={styles.panelHead}>
+            <div className={styles.panelHeadMain}>
+              <div className={styles.kicker}>Readiness</div>
+              <div className={styles.scoreRow}>
+                <span className={styles.scoreNum}>{result.score}</span>
+                <span className={styles.scoreMax}>/ 100</span>
+                <span className={styles.bandInline}>
+                  {result.anySelected ? result.band.label : "Nothing selected yet"}
+                </span>
+              </div>
+              <div className={styles.band}>{result.anySelected ? result.band.label : "Nothing selected yet"}</div>
+              <div className={styles.meter}>
+                <span className={styles.meterFill} style={{ width: `${result.score}%` }} />
+              </div>
+            </div>
+            <button
+              type="button"
+              className={styles.panelToggle}
+              onClick={() => setPanelOpen((o) => !o)}
+              aria-expanded={panelOpen}
+            >
+              {panelOpen ? "Hide" : "Details"}
+              <span aria-hidden="true">{panelOpen ? "▾" : "▴"}</span>
+            </button>
           </div>
-          <div className={styles.band}>{result.anySelected ? result.band.label : "Nothing selected yet"}</div>
-          <p className={styles.bandNote}>
-            {result.anySelected
-              ? result.band.note
-              : "Tick what you already have on the left, or start from one of the profiles above."}
-          </p>
 
-          <div className={styles.meter}>
-            <span className={styles.meterFill} style={{ width: `${result.score}%` }} />
-          </div>
+          <div className={styles.panelBody}>
+            <p className={styles.bandNote}>
+              {result.anySelected
+                ? result.band.note
+                : "Tick what you already have on the left, or start from one of the profiles above."}
+            </p>
 
-          <div className={styles.dims}>
+            <div className={styles.dims}>
             {DIMS.map((d) => {
               const pctVal = Math.round(result.dim[d.key] * 100);
               const isBottleneck = result.anySelected && result.bottleneck === d.key;
@@ -231,9 +255,10 @@ export default function ReadyToRaise({ onOpenTool }: Props) {
                     </li>
                   ))}
                 </ul>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </aside>
       </div>
 

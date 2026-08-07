@@ -179,6 +179,7 @@ export default function NetworkStrategy() {
         </p>
       </header>
 
+      <div className={styles.presetLabel}>Start from an example profile — then adjust</div>
       <div className={styles.presets}>
         {PRESETS.map((p) => (
           <button
