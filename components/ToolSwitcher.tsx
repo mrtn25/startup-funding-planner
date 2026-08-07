@@ -44,7 +44,7 @@ export default function ToolSwitcher() {
       <PillNav active={active} onChange={select} />
 
       <div id="panel-ready" role="tabpanel" aria-labelledby="tab-ready" hidden={active !== "ready"}>
-        <ReadyToRaise onOpenTool={openTool} />
+        <ReadyToRaise onOpenTool={openTool} isActive={active === "ready"} />
       </div>
 
       <div id="panel-planner" role="tabpanel" aria-labelledby="tab-planner" hidden={active !== "planner"}>

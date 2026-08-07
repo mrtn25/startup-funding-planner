@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./ReadyToRaise.module.css";
 import {
   ACTIONS,
@@ -57,15 +57,73 @@ const PRESETS: { id: string; label: string; on: Partial<Record<InputId, number>>
   { id: "reset", label: "Reset", on: {}, quiet: true },
 ];
 
-type Props = { onOpenTool?: (tool: "planner" | "network") => void };
+type Props = {
+  onOpenTool?: (tool: "planner" | "network") => void;
+  /** Whether this tool is the selected tab. Drives the docked panel. */
+  isActive?: boolean;
+};
 
-export default function ReadyToRaise({ onOpenTool }: Props) {
+export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
   const [state, setState] = useState<ReadyState>(initialReadyState);
   const [prio, setPrio] = useState(initialPriorities);
   const [openAction, setOpenAction] = useState<ActionKey | null>(null);
   const [openDim, setOpenDim] = useState<DimKey | null>(null);
   /** Only meaningful on mobile, where the score panel docks to the bottom. */
   const [panelOpen, setPanelOpen] = useState(false);
+
+  /*
+   * The docked panel is fixed to the viewport, so without this it would sit
+   * over the hero from the moment the page loads — this tool is the default
+   * tab, so its markup is present long before anyone has scrolled to it.
+   * Track whether the tool is actually on screen and slide the dock away
+   * when it isn't. Starts false so nothing flashes in before hydration.
+   *
+   * Measured from scroll position rather than an IntersectionObserver
+   * because the first measurement has to be synchronous: a tab restored in
+   * the background fires no observer callbacks until it is looked at.
+   *
+   * `isActive` is part of the condition rather than relying on the panel
+   * measuring 0×0 while hidden, because selecting another tool fires no
+   * scroll or resize — the last measurement would otherwise survive, and
+   * returning to this tool from the top of the page would put the dock back
+   * over the hero.
+   */
+  const sectionRef = useRef<HTMLElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || !isActive) {
+      setInView(false);
+      return;
+    }
+
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const r = section.getBoundingClientRect();
+      // A hidden tool measures 0×0, which correctly reads as "not in view".
+      setInView(r.height > 0 && r.top < window.innerHeight - 80 && r.bottom > 160);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", measure);
+
+    // Catches the board growing or shrinking as items are ticked.
+    const ro = new ResizeObserver(measure);
+    ro.observe(section);
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", measure);
+      ro.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [isActive]);
 
   const result = useMemo(() => compute(state), [state]);
   const archetypes = useMemo(() => rankArchetypes(prio), [prio]);
@@ -80,7 +138,7 @@ export default function ReadyToRaise({ onOpenTool }: Props) {
   const explained = openDim ? dimMeta[openDim] : null;
 
   return (
-    <section className={styles.root} aria-label="Ready to raise assessment">
+    <section className={styles.root} aria-label="Ready to raise assessment" ref={sectionRef}>
       <header className={styles.head}>
         <h2>Are you ready to raise?</h2>
         <p>
@@ -170,7 +228,12 @@ export default function ReadyToRaise({ onOpenTool }: Props) {
             Mobile: docked to the bottom of the viewport so the score stays
             visible while you work down the board, collapsed to a summary
             row that expands on tap. */}
-        <aside className={`${styles.panel}${panelOpen ? ` ${styles.panelOpen}` : ""} no-print`} aria-live="polite">
+        <aside
+          className={`${styles.panel}${panelOpen ? ` ${styles.panelOpen}` : ""}${
+            inView ? "" : ` ${styles.dockAway}`
+          } no-print`}
+          aria-live="polite"
+        >
           <div className={styles.panelHead}>
             <div className={styles.panelHeadMain}>
               <div className={styles.kicker}>Readiness</div>
