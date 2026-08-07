@@ -9,11 +9,14 @@
   --rr-fg3: #8a8880;
   --rr-line: rgba(20, 20, 19, 0.12);
   --rr-line2: rgba(20, 20, 19, 0.22);
-  --rr-pos: #1d9e75;
+  /* --rr-neg stays semantic (the bottleneck marker). --rr-sel is the brand
+     lime, used for selection and for score magnitude. */
+  --rr-sel: #c6f432;
+  --rr-sel-line: #9dc70f;
   --rr-warn: #ba7517;
   --rr-neg: #d85a30;
-  --rr-accent: #185fa5;
-  --rr-onbg: rgba(29, 158, 117, 0.09);
+  --rr-accent: hsl(248 100% 50%);
+  --rr-onbg: rgba(198, 244, 50, 0.28);
 
   color: var(--rr-fg);
   font-family: inherit;
@@ -32,8 +35,9 @@
     --rr-fg3: #8a8880;
     --rr-line: rgba(255, 255, 255, 0.13);
     --rr-line2: rgba(255, 255, 255, 0.24);
-    --rr-accent: #85b7eb;
-    --rr-onbg: rgba(29, 158, 117, 0.16);
+    --rr-accent: hsl(248 90% 78%);
+    --rr-onbg: rgba(198, 244, 50, 0.18);
+    --rr-sel-line: #c6f432;
   }
 }
 
@@ -145,7 +149,7 @@
   border-color: var(--rr-line2);
 }
 .chipOn {
-  border-color: var(--rr-pos);
+  border-color: var(--rr-sel-line);
   background: var(--rr-onbg);
 }
 .dot {
@@ -157,7 +161,7 @@
   transition: background 0.15s;
 }
 .chipOn .dot {
-  background: var(--rr-pos);
+  background: var(--rr-sel-line);
 }
 .hint {
   display: block;
@@ -175,7 +179,7 @@
   background: var(--rr-bg);
 }
 .segOn {
-  border-color: var(--rr-pos);
+  border-color: var(--rr-sel-line);
   background: var(--rr-onbg);
 }
 .segLabel {
@@ -204,9 +208,9 @@
   color: var(--rr-fg);
 }
 .segBtnOn {
-  background: var(--rr-pos);
-  border-color: var(--rr-pos);
-  color: #fff;
+  background: var(--rr-sel);
+  border-color: var(--rr-sel-line);
+  color: #17210a;
   font-weight: 500;
 }
 
@@ -270,7 +274,7 @@
 .meterFill {
   display: block;
   height: 100%;
-  background: var(--rr-pos);
+  background: var(--rr-sel-line);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -601,6 +605,7 @@
   font-weight: 500;
 }
 
+
 .arch {
   background: var(--rr-bg2);
   border-radius: 10px;
@@ -731,10 +736,43 @@
 }
 
 @media (max-width: 640px) {
+  .root {
+    padding: 1.5rem 1rem 2.5rem;
+  }
   .head h2 {
     font-size: 22px;
   }
   .actionBody {
     padding-left: 14px;
+  }
+  .panel {
+    padding: 1rem 1.1rem;
+  }
+  .scoreNum {
+    font-size: 34px;
+  }
+  /* The leverage bar is the first thing to go when width is tight — the
+     number beside it carries the same information. */
+  .prioBar {
+    display: none;
+  }
+  .actionBtn {
+    gap: 8px;
+    padding: 11px 12px;
+  }
+  .actionLabel {
+    font-size: 13px;
+  }
+  .actionsHead h3,
+  .prios h3 {
+    font-size: 17px;
+  }
+  .btn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  .scaleBtn {
+    width: 34px;
+    height: 30px;
   }
 }

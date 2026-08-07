@@ -29,7 +29,15 @@
   --warn-bg: #fef3c7;
   --warn-text: #92400e;
   --warn-border: #fcd34d;
-  --accent: #534ab7;
+
+  /* Brand pair: the hero blue is the primary accent across every tool, the
+     lime is the highlight. Lime is only ever a *background* — it has far too
+     little contrast against white to be used as text. */
+  --accent: hsl(var(--hue) 100% 50%);
+  --accent-ink: #fff;
+  --lime: #c6f432;
+  --lime-strong: #b2e01c;
+  --lime-ink: #17210a;
 
   /* Hero: the highlight hue matches --accent so the scroll hero and the
      tools below read as one system.
@@ -60,7 +68,11 @@
     --warn-bg: #3a2e0a;
     --warn-text: #fbbf24;
     --warn-border: #78530a;
-    --accent: #afa9ec;
+    --accent: hsl(var(--hue) 90% 75%);
+    --accent-ink: #14102e;
+    --lime: #c6f432;
+    --lime-strong: #d7fb52;
+    --lime-ink: #17210a;
 
     /* Page-level highlight lightens for the dark background, but the panel
        keeps the full-strength brand blue in both themes. */
@@ -121,13 +133,13 @@ body::before {
   border-radius: 100px;
   background: var(--accent);
   border: none;
-  color: #fff;
+  color: var(--accent-ink);
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
-  box-shadow: 0 2px 12px rgba(83, 74, 183, 0.25);
+  transition: filter 0.15s, transform 0.15s;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .pdf-btn:hover {
-  background: #3f37a0;
+  filter: brightness(1.12);
   transform: translateY(-1px);
 }
 
@@ -200,7 +212,7 @@ body::before {
 }
 .vsb.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   border-color: var(--accent);
 }
 
@@ -229,7 +241,7 @@ body::before {
   padding: 4px 12px;
   border-radius: 20px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   border: none;
   cursor: pointer;
   font-weight: 500;
@@ -472,21 +484,23 @@ input[type="text"]:focus {
   border-radius: 20px;
   font-weight: 500;
 }
+/* Stakeholder badges: founders on the brand blue, investors on the lime,
+   pool and debt on amber. Categorical, not semantic. */
 .bf {
-  background: #eeedfe;
-  color: #3c3489;
+  background: #e0e2ff;
+  color: #1c1a8f;
 }
 .bi {
-  background: #e1f5ee;
-  color: #085041;
+  background: #edfbc8;
+  color: #3d5209;
 }
 .be {
   background: #faeeda;
   color: #633806;
 }
 .bsec {
-  background: #e1f5ee;
-  color: #085041;
+  background: #edfbc8;
+  color: #3d5209;
 }
 .bnd {
   background: #eaf3de;
@@ -749,19 +763,19 @@ footer {
   border: 0.5px solid;
 }
 .t-fff {
-  background: #fde8fe;
-  color: #7b0f8c;
-  border-color: #d07ae0;
+  background: #fdf0d5;
+  color: #7a4e0a;
+  border-color: #e0b45c;
 }
 .t-angel {
-  background: #e8f4ff;
-  color: #0a5ea8;
-  border-color: #6aaee0;
+  background: #e0e2ff;
+  color: #1c1a8f;
+  border-color: #8f92ee;
 }
 .t-vc {
-  background: #e1f5ee;
-  color: #085041;
-  border-color: #5abfa0;
+  background: #edfbc8;
+  color: #3d5209;
+  border-color: #a9d63f;
 }
 .t-other {
   background: var(--surface2);
@@ -850,6 +864,39 @@ footer {
 .inv-count-tip strong {
   color: var(--text2);
   font-weight: 500;
+}
+
+/* ── NARROW SCREENS ── */
+@media (max-width: 720px) {
+  .page {
+    padding: 1.5rem 1rem 3rem;
+  }
+  /* Metric cards and the LP comparison stack rather than squeezing. */
+  .g3,
+  .g2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .venture-row {
+    align-items: flex-start;
+  }
+  .venture-label {
+    min-width: 100%;
+    margin-bottom: -4px;
+  }
+  /* The ESOP control sits beside the founder count on desktop; on a phone
+     the 24px inset reads as broken indentation. */
+  .venture-row > div[style*="margin-left"] {
+    margin-left: 0 !important;
+  }
+  .ndl {
+    min-width: 100%;
+  }
+  .er > span:first-child {
+    min-width: 100%;
+  }
+  h1 {
+    font-size: 19px;
+  }
 }
 
 /* ── PRINT / PDF ── */

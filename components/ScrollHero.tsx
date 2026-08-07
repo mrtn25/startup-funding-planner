@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import styles from "./ScrollHero.module.css";
 
 const WORDS = ["build.", "validate.", "pitch.", "raise.", "fund.", "scale.", "exit."] as const;
@@ -10,12 +13,64 @@ type ScrollHeroProps = {
 /**
  * Scroll-driven word hero.
  *
- * Server component on purpose — there is no client-side logic here at all.
- * See ScrollHero.module.css for how the highlight works.
+ * Each word paints itself with the same tall gradient — dimmed, with an
+ * accent band at the reading line — clipped to its glyphs, so a word lights
+ * up exactly as it crosses that line.
+ *
+ * The original technique anchored that gradient to the viewport with
+ * `background-attachment: fixed`. Mobile browsers don't honour fixed
+ * attachment, so on a phone the band never lined up and no word ever lit up.
+ * Instead the gradient is sized to one viewport and its vertical offset is
+ * set per word from JS — which is what fixed attachment does internally, but
+ * works everywhere.
  */
 export default function ScrollHero({ ctaHref }: ScrollHeroProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wordsRef = useRef<HTMLLIElement[]>([]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    let frame = 0;
+
+    const paint = () => {
+      frame = 0;
+      for (const el of wordsRef.current) {
+        if (!el) continue;
+        // Offsetting the gradient by -top pins it to the viewport.
+        el.style.setProperty("--lit", `${-el.getBoundingClientRect().top}px`);
+      }
+    };
+
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(paint);
+    };
+
+    const onResize = () => {
+      // Gradient stops are expressed against the real viewport height rather
+      // than 100vh, which on mobile refers to the address-bar-less height.
+      root.style.setProperty("--vph", `${window.innerHeight}px`);
+      // Paint synchronously rather than through rAF: a tab that loads in the
+      // background never runs animation frames, which would leave every word
+      // dimmed until the first scroll.
+      if (frame) cancelAnimationFrame(frame);
+      paint();
+    };
+
+    onResize();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
   return (
     <div
+      ref={rootRef}
       className={`${styles.root} ${styles.animate} no-print`}
       style={{ "--count": WORDS.length } as React.CSSProperties}
     >
@@ -28,8 +83,14 @@ export default function ScrollHero({ ctaHref }: ScrollHeroProps) {
             <span className="sr-only">You can build, validate, pitch, raise, fund, scale and exit your startup.</span>
           </h1>
           <ul className={styles.list} aria-hidden="true">
-            {WORDS.map((word) => (
-              <li key={word} className={styles.word}>
+            {WORDS.map((word, i) => (
+              <li
+                key={word}
+                className={styles.word}
+                ref={(el) => {
+                  if (el) wordsRef.current[i] = el;
+                }}
+              >
                 {word}
               </li>
             ))}

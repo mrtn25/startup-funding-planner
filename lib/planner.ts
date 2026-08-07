@@ -64,14 +64,26 @@ export type PlannerState = {
 
 /* ── Static data ─────────────────────────────────────────────── */
 
+/*
+ * Round colours run as a ramp from sky through teal to the brand lime, so
+ * later rounds read as progression rather than as unrelated categories.
+ * Founders sit outside the ramp on the brand blue (see FOUNDER_COLOR) and
+ * the ESOP pool stays amber, keeping all three groups distinguishable in
+ * the stacked chart.
+ */
 export const ROUND_DEFS: RoundDef[] = [
-  { id: "preSeed", name: "Pre-Seed", color: "#7F77DD", bg: "rgba(127,119,221,0.22)", investMax: 5, investStep: 0.1 },
-  { id: "seed", name: "Seed", color: "#1D9E75", bg: "rgba(29,158,117,0.20)", investMax: 15, investStep: 0.5 },
-  { id: "serA", name: "Series A", color: "#EF9F27", bg: "rgba(239,159,39,0.20)", investMax: 50, investStep: 1 },
-  { id: "serB", name: "Series B", color: "#D85A30", bg: "rgba(216,90,48,0.20)", investMax: 150, investStep: 5 },
-  { id: "serC", name: "Series C", color: "#D4537E", bg: "rgba(212,83,126,0.20)", investMax: 300, investStep: 10 },
-  { id: "serD", name: "Series D", color: "#378ADD", bg: "rgba(55,138,221,0.20)", investMax: 600, investStep: 25 },
+  { id: "preSeed", name: "Pre-Seed", color: "#0091EA", bg: "rgba(0,145,234,0.20)", investMax: 5, investStep: 0.1 },
+  { id: "seed", name: "Seed", color: "#00B5AD", bg: "rgba(0,181,173,0.20)", investMax: 15, investStep: 0.5 },
+  { id: "serA", name: "Series A", color: "#35C462", bg: "rgba(53,196,98,0.20)", investMax: 50, investStep: 1 },
+  { id: "serB", name: "Series B", color: "#7AD426", bg: "rgba(122,212,38,0.20)", investMax: 150, investStep: 5 },
+  { id: "serC", name: "Series C", color: "#A8E31E", bg: "rgba(168,227,30,0.22)", investMax: 300, investStep: 10 },
+  { id: "serD", name: "Series D", color: "#C6F432", bg: "rgba(198,244,50,0.26)", investMax: 600, investStep: 25 },
 ];
+
+/** Founders and the option pool, outside the round ramp. */
+export const FOUNDER_COLOR = "#2200FF";
+export const ESOP_COLOR = "#EF9F27";
+export const CONVERTIBLE_COLOR = "#BA7517";
 
 export const ROUND_DEF_BY_ID = Object.fromEntries(ROUND_DEFS.map((r) => [r.id, r])) as Record<RoundId, RoundDef>;
 
@@ -452,7 +464,7 @@ export function calc(state: PlannerState): CalcResult {
       const convDilFrac = convEffect.pct / 100;
       const convShares = Math.round((totalShares * convDilFrac) / (1 - convDilFrac));
       totalShares += convShares;
-      convEntry = { name: "Convertible Loan", shares: convShares, type: "conv", color: "#BA7517", pct: 0 };
+      convEntry = { name: "Convertible Loan", shares: convShares, type: "conv", color: CONVERTIBLE_COLOR, pct: 0 };
     }
 
     const dilFrac = r.dilPct / 100;

@@ -12,7 +12,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { fmtM, roundName, ROUND_DEF_BY_ID, type CalcResult, type PlannerState } from "@/lib/planner";
+import { fmtM, roundName, ROUND_DEF_BY_ID, FOUNDER_COLOR, ESOP_COLOR, type CalcResult, type PlannerState } from "@/lib/planner";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -55,13 +55,13 @@ export default function DilutionChart({ data, state, onToggleVal, onToggleInv }:
     {
       label: "Founders",
       data: founderData,
-      backgroundColor: "rgba(127,119,221,0.18)",
-      borderColor: "#7F77DD",
+      backgroundColor: "rgba(34,0,255,0.14)",
+      borderColor: FOUNDER_COLOR,
       borderWidth: 2,
       fill: "stack",
       tension: 0.15,
       pointRadius: 5,
-      pointBackgroundColor: "#7F77DD",
+      pointBackgroundColor: FOUNDER_COLOR,
       spanGaps: true,
       yAxisID: "y",
     },
@@ -69,13 +69,13 @@ export default function DilutionChart({ data, state, onToggleVal, onToggleInv }:
       label: "ESOP",
       data: esopData,
       backgroundColor: "rgba(239,159,39,0.12)",
-      borderColor: "#EF9F27",
+      borderColor: ESOP_COLOR,
       borderWidth: 1.5,
       borderDash: [4, 3],
       fill: "stack",
       tension: 0,
       pointRadius: 4,
-      pointBackgroundColor: "#EF9F27",
+      pointBackgroundColor: ESOP_COLOR,
       spanGaps: true,
       yAxisID: "y",
     },
@@ -154,8 +154,8 @@ export default function DilutionChart({ data, state, onToggleVal, onToggleInv }:
   };
 
   const legendItems = [
-    { color: "#7F77DD", label: "Founders" },
-    { color: "#EF9F27", label: "ESOP" },
+    { color: FOUNDER_COLOR, label: "Founders" },
+    { color: ESOP_COLOR, label: "ESOP" },
     ...active.map((r) => ({ color: ROUND_DEF_BY_ID[r.id].color, label: roundName(r.id) })),
   ];
 

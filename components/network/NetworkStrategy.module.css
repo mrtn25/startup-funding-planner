@@ -9,11 +9,16 @@
   --ns-fg3: #8a8880;
   --ns-line: rgba(20, 20, 19, 0.12);
   --ns-line2: rgba(20, 20, 19, 0.22);
+  /* --ns-pos / --ns-neg stay semantic: they encode the SIGN of a weight in
+     the edge layer and legend, so they must not be re-themed.
+     --ns-sel is the brand lime and marks selection / magnitude only. */
   --ns-pos: #1d9e75;
   --ns-neg: #d85a30;
   --ns-warn: #ba7517;
-  --ns-accent: #185fa5;
-  --ns-posbg: rgba(29, 158, 117, 0.09);
+  --ns-accent: hsl(248 100% 50%);
+  --ns-sel: #c6f432;
+  --ns-sel-line: #9dc70f;
+  --ns-selbg: rgba(198, 244, 50, 0.28);
 
   color: var(--ns-fg);
   font-family: inherit;
@@ -32,8 +37,9 @@
     --ns-fg3: #8a8880;
     --ns-line: rgba(255, 255, 255, 0.13);
     --ns-line2: rgba(255, 255, 255, 0.24);
-    --ns-accent: #85b7eb;
-    --ns-posbg: rgba(29, 158, 117, 0.16);
+    --ns-accent: hsl(248 90% 78%);
+    --ns-selbg: rgba(198, 244, 50, 0.18);
+    --ns-sel-line: #c6f432;
   }
 }
 
@@ -181,11 +187,11 @@
   transition: background 0.15s;
 }
 .isOn {
-  border-color: var(--ns-pos);
-  background: var(--ns-posbg);
+  border-color: var(--ns-sel-line);
+  background: var(--ns-selbg);
 }
 .isOn .dot {
-  background: var(--ns-pos);
+  background: var(--ns-sel-line);
 }
 
 .mec {
@@ -211,7 +217,7 @@
   display: block;
   height: 100%;
   width: 0;
-  background: var(--ns-pos);
+  background: var(--ns-sel-line);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -479,14 +485,44 @@
 }
 
 @media (max-width: 640px) {
-  .model {
-    grid-template-columns: minmax(0, 1fr) 34px minmax(0, 0.85fr) 34px minmax(0, 0.9fr);
+  .root {
+    padding: 1.5rem 1rem 2.5rem;
   }
-  .in,
+  .model {
+    grid-template-columns: minmax(0, 1fr) 22px minmax(0, 0.8fr) 22px minmax(0, 0.86fr);
+  }
+  .in {
+    font-size: 11px;
+    padding: 6px 7px;
+    gap: 6px;
+  }
   .sname {
-    font-size: 11.5px;
+    font-size: 10.5px;
+  }
+  .score {
+    font-size: 13px;
+  }
+  .str {
+    padding: 7px 8px;
+    gap: 4px;
+  }
+  .mec {
+    padding: 6px 7px;
+  }
+  .mlabel {
+    font-size: 10px;
   }
   .head h2 {
     font-size: 22px;
+  }
+  .labels {
+    font-size: 9.5px;
+  }
+  .btn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  .panel {
+    padding: 1rem 1.1rem;
   }
 }

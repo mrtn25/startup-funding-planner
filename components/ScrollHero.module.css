@@ -19,8 +19,15 @@
    ══════════════════════════════════════════════════════════════ */
 
 .root {
-  --start: 50vh;
+  /* --vph is the real viewport height, set from JS. 100vh is only the
+     fallback — on mobile it excludes the address bar and would put the
+     reading line in the wrong place. */
+  --vph: 100vh;
+  --start: calc(var(--vph) * 0.5);
   --space: 50vh;
+  /* Single source of truth for the word size; the closing tagline reuses it
+     so the two can never drift apart. */
+  --word-size: clamp(2rem, 8.5vw, 6.5rem);
   min-height: 100vh;
   width: 100%;
 }
@@ -35,7 +42,7 @@
   align-items: start;
   width: 100%;
   margin-bottom: var(--space);
-  font-size: clamp(2.5rem, 9vw, 6.5rem);
+  font-size: var(--word-size);
   font-weight: 600;
   letter-spacing: -0.03em;
 }
@@ -71,13 +78,19 @@
 
 .word {
   --dimmed: color-mix(in oklch, var(--text), transparent 80%);
-  background: linear-gradient(
+  /* The flat colour is the base layer: it shows wherever the one-viewport-tall
+     gradient above it doesn't reach, keeping off-screen words dimmed rather
+     than invisible. background-clip: text clips both layers to the glyphs. */
+  background-color: var(--dimmed);
+  background-image: linear-gradient(
     180deg,
     var(--dimmed) 0 calc(var(--start) - 0.5lh),
     var(--hero-accent) calc(var(--start) - 0.55lh) calc(var(--start) + 0.55lh),
     var(--dimmed) calc(var(--start) + 0.5lh)
   );
-  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: 100% var(--vph);
+  background-position: 0 var(--lit, 0px);
   color: transparent;
   background-clip: text;
   -webkit-background-clip: text;
@@ -117,7 +130,8 @@
 .tagline {
   margin: 0;
   font-weight: 600;
-  font-size: clamp(1.75rem, 6vw, 4rem);
+  /* Matches the scrolling words exactly — same token. */
+  font-size: var(--word-size);
   letter-spacing: -0.03em;
   line-height: 1.15;
 }
@@ -181,11 +195,10 @@
     animation-timeline: --outro;
     animation-range: entry 50%;
   }
-  .animate .outroInner {
-    animation: reveal both ease-in-out;
-    animation-timeline: --outro;
-    animation-range: entry 50%;
-  }
+  /* Only the panel itself animates. The content deliberately does not fade in:
+     a scroll-driven opacity animation that fails to resolve leaves the tagline
+     and the CTA stuck semi-transparent, and this is the page's primary call to
+     action. The panel growing over the words is the effect on its own. */
 
   @keyframes grow {
     to {
@@ -193,30 +206,24 @@
       border-radius: 0;
     }
   }
-  @keyframes reveal {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate .outro::before,
-  .animate .outroInner {
+  .animate .outro::before {
     animation: none;
     scale: 1;
-    opacity: 1;
   }
 }
 
-/* On narrow screens the headline + list side by side gets cramped,
-   so stack the reading line tighter. */
 @media (max-width: 640px) {
   .section {
-    padding-top: calc(var(--start) - 0.5lh);
-    gap: 0.25em;
+    gap: 0.22em;
+  }
+  .outroInner {
+    gap: 1.25rem;
+    padding: 1.5rem 1.25rem;
+  }
+  .cta {
+    padding: 13px 26px;
   }
 }

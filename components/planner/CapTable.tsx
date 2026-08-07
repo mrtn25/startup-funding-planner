@@ -9,6 +9,9 @@ import {
   pct,
   roundName,
   INVESTOR_BADGE_COLORS,
+  FOUNDER_COLOR,
+  ESOP_COLOR,
+  CONVERTIBLE_COLOR,
   type CalcResult,
   type PlannerState,
   type RoundId,
@@ -16,9 +19,9 @@ import {
 } from "@/lib/planner";
 
 const BAR_COLORS: Partial<Record<StakeholderType, string>> = {
-  founder: "#7F77DD",
-  esop: "#EF9F27",
-  conv: "#BA7517",
+  founder: FOUNDER_COLOR,
+  esop: ESOP_COLOR,
+  conv: CONVERTIBLE_COLOR,
 };
 const BADGE_CLS: Record<StakeholderType, string> = {
   founder: "bf",
