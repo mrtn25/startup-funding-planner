@@ -34,15 +34,14 @@
   /* Hero: the highlight hue matches --accent so the scroll hero and the
      tools below read as one system.
 
-     The closing panel is a deep blue in the same hue and stays dark in both
-     themes, so it needs its own text and accent tokens rather than reusing
-     the page ones. */
+     The closing panel is filled with that exact highlight blue — the colour
+     the words light up in — and stays that blue in both themes, so it carries
+     its own text tokens rather than reusing the page ones. */
   --hue: 248;
   --hero-accent: hsl(var(--hue) 100% 50%);
-  --hero-panel: hsl(var(--hue) 58% 13%);
-  --hero-panel-text: hsl(var(--hue) 40% 96%);
-  --hero-panel-muted: hsl(var(--hue) 26% 78%);
-  --hero-accent-on-panel: hsl(var(--hue) 90% 76%);
+  --hero-panel: hsl(var(--hue) 100% 50%);
+  --hero-panel-text: #fff;
+  --hero-panel-muted: rgba(255, 255, 255, 0.8);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -63,9 +62,9 @@
     --warn-border: #78530a;
     --accent: #afa9ec;
 
+    /* Page-level highlight lightens for the dark background, but the panel
+       keeps the full-strength brand blue in both themes. */
     --hero-accent: hsl(var(--hue) 90% 75%);
-    /* Panel keeps its deep blue in dark mode; only the page around it changes. */
-    --hero-panel: hsl(var(--hue) 55% 11%);
   }
 }
 

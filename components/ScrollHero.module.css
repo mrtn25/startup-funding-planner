@@ -122,8 +122,10 @@
   line-height: 1.15;
 }
 
+/* The panel itself now carries the accent colour, so the tagline just needs
+   to sit cleanly on top of it. */
 .taglineAccent {
-  color: var(--hero-accent-on-panel);
+  color: var(--hero-panel-text);
 }
 
 .blurb {
@@ -138,8 +140,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--hero-accent-on-panel);
-  color: hsl(var(--hue) 58% 13%);
+  background: var(--hero-panel-text);
+  color: var(--hero-panel);
   font-size: 15px;
   font-weight: 600;
   padding: 14px 32px;
