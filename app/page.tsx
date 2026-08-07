@@ -1,4 +1,5 @@
 import ScrollHero from "@/components/ScrollHero";
+import SiteFooter from "@/components/SiteFooter";
 import ToolSwitcher from "@/components/ToolSwitcher";
 
 export default function Home() {
@@ -6,6 +7,7 @@ export default function Home() {
     <>
       <ScrollHero ctaHref="#tools" />
       <ToolSwitcher />
+      <SiteFooter />
     </>
   );
 }

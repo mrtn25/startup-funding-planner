@@ -500,8 +500,8 @@ function Bibliography() {
   ACTIONS.forEach((a) => a.sources.forEach((s) => used.add(s)));
 
   return (
-    <div className={styles.biblio}>
-      <h4>References</h4>
+    <details className={styles.biblio}>
+      <summary>References ({[...used].length} papers)</summary>
       <ol>
         {Object.keys(SRC)
           .filter((id) => used.has(id))
@@ -516,6 +516,6 @@ function Bibliography() {
             </li>
           ))}
       </ol>
-    </div>
+    </details>
   );
 }

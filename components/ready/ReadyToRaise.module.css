@@ -716,14 +716,17 @@
   border-top: 1px solid var(--rr-line);
   padding-top: 1.25rem;
 }
-.biblio h4 {
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0 0 0.75rem;
+.biblio summary {
+  font-size: 13.5px;
+  cursor: pointer;
   color: var(--rr-fg2);
+  list-style: revert;
+}
+.biblio summary:hover {
+  color: var(--rr-fg);
 }
 .biblio ol {
-  margin: 0;
+  margin: 0.9rem 0 0;
   padding-left: 1.35rem;
   display: flex;
   flex-direction: column;

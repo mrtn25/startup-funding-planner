@@ -427,8 +427,8 @@ function WeightsTable() {
 
 function Bibliography() {
   return (
-    <div className={styles.biblio}>
-      <h4>References</h4>
+    <details className={styles.biblio}>
+      <summary>References ({Object.keys(SRC).length} papers)</summary>
       <ol>
         {Object.keys(SRC).map((id) => (
           <li key={id}>
@@ -441,7 +441,7 @@ function Bibliography() {
           </li>
         ))}
       </ol>
-    </div>
+    </details>
   );
 }
 

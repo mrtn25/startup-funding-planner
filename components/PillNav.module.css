@@ -1,5 +1,5 @@
-/* Sticky tool switcher. Styling follows the pillbar from the
-   network-strategy drop-in, promoted to a shared component. */
+/* Sticky tool switcher. Desktop: three pills. Mobile: a lime trigger that
+   opens a list with the full tool names. */
 
 .wrap {
   position: sticky;
@@ -47,33 +47,82 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-/* Each pill carries both a full and an abbreviated label; CSS picks one so
-   there is no viewport check in JS and nothing to mismatch on hydration. */
-.short {
+/* Mobile-only chrome. */
+.trigger {
   display: none;
 }
 
-/* Three full labels are wider than a phone. Rather than let the bar scroll
-   and clip, it goes full width with equal pills and the short labels. */
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .wrap {
     padding: 10px 0.75rem;
+    /* The dropdown is absolutely positioned against this. */
+    position: sticky;
+    justify-content: stretch;
   }
-  .bar {
+
+  .trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     width: 100%;
-    max-width: 420px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 12px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--lime);
+    color: var(--lime-ink);
+    cursor: pointer;
   }
-  .pill {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 10px 6px;
-    font-size: 13px;
-    text-align: center;
+  .triggerLabel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .full {
+  .chev {
+    font-size: 12px;
+    flex: none;
+    transition: transform 0.18s ease;
+  }
+  .chevOpen {
+    transform: rotate(180deg);
+  }
+
+  /* Collapsed by default; expands into a card under the trigger. */
+  .bar {
     display: none;
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: calc(100% - 4px);
+    width: auto;
+    max-width: none;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
   }
-  .short {
-    display: inline;
+  .barOpen {
+    display: flex;
+  }
+
+  .pill {
+    width: 100%;
+    text-align: left;
+    padding: 13px 16px;
+    border-radius: 12px;
+    font-size: 15px;
+    white-space: normal;
+  }
+  .pill[aria-selected="true"] {
+    background: var(--lime);
+    color: var(--lime-ink);
+    font-weight: 600;
+    box-shadow: none;
   }
 }
