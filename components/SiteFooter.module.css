@@ -38,7 +38,10 @@
   line-height: 1.6;
   color: var(--text3);
   margin: 0;
-  max-width: 52ch;
+  /* Wide enough to break into two lines rather than three — which also
+     starts the block further left, since it is right-anchored by the
+     space-between above. */
+  max-width: 90ch;
   text-align: left;
 }
 
