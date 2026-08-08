@@ -202,9 +202,9 @@ body::before {
   flex-wrap: wrap;
 }
 .vsb {
-  font-size: 12px;
-  padding: 5px 13px;
-  border: 0.5px solid var(--border2);
+  font-size: 12.5px;
+  padding: 6px 14px;
+  border: 1px solid var(--border2);
   border-radius: 20px;
   background: transparent;
   color: var(--text2);
@@ -237,8 +237,8 @@ body::before {
   letter-spacing: 0.08em;
 }
 .milestone-gen-btn {
-  font-size: 11px;
-  padding: 4px 12px;
+  font-size: 12.5px;
+  padding: 6px 14px;
   border-radius: 20px;
   background: var(--accent);
   color: var(--accent-ink);
@@ -282,24 +282,30 @@ body::before {
 
 /* ── PAGE ── */
 .page {
-  max-width: 980px;
+  /* Matches the shell of the other two tools exactly. */
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
+  padding: 2rem 1.25rem 3rem;
+  -webkit-font-smoothing: antialiased;
 }
 h1 {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 500;
+  line-height: 1.25;
+  margin-bottom: 0.5rem;
 }
 .subtitle {
-  font-size: 13px;
+  font-size: 15px;
+  line-height: 1.65;
   color: var(--text2);
   margin-bottom: 2rem;
+  max-width: 720px;
 }
 .sec-label {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 400;
   color: var(--text3);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   margin-bottom: 8px;
   margin-top: 1.75rem;
@@ -400,18 +406,20 @@ input[type="text"]:focus {
   width: 100%;
 }
 .tog {
-  font-size: 11px;
-  padding: 3px 10px;
-  border: 0.5px solid var(--border2);
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border: 1px solid var(--border2);
   border-radius: 20px;
   background: transparent;
   color: var(--text2);
   cursor: pointer;
 }
+/* An active round is a selection, so it takes the lime like the boards. */
 .tog.on {
-  background: var(--info-bg);
-  color: var(--info-text);
-  border-color: var(--info-border);
+  background: var(--lime);
+  color: var(--lime-ink);
+  border-color: var(--lime-strong);
+  font-weight: 500;
 }
 .dot {
   width: 8px;
@@ -445,18 +453,20 @@ input[type="text"]:focus {
   margin-top: 4px;
 }
 .lb {
-  font-size: 11px;
-  padding: 4px 10px;
-  border: 0.5px solid var(--border2);
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border: 1px solid var(--border2);
   border-radius: 20px;
   background: transparent;
   color: var(--text2);
   cursor: pointer;
 }
+/* Mode choices take the accent, like the stage selector. */
 .lb.on {
-  background: var(--info-bg);
-  color: var(--info-text);
-  border-color: var(--info-border);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 500;
 }
 .lr {
   display: flex;
@@ -528,18 +538,19 @@ input[type="text"]:focus {
   margin-bottom: 12px;
 }
 .lpb {
-  font-size: 11px;
-  padding: 4px 11px;
-  border: 0.5px solid var(--border2);
+  font-size: 12.5px;
+  padding: 6px 14px;
+  border: 1px solid var(--border2);
   border-radius: 20px;
   background: transparent;
   color: var(--text2);
   cursor: pointer;
 }
 .lpb.on {
-  background: var(--info-bg);
-  color: var(--info-text);
-  border-color: var(--info-border);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 500;
 }
 .lps {
   background: var(--surface2);
@@ -644,9 +655,9 @@ input[type="text"]:focus {
   flex-shrink: 0;
 }
 .ctb {
-  font-size: 11px;
-  padding: 3px 10px;
-  border: 0.5px solid var(--border2);
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border: 1px solid var(--border2);
   border-radius: 20px;
   background: transparent;
   cursor: pointer;
@@ -756,8 +767,8 @@ input[type="text"]:focus {
   padding: 0 4px;
 }
 .inv-addbtn {
-  font-size: 11px;
-  padding: 3px 11px;
+  font-size: 11.5px;
+  padding: 4px 12px;
   border-radius: 20px;
   background: transparent;
   cursor: pointer;
@@ -806,9 +817,9 @@ input[type="text"]:focus {
   margin-top: 6px;
 }
 .tkt {
-  font-size: 10px;
-  padding: 2px 8px;
-  border: 0.5px solid var(--border2);
+  font-size: 11.5px;
+  padding: 4px 11px;
+  border: 1px solid var(--border2);
   border-radius: 20px;
   background: transparent;
   color: var(--text2);
@@ -823,9 +834,9 @@ input[type="text"]:focus {
 
 /* ── Inline investor dropdown in rounds table ── */
 .inv-dropdown-toggle {
-  font-size: 11px;
-  padding: 3px 10px;
-  border: 0.5px solid var(--border2);
+  font-size: 12px;
+  padding: 5px 12px;
+  border: 1px solid var(--border2);
   border-radius: 20px;
   background: transparent;
   color: var(--text2);
@@ -833,9 +844,10 @@ input[type="text"]:focus {
   white-space: nowrap;
 }
 .inv-dropdown-toggle.has-inv {
-  background: var(--info-bg);
-  color: var(--info-text);
-  border-color: var(--info-border);
+  background: var(--lime);
+  color: var(--lime-ink);
+  border-color: var(--lime-strong);
+  font-weight: 500;
 }
 .inv-dropdown-panel {
   padding: 12px 14px;

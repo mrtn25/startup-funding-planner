@@ -83,7 +83,7 @@ export default function VentureCard({ state, onPatch, onIndustry }: Props) {
           <input
             className="venture-input"
             type="text"
-            placeholder="e.g. GreenShift AI"
+            placeholder="e.g. Acme Robotics"
             value={state.ventureName}
             onChange={(e) => patchVenture({ ventureName: e.target.value })}
           />
@@ -95,7 +95,7 @@ export default function VentureCard({ state, onPatch, onIndustry }: Props) {
           </span>
           <textarea
             className="venture-textarea"
-            placeholder="Brief description — e.g. AI-powered carbon accounting platform for SMEs..."
+            placeholder="What you build, who it's for, and why now"
             value={state.ventureDesc}
             onChange={(e) => patchVenture({ ventureDesc: e.target.value })}
           />

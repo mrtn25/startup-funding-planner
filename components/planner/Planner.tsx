@@ -13,6 +13,7 @@ import {
   calc,
   fmtM,
   initialPlannerState,
+  roundName,
   type IndustryKey,
   type Investor,
   type PlannerState,
@@ -50,6 +51,7 @@ export default function Planner() {
 
   const data = useMemo(() => calc(state), [state]);
   const { convEffect } = data;
+  const activeRounds = data.active;
 
   return (
     <div className="page">
@@ -63,7 +65,7 @@ export default function Planner() {
 
       <VentureCard state={state} onPatch={patch} onIndustry={onIndustry} />
 
-      <div className="sec-label">Non-Dilutive Funding &amp; Convertibles</div>
+      <div className="sec-label">Grants &amp; Non-Dilutive Funding</div>
       <div className="card">
         <div className="nd-row">
           <span className="ndl">Grants / Non-Dilutive</span>
@@ -80,8 +82,16 @@ export default function Planner() {
           <span style={{ fontSize: 12, color: "var(--text3)", marginLeft: 4 }}>(no equity effect)</span>
         </div>
 
+        <div className="info-box">
+          <strong>Grants &amp; non-dilutive funding</strong> (EU Horizon, EIC Accelerator, EXIST, SBIR) extend your
+          runway without touching the cap table. They are the only money here that costs you no ownership.
+        </div>
+      </div>
+
+      <div className="sec-label">Convertible / SAFE</div>
+      <div className="card">
         <div className="nd-row">
-          <span className="ndl">Convertible Note</span>
+          <span className="ndl">Amount</span>
           <input
             type="number"
             min="0"
@@ -117,22 +127,45 @@ export default function Planner() {
           <span style={{ fontSize: 12, color: "var(--text2)" }}>M€ (0 = no cap)</span>
         </div>
 
+        <div className="nd-row">
+          <span className="ndl">Converts at</span>
+          <div className="venture-seg">
+            {activeRounds.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                className={`vsb${(data.convTarget?.id ?? activeRounds[0]?.id) === r.id ? " active" : ""}`}
+                onClick={() => patch({ convRound: r.id })}
+              >
+                {roundName(r.id)}
+              </button>
+            ))}
+            {!activeRounds.length && (
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>Enable a round first</span>
+            )}
+          </div>
+        </div>
+
         {convEffect.pct > 0 && (
           <div className="info-box">
             Convertible note of {fmtM(convEffect.amt)} converts at effective valuation of {fmtM(convEffect.effectiveVal)}{" "}
             ({Math.round(convEffect.discount * 100)}% discount
-            {convEffect.cap > 0 ? `, cap ${fmtM(convEffect.cap)}` : ""}) ~{convEffect.pct.toFixed(1)}% dilution at first
-            round.
+            {convEffect.cap > 0 ? `, cap ${fmtM(convEffect.cap)}` : ""}) — about {convEffect.pct.toFixed(1)}% dilution,
+            taken immediately before {data.convTarget ? roundName(data.convTarget.id) : "the first round"} prices.
           </div>
         )}
 
         <div className="info-box" style={{ marginTop: 10 }}>
-          <strong>Grants &amp; Non-Dilutive Funding</strong> (e.g. EU Horizon, EIC Accelerator, SBIR, Exist) extend your
-          runway without equity dilution.
+          A convertible note or SAFE is <strong>not non-dilutive</strong> — it is equity with the price postponed. You
+          take the money now and agree the ownership later, when a priced round sets a valuation.
           <br />
-          <strong>Convertible Notes</strong> convert into equity at the next round. The <strong>Discount</strong> rewards
-          early risk: the note converts at next-round price minus X%. The <strong>Valuation Cap</strong> limits the
-          conversion valuation, protecting early investors at high follow-on valuations.
+          <br />
+          It converts <strong>into</strong> one of your rounds, immediately before it prices — so the noteholder is
+          diluted by that round along with everyone else. Pick which round above: the next one for a normal pre-round
+          raise, or a later one if the note is a bridge across a round. The <strong>discount</strong> rewards the early
+          risk by converting at that round&apos;s price minus X%; the <strong>valuation cap</strong> limits the
+          conversion valuation, which protects the noteholder if the round prices high. Whichever is more favourable to
+          them applies.
         </div>
       </div>
 

@@ -50,6 +50,8 @@ export type PlannerState = {
   convAmt: string;
   convDiscount: string;
   convCap: string;
+  /** Which active round the note converts into. Empty = the first one. */
+  convRound: RoundId | "";
   rounds: RoundState[];
   investors: Record<RoundId, Investor[]>;
   exitDirect: string;
@@ -408,6 +410,8 @@ export type CalcResult = {
   totalNonDilutive: number;
   grantAmt: number;
   convEffect: ConvertibleEffect;
+  /** The round the note converts into, if any. */
+  convTarget: RoundState | null;
 };
 
 const TOTAL_INIT = 10_000_000;
@@ -432,9 +436,19 @@ export function calc(state: PlannerState): CalcResult {
   }
   const esopEntry: Stakeholder = { name: "ESOP Pool", shares: Math.round(TOTAL_INIT * esopFrac), type: "esop", pct: 0 };
 
-  const firstActive = active[0];
-  const convEffect: ConvertibleEffect = firstActive
-    ? getConvertibleEffect(state, ((firstActive.invest * sf) / firstActive.dilPct) * 100)
+  /*
+   * A convertible doesn't sit outside the round structure — it converts INTO
+   * a priced round, and which one is the founder's choice: at the next round,
+   * or later if it's a bridge across one. An unset or inactive target falls
+   * back to the first active round.
+   */
+  const convIdx = Math.max(
+    0,
+    active.findIndex((r) => r.id === state.convRound),
+  );
+  const convTarget = active[convIdx];
+  const convEffect: ConvertibleEffect = convTarget
+    ? getConvertibleEffect(state, ((convTarget.invest * sf) / convTarget.dilPct) * 100)
     : { pct: 0, amt: 0, effectiveVal: 0, discount: 0, cap: 0 };
   let convEntry: Stakeholder | null = null;
 
@@ -459,8 +473,9 @@ export function calc(state: PlannerState): CalcResult {
     const si = r.invest * sf;
     const sp = (si / r.dilPct) * 100;
 
-    // A convertible converts immediately before the first priced round.
-    if (ri === 0 && convEffect.pct > 0) {
+    // The note converts immediately before its target priced round, so the
+    // round that follows dilutes the noteholder along with everyone else.
+    if (ri === convIdx && convEffect.pct > 0) {
       const convDilFrac = convEffect.pct / 100;
       const convShares = Math.round((totalShares * convDilFrac) / (1 - convDilFrac));
       totalShares += convShares;
@@ -519,6 +534,7 @@ export function calc(state: PlannerState): CalcResult {
     totalNonDilutive: grantAmt + num(state.convAmt),
     grantAmt,
     convEffect,
+    convTarget: convTarget ?? null,
   };
 }
 
@@ -658,6 +674,7 @@ export function initialPlannerState(): PlannerState {
     convAmt: "0",
     convDiscount: "20",
     convCap: "0",
+    convRound: "",
     rounds: INITIAL_ROUNDS.map((r) => ({ ...r })),
     investors: { preSeed: [], seed: [], serA: [], serB: [], serC: [], serD: [] },
     exitDirect: "",
