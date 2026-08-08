@@ -13,6 +13,8 @@ import {
   INPUTS,
   PRIORITIES,
   rankArchetypes,
+  itemStatus,
+  STAGES,
   SRC,
   W1,
   type ActionKey,
@@ -21,6 +23,7 @@ import {
   type InputId,
   type PrioKey,
   type ReadyState,
+  type Stage,
 } from "@/lib/ready-to-raise";
 
 /* Prose in the model module is authored in this repo, never user input,
@@ -29,32 +32,42 @@ import {
 const GROUP_ORDER: GroupKey[] = ["access", "signal", "clarity", "material", "process"];
 
 /** Quick starting points, so the board isn't a cold start. */
-const PRESETS: { id: string; label: string; on: Partial<Record<InputId, number>>; quiet?: boolean }[] = [
+const PRESETS: {
+  id: string;
+  label: string;
+  stage: Stage;
+  on: Partial<Record<InputId, number>>;
+  quiet?: boolean;
+}[] = [
   {
     id: "first",
     label: "First-time founder, pre-seed",
+    stage: "preseed",
     on: { goal: 0.5, deck: 1, targetProfile: 1, coldOutreach: 1 },
   },
   {
     id: "traction",
     label: "Has traction, no investor network",
+    stage: "seed",
     on: { revenue: 1, logos: 1, goal: 1, deck: 1, teaser: 1, list: 0.5, coldOutreach: 1, platformOutreach: 1 },
   },
   {
     id: "connected",
     label: "Well connected, thin proof",
+    stage: "preseed",
     on: { knowInvestors: 1, vouch: 1, vouchList: 1, warmIntros: 1, advisors: 1, accelerator: 1, goal: 0.5 },
   },
   {
     id: "repeat",
     label: "Second-time founder, mid-raise",
+    stage: "seed",
     on: {
       knowInvestors: 1, vouch: 1, vouchList: 1, warmIntros: 1, priorExit: 1, advisors: 1,
       goal: 1, targetProfile: 1, teaser: 1, deck: 1, readDeck: 1, dataroom: 1, crm: 1,
       list: 1, adviceFirst: 1, channelTest: 1,
     },
   },
-  { id: "reset", label: "Reset", on: {}, quiet: true },
+  { id: "reset", label: "Reset", stage: "preseed", on: {}, quiet: true },
 ];
 
 type Props = {
@@ -70,6 +83,9 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
   const [openDim, setOpenDim] = useState<DimKey | null>(null);
   /** Only meaningful on mobile, where the score panel docks to the bottom. */
   const [panelOpen, setPanelOpen] = useState(false);
+  /* Eight things to fix at once is what demoralises; the leverage ranking
+     already says which three matter. */
+  const [showAllActions, setShowAllActions] = useState(false);
 
   /*
    * The docked panel is fixed to the viewport, so without this it would sit
@@ -130,9 +146,10 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
 
   const setLevel = (id: InputId, value: number) => setState((s) => ({ ...s, [id]: value }));
   const toggle = (id: InputId) => setState((s) => ({ ...s, [id]: s[id] ? 0 : 1 }));
+  const setStage = (stage: Stage) => setState((s) => ({ ...s, stage }));
 
-  const applyPreset = (on: Partial<Record<InputId, number>>) =>
-    setState({ ...initialReadyState(), ...on } as ReadyState);
+  const applyPreset = (on: Partial<Record<InputId, number>>, stage: Stage) =>
+    setState({ ...initialReadyState(stage), ...on } as ReadyState);
 
   const dimMeta = Object.fromEntries(DIMS.map((d) => [d.key, d])) as Record<DimKey, (typeof DIMS)[number]>;
   const explained = openDim ? dimMeta[openDim] : null;
@@ -147,6 +164,26 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
         </p>
       </header>
 
+      <div className={styles.stageRow}>
+        <span className={styles.presetLabel}>Your stage</span>
+        <div className={styles.stageBtns} role="group" aria-label="Funding stage">
+          {STAGES.map((st) => (
+            <button
+              key={st.key}
+              type="button"
+              aria-pressed={state.stage === st.key}
+              className={`${styles.stageBtn}${state.stage === st.key ? ` ${styles.stageBtnOn}` : ""}`}
+              onClick={() => setStage(st.key)}
+            >
+              {st.label}
+            </button>
+          ))}
+        </div>
+        <span className={styles.stageNote}>
+          Items you aren&apos;t expected to have yet are greyed out and left out of the score.
+        </span>
+      </div>
+
       <div className={styles.presetLabel}>Start from an example profile — then adjust</div>
       <div className={styles.presets}>
         {PRESETS.map((p) => (
@@ -154,7 +191,7 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
             key={p.id}
             type="button"
             className={`${styles.btn}${p.quiet ? ` ${styles.btnQuiet}` : ""}`}
-            onClick={() => applyPreset(p.on)}
+            onClick={() => applyPreset(p.on, p.stage)}
           >
             {p.label}
           </button>
@@ -166,13 +203,14 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
         <div>
           {GROUP_ORDER.map((g) => {
             const items = INPUTS.filter((i) => i.group === g);
-            const have = items.filter((i) => (state[i.id] ?? 0) > 0).length;
+            const expected = items.filter((i) => itemStatus(i, state.stage) === "expected");
+            const have = expected.filter((i) => (state[i.id] ?? 0) > 0).length;
             return (
               <div className={styles.group} key={g}>
                 <div className={styles.groupHead}>
                   <span className={styles.groupTitle}>{GROUP_LABEL[g]}</span>
                   <span className={styles.groupCount}>
-                    {have}/{items.length}
+                    {have}/{expected.length}
                   </span>
                 </div>
                 <div className={styles.chips}>
@@ -180,9 +218,14 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
                     item.steps ? (
                       <div
                         key={item.id}
-                        className={`${styles.seg}${(state[item.id] ?? 0) > 0 ? ` ${styles.segOn}` : ""}`}
+                        className={`${styles.seg}${(state[item.id] ?? 0) > 0 ? ` ${styles.segOn}` : ""}${
+                          itemStatus(item, state.stage) !== "expected" ? ` ${styles.notYet}` : ""
+                        }`}
                       >
-                        <span className={styles.segLabel}>{item.label}</span>
+                        <span className={styles.segLabel}>
+                          {item.label}
+                          <StatusTag status={itemStatus(item, state.stage)} />
+                        </span>
                         <div className={styles.segBtns} role="group" aria-label={item.label}>
                           {item.steps.map((s) => {
                             const active = (state[item.id] ?? 0) === s.value;
@@ -206,12 +249,15 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
                         key={item.id}
                         type="button"
                         aria-pressed={(state[item.id] ?? 0) > 0}
-                        className={`${styles.chip}${(state[item.id] ?? 0) > 0 ? ` ${styles.chipOn}` : ""}`}
+                        className={`${styles.chip}${(state[item.id] ?? 0) > 0 ? ` ${styles.chipOn}` : ""}${
+                          itemStatus(item, state.stage) !== "expected" ? ` ${styles.notYet}` : ""
+                        }`}
                         onClick={() => toggle(item.id)}
                       >
                         <span className={styles.dot} />
                         <span>
                           {item.label}
+                          <StatusTag status={itemStatus(item, state.stage)} />
                           {item.hint && <span className={styles.hint}>{item.hint}</span>}
                         </span>
                       </button>
@@ -239,13 +285,25 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
               <div className={styles.kicker}>Readiness</div>
               <div className={styles.scoreRow}>
                 <span className={styles.scoreNum}>{result.score}</span>
-                <span className={styles.scoreMax}>/ 100</span>
+                <span className={styles.scoreMax}>
+                  {result.anySelected ? `typical ${result.typical[0]}–${result.typical[1]}` : "/ 100"}
+                </span>
                 <span className={styles.bandInline}>
                   {result.anySelected ? result.band.label : "Nothing selected yet"}
                 </span>
               </div>
               <div className={styles.band}>{result.anySelected ? result.band.label : "Nothing selected yet"}</div>
               <div className={styles.meter}>
+                {result.anySelected && (
+                  <span
+                    className={styles.meterBand}
+                    style={{
+                      left: `${result.typical[0]}%`,
+                      width: `${result.typical[1] - result.typical[0]}%`,
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
                 <span className={styles.meterFill} style={{ width: `${result.score}%` }} />
               </div>
             </div>
@@ -329,11 +387,13 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
       <div className={styles.actions}>
         <div className={styles.actionsHead}>
           <h3>What to do next</h3>
-          <span className={styles.actionsNote}>Ranked by leverage — how much each would move your score</span>
+          <span className={styles.actionsNote}>
+            {showAllActions ? "Ranked by leverage" : "The three with the most leverage right now"}
+          </span>
         </div>
 
         <div className={styles.actionList}>
-          {result.actions.map((a, i) => {
+          {(showAllActions ? result.actions : result.actions.slice(0, 3)).map((a, i) => {
             const open = openAction === a.key;
             return (
               <div key={a.key} className={`${styles.action}${i === 0 && result.anySelected ? ` ${styles.actionTop}` : ""}`}>
@@ -391,6 +451,12 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
             );
           })}
         </div>
+
+        {!showAllActions && result.actions.length > 3 && (
+          <button type="button" className={styles.moreBtn} onClick={() => setShowAllActions(true)}>
+            Show {result.actions.length - 3} more
+          </button>
+        )}
       </div>
 
       {/* ── Investor priorities ── */}
@@ -445,6 +511,14 @@ export default function ReadyToRaise({ onOpenTool, isActive = true }: Props) {
   );
 }
 
+/** Marks items that aren't counted against you at the selected stage. */
+function StatusTag({ status }: { status: ReturnType<typeof itemStatus> }) {
+  if (status === "expected") return null;
+  return (
+    <span className={styles.tag}>{status === "bonus" ? "bonus" : "not yet expected"}</span>
+  );
+}
+
 function WeightsTable() {
   return (
     <details className={styles.weights}>
@@ -487,8 +561,16 @@ function WeightsTable() {
         Dimension weights are set by hand from the cited literature, not fitted to data — no dataset exists on which a
         readiness model like this has been estimated. Access carries the most because roughly 60% of deal flow arrives
         through networks; materials carry the least because the evidence says the formal plan matters less than founders
-        assume. Treat the output as a structured argument about where your effort goes, not a prediction of whether you
-        will raise.
+        assume.
+      </p>
+      <p className={styles.caveat}>
+        Within a dimension the items are treated as <strong>substitutes, not a checklist</strong>: warm introductions,
+        events and platforms are three ways into the same channel, so the score saturates — the three strongest items
+        already put you at roughly 85%, and the rest fill in from there. Items you aren&apos;t expected to have at your
+        stage, and items nobody can simply go and acquire (a prior exit), are left out of the target entirely and only
+        ever count as upside. The typical range shown against your score is a design assumption on the same footing as
+        the weights, not a measured benchmark. Treat the output as a structured argument about where your effort goes,
+        not a prediction of whether you will raise.
       </p>
     </details>
   );

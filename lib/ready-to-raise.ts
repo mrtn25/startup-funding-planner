@@ -60,6 +60,17 @@ export type ActionKey =
   | "dataroom"
   | "instrument";
 
+export type Stage = "idea" | "preseed" | "seed" | "seriesa";
+
+export const STAGES: { key: Stage; label: string }[] = [
+  { key: "idea", label: "Idea" },
+  { key: "preseed", label: "Pre-Seed" },
+  { key: "seed", label: "Seed" },
+  { key: "seriesa", label: "Series A+" },
+];
+
+const STAGE_INDEX: Record<Stage, number> = { idea: 0, preseed: 1, seed: 2, seriesa: 3 };
+
 /** Every input resolves to a level in [0, 1]. Segmented ones offer a middle. */
 export type InputDef = {
   id: InputId;
@@ -70,9 +81,29 @@ export type InputDef = {
   /** Present for ordinal items; absent means a plain on/off chip. */
   steps?: { value: number; label: string }[];
   hint?: string;
+  /**
+   * Only expected from this stage onward. Before it the item is shown greyed
+   * and left out of the denominator — a pre-seed founder without a data room
+   * is normal, not incomplete. Ticking it early still counts as a bonus.
+   */
+  from?: Stage;
+  /**
+   * Never expected at any stage, so never in the denominator. Either innate
+   * (a prior exit is a fact about you, not a task) or one optional route
+   * among several (an accelerator). Only ever adds.
+   */
+  bonus?: boolean;
 };
 
-export type ReadyState = Record<InputId, number>;
+export type ItemStatus = "expected" | "early" | "bonus";
+
+export function itemStatus(item: InputDef, stage: Stage): ItemStatus {
+  if (item.bonus) return "bonus";
+  if (item.from && STAGE_INDEX[stage] < STAGE_INDEX[item.from]) return "early";
+  return "expected";
+}
+
+export type ReadyState = Record<InputId, number> & { stage: Stage };
 
 /* ── Sources ─────────────────────────────────────────────────── */
 
@@ -263,11 +294,11 @@ export const INPUTS: InputDef[] = [
   },
 
   // Signals
-  { id: "revenue", group: "signal", label: "Revenue / MRR", de: "Umsatz / MRR" },
-  { id: "logos", group: "signal", label: "Recognisable customers", de: "Namhafte Kund/innen" },
-  { id: "press", group: "signal", label: "Press / awards", de: "Presse / Awards" },
-  { id: "priorExit", group: "signal", label: "A prior exit", de: "Frühere Exits" },
-  { id: "accelerator", group: "signal", label: "Accelerator / programme", de: "Accelerator / Programme" },
+  { id: "revenue", group: "signal", label: "Revenue / MRR", de: "Umsatz / MRR", from: "seed" },
+  { id: "logos", group: "signal", label: "Recognisable customers", de: "Namhafte Kund/innen", from: "preseed" },
+  { id: "press", group: "signal", label: "Press / awards", de: "Presse / Awards", bonus: true },
+  { id: "priorExit", group: "signal", label: "A prior exit", de: "Frühere Exits", bonus: true },
+  { id: "accelerator", group: "signal", label: "Accelerator / programme", de: "Accelerator / Programme", bonus: true },
   { id: "advisors", group: "signal", label: "Well-known advisors", de: "Bekannte Berater/innen" },
 
   // Clarity
@@ -289,15 +320,15 @@ export const INPUTS: InputDef[] = [
     de: "Welche Investor/innen passen strategisch zu dir?",
   },
   { id: "grants", group: "clarity", label: "I've considered grants / non-dilutive", de: "Hast du auch über Grants nachgedacht?" },
-  { id: "storyTest", group: "clarity", label: "I'm testing different storylines", de: "Verschiedene Storylines (Industrie Insider vs Outsider)" },
+  { id: "storyTest", group: "clarity", label: "I'm testing different storylines", de: "Verschiedene Storylines (Industrie Insider vs Outsider)", from: "preseed" },
 
   // Materials
   { id: "teaser", group: "material", label: "Teaser deck (2 minutes)", de: "Teaser Deck (2 Minuten)" },
-  { id: "deck", group: "material", label: "Pitch deck (15+ slides)", de: "Pitch Deck (≥15 Folien)" },
-  { id: "readDeck", group: "material", label: "Read-deck to share after meetings", de: "Read-Deck (Post-Meeting zum Teilen)" },
-  { id: "dataroom", group: "material", label: "Data room with access control", de: "Datenraum mit Freigabe-Optionen" },
-  { id: "crm", group: "material", label: "Investor CRM set up", de: "Investor CRM aufgesetzt" },
-  { id: "qa", group: "material", label: "Investor Q&A document", de: "Investor Q&A Fragebogen" },
+  { id: "deck", group: "material", label: "Pitch deck (15+ slides)", de: "Pitch Deck (≥15 Folien)", from: "preseed" },
+  { id: "readDeck", group: "material", label: "Read-deck to share after meetings", de: "Read-Deck (Post-Meeting zum Teilen)", from: "seed" },
+  { id: "dataroom", group: "material", label: "Data room with access control", de: "Datenraum mit Freigabe-Optionen", from: "seed" },
+  { id: "crm", group: "material", label: "Investor CRM set up", de: "Investor CRM aufgesetzt", from: "preseed" },
+  { id: "qa", group: "material", label: "Investor Q&A document", de: "Investor Q&A Fragebogen", from: "seed" },
 
   // Process
   {
@@ -317,7 +348,7 @@ export const INPUTS: InputDef[] = [
     label: "I run advice-first conversations",
     de: "Casual Dating mit Investoren (asking for advice not for money)",
   },
-  { id: "channelTest", group: "process", label: "I'm testing outreach channels", de: "Outreach Kanäle" },
+  { id: "channelTest", group: "process", label: "I'm testing outreach channels", de: "Outreach Kanäle", from: "preseed" },
 ];
 
 export const INPUT_BY_ID = Object.fromEntries(INPUTS.map((i) => [i.id, i])) as Record<InputId, InputDef>;
@@ -493,27 +524,61 @@ export type ScoredAction = { key: ActionKey; def: ActionDef; priority: number };
 
 export type ReadyResult = {
   dim: Record<DimKey, number>;
-  /** 0–100 headline readiness. */
+  /** 0–100 headline readiness, measured against what this stage expects. */
   score: number;
-  band: { key: "early" | "building" | "close" | "ready"; label: string; note: string };
+  band: { key: BandKey; label: string; note: string };
+  /** Range a prepared founder at this stage tends to land in. */
+  typical: [number, number];
+  stage: Stage;
   /** Weakest dimension by weighted shortfall; null once nothing is meaningfully short. */
   bottleneck: DimKey | null;
   actions: ScoredAction[];
   anySelected: boolean;
 };
 
-export function initialReadyState(): ReadyState {
-  return Object.fromEntries(INPUTS.map((i) => [i.id, 0])) as ReadyState;
+export function initialReadyState(stage: Stage = "preseed"): ReadyState {
+  return { ...Object.fromEntries(INPUTS.map((i) => [i.id, 0])), stage } as ReadyState;
 }
 
-/** Maximum achievable raw score per dimension — used to normalise. */
-const DIM_MAX: Record<DimKey, number> = (() => {
+/**
+ * Weighted sum that still counts as "expected" at a given stage. Items not yet
+ * applicable, and items that are never expected, are excluded — so a pre-seed
+ * founder is not measured against a Series A checklist.
+ */
+function dimMax(stage: Stage): Record<DimKey, number> {
   const max = { access: 0, signal: 0, clarity: 0, material: 0, process: 0 } as Record<DimKey, number>;
   INPUTS.forEach((i) => {
+    if (itemStatus(i, stage) !== "expected") return;
     const w = W1[i.id] ?? {};
     (Object.keys(w) as DimKey[]).forEach((d) => (max[d] += w[d]!));
   });
   return max;
+}
+
+/**
+ * Saturation constant per dimension.
+ *
+ * The items inside a dimension are mostly SUBSTITUTES, not complements —
+ * warm intros, events and platforms are three ways into the same channel,
+ * not three requirements. A linear sum/max therefore told a maximally
+ * well-connected founder their access was 60% and called it their
+ * bottleneck, because the denominator also contained cold outreach, a prior
+ * exit and an accelerator.
+ *
+ * Each k is set so the three strongest items in a dimension already reach
+ * ~85% of the curve; everything after that fills in the rest.
+ */
+const SAT_K: Record<DimKey, number> = (() => {
+  const k = {} as Record<DimKey, number>;
+  (Object.keys(DIM_WEIGHT) as DimKey[]).forEach((d) => {
+    const top3 = INPUTS.map((i) => W1[i.id]?.[d] ?? 0)
+      .filter((w) => w > 0)
+      .sort((a, b) => b - a)
+      .slice(0, 3)
+      .reduce((a, b) => a + b, 0);
+    k[d] = top3 > 0 ? -Math.log(0.15) / top3 : 1;
+  });
+  return k;
 })();
 
 /** The most headline score any single action could recover, used to scale priorities. */
@@ -521,29 +586,55 @@ const MAX_REACH = Math.max(
   ...ACTIONS.map((a) => (Object.keys(a.fixes) as DimKey[]).reduce((s, d) => s + a.fixes[d]! * DIM_WEIGHT[d], 0)),
 );
 
-const BANDS = [
-  { key: "early" as const, min: 0, label: "Not raising yet", note: "There is groundwork to do before outreach pays off. Fix the top item first — starting now mostly burns the contacts you have." },
-  { key: "building" as const, min: 35, label: "Building", note: "The foundations are forming. Keep going on the top two items; a raise opened now would be slower than it needs to be." },
-  { key: "close" as const, min: 60, label: "Close", note: "Close enough that momentum matters more than polish. Clear the top item, then open the round rather than perfecting the rest." },
-  { key: "ready" as const, min: 80, label: "Ready to raise", note: "Nothing structural is missing. From here the binding constraint is sequencing and timing, not readiness." },
-];
+/**
+ * The range a reasonably-prepared founder tends to land in at each stage.
+ *
+ * These are set by hand alongside the weights — there is no dataset of scored
+ * founders to calibrate against, so they are a design assumption, not a
+ * measured benchmark. They exist because a bare "62 / 100" invites comparison
+ * with a maximum nobody reaches, which reads as failure rather than as
+ * information.
+ */
+export const TYPICAL: Record<Stage, [number, number]> = {
+  idea: [35, 60],
+  preseed: [45, 68],
+  seed: [52, 74],
+  seriesa: [58, 80],
+};
+
+export type BandKey = "below" | "typical" | "ahead";
 
 export function compute(state: ReadyState): ReadyResult {
-  const dim = { access: 0, signal: 0, clarity: 0, material: 0, process: 0 } as Record<DimKey, number>;
+  const stage = state.stage ?? "preseed";
+  const max = dimMax(stage);
+  const raw = { access: 0, signal: 0, clarity: 0, material: 0, process: 0 } as Record<DimKey, number>;
 
+  // Everything ticked contributes, including items that aren't expected yet —
+  // those are pure upside rather than part of the target.
   INPUTS.forEach((i) => {
     const level = state[i.id] ?? 0;
     if (!level) return;
     const w = W1[i.id] ?? {};
-    (Object.keys(w) as DimKey[]).forEach((d) => (dim[d] += w[d]! * level));
+    (Object.keys(w) as DimKey[]).forEach((d) => (raw[d] += w[d]! * level));
   });
 
+  const dim = { access: 0, signal: 0, clarity: 0, material: 0, process: 0 } as Record<DimKey, number>;
   (Object.keys(dim) as DimKey[]).forEach((d) => {
-    dim[d] = DIM_MAX[d] > 0 ? Math.min(1, dim[d] / DIM_MAX[d]) : 0;
+    if (max[d] <= 0) {
+      // Nothing expected here at this stage: it can only be upside.
+      dim[d] = raw[d] > 0 ? 1 : 0;
+      return;
+    }
+    const k = SAT_K[d];
+    dim[d] = Math.min(1, (1 - Math.exp(-k * raw[d])) / (1 - Math.exp(-k * max[d])));
   });
 
+  // Dimensions with nothing expected at this stage drop out of the headline
+  // rather than scoring zero against a target that doesn't exist.
+  const counted = (Object.keys(DIM_WEIGHT) as DimKey[]).filter((d) => max[d] > 0);
+  const weightSum = counted.reduce((a, d) => a + DIM_WEIGHT[d], 0) || 1;
   const score = Math.round(
-    (Object.keys(DIM_WEIGHT) as DimKey[]).reduce((a, d) => a + dim[d] * DIM_WEIGHT[d], 0) * 100,
+    (counted.reduce((a, d) => a + dim[d] * DIM_WEIGHT[d], 0) / weightSum) * 100,
   );
 
   /* An action's priority is the ABSOLUTE weighted shortfall of the dimensions
@@ -562,15 +653,43 @@ export function compute(state: ReadyState): ReadyResult {
     return { key: def.key, def, priority: Math.round((need / MAX_REACH) * 100) };
   }).sort((a, b) => b.priority - a.priority);
 
-  const weakest = (Object.keys(DIM_WEIGHT) as DimKey[]).reduce((worst, d) =>
-    (1 - dim[d]) * DIM_WEIGHT[d] > (1 - dim[worst]) * DIM_WEIGHT[worst] ? d : worst,
+  const weakest = counted.reduce(
+    (worst, d) => ((1 - dim[d]) * DIM_WEIGHT[d] > (1 - dim[worst]) * DIM_WEIGHT[worst] ? d : worst),
+    counted[0] ?? "access",
   );
   // With nothing meaningfully short there is no bottleneck to name.
   const bottleneck = dim[weakest] >= 0.999 ? null : weakest;
 
-  const band = [...BANDS].reverse().find((b) => score >= b.min)!;
+  const [lo, hi] = TYPICAL[stage];
+  const band: ReadyResult["band"] =
+    score < lo
+      ? {
+          key: "below",
+          label: "Below typical",
+          note: "Below where founders at this stage usually are when they open a round. Clear the top item first — starting now mostly spends contacts you'll want later.",
+        }
+      : score > hi
+        ? {
+            key: "ahead",
+            label: "Ahead of typical",
+            note: "Nothing structural is missing for this stage. From here the binding constraint is sequencing and timing, not readiness.",
+          }
+        : {
+            key: "typical",
+            label: "Typical for this stage",
+            note: "About where founders at this stage usually are. Momentum now matters more than polish — clear the top item, then open the round.",
+          };
 
-  return { dim, score, band, bottleneck, actions, anySelected: INPUTS.some((i) => (state[i.id] ?? 0) > 0) };
+  return {
+    dim,
+    score,
+    band,
+    typical: TYPICAL[stage],
+    stage,
+    bottleneck,
+    actions,
+    anySelected: INPUTS.some((i) => (state[i.id] ?? 0) > 0),
+  };
 }
 
 /* ── Investor priorities → who to target ─────────────────────── */

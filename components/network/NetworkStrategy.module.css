@@ -245,6 +245,14 @@
   font-variant-numeric: tabular-nums;
   flex: none;
 }
+/* Before anything is selected the column is inert, not a ranking. */
+.colIdle .score {
+  color: var(--ns-fg3);
+}
+.colIdle .sname {
+  color: var(--ns-fg2);
+}
+
 .isTop {
   border-color: var(--ns-accent);
   border-width: 2px;

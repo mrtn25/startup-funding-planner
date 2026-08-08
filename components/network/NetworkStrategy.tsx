@@ -204,7 +204,10 @@ export default function NetworkStrategy() {
           <div className={styles.model} ref={modelRef}>
             <svg className={styles.edges} viewBox={viewBox} preserveAspectRatio="none" aria-hidden="true">
               {edges.map((e) => {
-                const a = e.src.kind === "in" ? (on[e.src.key] ? 1 : 0) : activation[e.src.key] || 0;
+                // Mechanism activations sit at the sigmoid's resting value with
+                // no input, which would draw a web of edges that mean nothing.
+                const a =
+                  e.src.kind === "in" ? (on[e.src.key] ? 1 : 0) : anyOn ? activation[e.src.key] || 0 : 0;
                 return (
                   <path
                     key={e.id}
@@ -248,13 +251,16 @@ export default function NetworkStrategy() {
                 >
                   <span className={styles.mlabel}>{NAMES[m]}</span>
                   <span className={styles.bar}>
-                    <span className={styles.fill} style={{ width: `${Math.round(activation[m] * 100)}%` }} />
+                    <span className={styles.fill} style={{ width: anyOn ? `${Math.round(activation[m] * 100)}%` : 0 }} />
                   </span>
                 </button>
               ))}
             </div>
 
-            <div className={`${styles.col} ${styles.colStr}`}>
+            {/* With nothing selected every mechanism sits at the sigmoid's
+                resting value, so the scores are an artefact of the curve
+                rather than a result. Show a dash until there is input. */}
+            <div className={`${styles.col} ${styles.colStr}${anyOn ? "" : ` ${styles.colIdle}`}`}>
               {order.map((s, i) => (
                 <button
                   type="button"
@@ -266,7 +272,7 @@ export default function NetworkStrategy() {
                   onClick={() => setFocus(`st:${s}`)}
                 >
                   <span className={styles.sname}>{NAMES[s]}</span>
-                  <span className={styles.score}>{score[s]}</span>
+                  <span className={styles.score}>{anyOn ? score[s] : "—"}</span>
                 </button>
               ))}
             </div>
