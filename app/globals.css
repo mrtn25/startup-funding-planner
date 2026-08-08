@@ -687,7 +687,9 @@ input[type="text"]:focus {
   color: var(--text);
   font-weight: 500;
 }
-footer {
+/* Scoped to the planner's own closing line. As a bare `footer` selector this
+   also caught the site footer and centred it. */
+.page footer {
   margin-top: 3rem;
   font-size: 11px;
   color: var(--text3);

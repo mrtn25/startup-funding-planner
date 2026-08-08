@@ -22,31 +22,6 @@
   flex-wrap: wrap;
 }
 
-.gh {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 9px 16px 9px 13px;
-  border-radius: 100px;
-  border: 1px solid var(--border2);
-  background: var(--bg);
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color 0.15s, background 0.15s;
-}
-.gh:hover {
-  border-color: var(--text2);
-  background: var(--surface2);
-}
-.gh svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-  flex: none;
-}
-
 .profile {
   font-size: 13px;
   color: var(--text2);
@@ -64,6 +39,7 @@
   color: var(--text3);
   margin: 0;
   max-width: 52ch;
+  text-align: left;
 }
 
 @media (max-width: 640px) {

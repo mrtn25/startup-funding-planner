@@ -1,0 +1,89 @@
+/* Circle-to-pill button, after the 21st.dev motion-button pattern.
+   At rest it reads as a blue circle with an icon and a label beside it;
+   on hover the circle grows into the full pill and the label inverts. */
+
+.btn {
+  position: relative;
+  display: inline-block;
+  height: 56px;
+  padding: 4px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The growing element. Width is animated rather than a transform so the
+   pill keeps true round caps at every point of the animation. */
+.circle {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:hover .circle,
+.btn:focus-visible .circle {
+  width: calc(100% - 8px);
+}
+
+.icon {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  transform: translateY(-50%);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn:hover .icon,
+.btn:focus-visible .icon {
+  transform: translate(0.4rem, -50%);
+}
+.icon svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  display: block;
+}
+
+.label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  /* Offsets the centred label clear of the resting circle. */
+  padding-left: 34px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition: color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn:hover .label,
+.btn:focus-visible .label {
+  color: var(--accent-ink);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circle,
+  .icon,
+  .label {
+    transition-duration: 0.01ms;
+  }
+}

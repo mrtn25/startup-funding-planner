@@ -1,3 +1,4 @@
+import MotionButton from "./MotionButton";
 import styles from "./SiteFooter.module.css";
 
 const REPO_URL = "https://github.com/mrtn25/startup-funding-planner";
@@ -17,10 +18,7 @@ export default function SiteFooter() {
     <footer className={`${styles.footer} no-print`}>
       <div className={styles.inner}>
         <div className={styles.links}>
-          <a className={styles.gh} href={REPO_URL} target="_blank" rel="noopener noreferrer">
-            <GitHubMark />
-            Source on GitHub
-          </a>
+          <MotionButton href={REPO_URL} label="Source on GitHub" icon={<GitHubMark />} external />
           <a className={styles.profile} href={PROFILE_URL} target="_blank" rel="noopener noreferrer">
             @mrtn25
           </a>
