@@ -104,8 +104,9 @@ export default function ScrollHero({ ctaHref }: ScrollHeroProps) {
             <span className={styles.taglineAccent}>your startup.</span>
           </p>
           <p className={styles.blurb}>
-            Three free tools for founders — check whether you&apos;re actually ready to raise, model exactly what each
-            round costs you, and work out which way into an investor network fits your profile.
+            Four free tools for founders — check whether you&apos;re ready to raise, work out how much to raise and
+            what it buys, model exactly what that costs you in ownership, and find the way into an investor network
+            that fits your profile.
           </p>
           <a className={styles.cta} href={ctaHref}>
             Open the tools

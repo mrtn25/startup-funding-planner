@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Startup Funding & Dilution Planner",
   description:
-    "Check whether you're ready to raise, model dilution across FFF, Angels & VCs, build your cap table and simulate exits — and find the network strategy that fits your founder profile.",
+    "Four free tools for founders: an investor-readiness assessment, a round planner that sizes the raise and its use of funds, a dilution and cap-table planner, and a research-backed network strategy model.",
 };
 
 export const viewport: Viewport = {
