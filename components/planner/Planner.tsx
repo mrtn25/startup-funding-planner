@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import CapTable from "./CapTable";
 import DilutionChart from "./DilutionChart";
 import ExitScenario from "./ExitScenario";
@@ -21,7 +21,12 @@ import {
   type RoundState,
 } from "@/lib/planner";
 
-export default function Planner() {
+type Props = {
+  /** Amount handed over from the Round Planner, in M€. */
+  seed?: { roundId: RoundId; investM: number; token: number } | null;
+};
+
+export default function Planner({ seed }: Props) {
   const [state, setState] = useState<PlannerState>(initialPlannerState);
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
 
@@ -49,6 +54,24 @@ export default function Planner() {
 
   const onIndustry = useCallback((key: IndustryKey) => setState((s) => applyIndustry(s, key)), []);
 
+  /*
+   * Applying a hand-off from the Round Planner: drop the amount onto the
+   * matching round, switch that round on and leave everything else alone.
+   * Keyed on the token so handing over the same number twice still applies.
+   */
+  useEffect(() => {
+    if (!seed) return;
+    setState((p) => ({
+      ...p,
+      industry: "custom",
+      rounds: p.rounds.map((r) =>
+        r.id === seed.roundId
+          ? { ...r, invest: Math.round(seed.investM * 100) / 100, active: true }
+          : r,
+      ),
+    }));
+  }, [seed?.token]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const data = useMemo(() => calc(state), [state]);
   const { convEffect } = data;
   const activeRounds = data.active;
@@ -56,10 +79,10 @@ export default function Planner() {
   return (
     <div className="page">
       <div style={{ marginBottom: 4 }}>
-        <h1>Startup Funding &amp; Dilution Planner</h1>
+        <h1>Dilution Planner</h1>
         <p className="subtitle">
-          Plan your financing rounds — model FFF, Angels &amp; VCs, track dilution, build your cap table, and simulate
-          exit scenarios.
+          What each round actually costs you in ownership. Model FFF, Angels &amp; VCs across financing rounds, track
+          dilution, build the cap table and simulate exits under different liquidation preferences.
         </p>
       </div>
 

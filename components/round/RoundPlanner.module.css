@@ -448,3 +448,170 @@
     width: 46px;
   }
 }
+
+/* ── Suggested runway ── */
+.suggest {
+  padding: 8px 0 2px;
+}
+.suggestBtn {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border: 1px dashed var(--rp-accent);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--rp-accent);
+  cursor: pointer;
+}
+.suggestBtn:hover {
+  background: var(--rp-accent);
+  color: #fff;
+  border-style: solid;
+}
+
+/* ── Timeline ── */
+.timeline {
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--rp-line);
+  padding-top: 1.5rem;
+}
+.timeline h3 {
+  font-size: 19px;
+  font-weight: 500;
+  margin: 0 0 0.35rem;
+}
+.timelineIntro {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--rp-fg2);
+  margin: 0 0 1.5rem;
+  max-width: 74ch;
+}
+
+.gantt {
+  margin-bottom: 1rem;
+}
+.ganttTrack {
+  position: relative;
+  height: 52px;
+  background: var(--rp-bg2);
+  border-radius: 8px;
+}
+.ganttBar {
+  position: absolute;
+  top: 10px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  overflow: hidden;
+  min-width: 4px;
+}
+.ganttLabel {
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+.barBuild {
+  background: #2200ff;
+}
+.barRaise {
+  background: #00b5ad;
+}
+.barSafety {
+  background: var(--rp-sel);
+}
+.barSafety .ganttLabel {
+  color: #17210a;
+}
+.barGap {
+  background: repeating-linear-gradient(45deg, #d85a30, #d85a30 5px, #b8481f 5px, #b8481f 10px);
+}
+
+/* Markers sit under the track so they never cover a bar label. */
+.marker,
+.markerLow {
+  position: absolute;
+  top: 0;
+  bottom: -22px;
+  width: 0;
+  border-left: 2px dashed var(--rp-fg3);
+}
+.markerLow {
+  border-left-color: var(--rp-warn);
+}
+.markerDot {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rp-fg3);
+}
+.markerLow .markerDot {
+  background: var(--rp-warn);
+}
+.markerText {
+  position: absolute;
+  bottom: -16px;
+  left: 6px;
+  font-size: 10.5px;
+  white-space: nowrap;
+  color: var(--rp-fg3);
+}
+.markerLow .markerText {
+  color: var(--rp-warn);
+  bottom: -30px;
+}
+.markerTextEnd {
+  left: auto;
+  right: 6px;
+  text-align: right;
+}
+
+.ganttAxis {
+  position: relative;
+  height: 46px;
+  margin-top: 4px;
+}
+.ganttAxis span {
+  position: absolute;
+  font-size: 10.5px;
+  color: var(--rp-fg3);
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+  top: 30px;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--rp-fg2);
+}
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+@media (max-width: 640px) {
+  .ganttLabel {
+    font-size: 10px;
+  }
+  .markerText {
+    font-size: 9.5px;
+  }
+}

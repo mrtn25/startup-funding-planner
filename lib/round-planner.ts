@@ -142,6 +142,14 @@ export type RoundPlanState = {
   currentCash: number;
   /** Net burn today, k€ per month, before any new hires. */
   currentBurn: number;
+  /** Founders who will draw a salary once the round closes. */
+  founders: number;
+  /** Salary per founder, k€ per month, from close. Often 0 before a round. */
+  founderSalary: number;
+  /** How long the plan takes to reach the milestone the next round expects. */
+  monthsToMilestone: number;
+  /** How long raising the next round takes, first meeting to money in. */
+  fundraiseMonths: number;
   /** Months of runway the round should buy. */
   targetMonths: number;
   /** Contingency on top of the plan, as a fraction. */
@@ -153,17 +161,68 @@ export type RoundPlanState = {
   spend: Record<SpendKey, number>;
 };
 
-export function initialRoundPlan(): RoundPlanState {
-  return {
-    stage: "seed",
+/**
+ * Sensible starting points per stage. Pre-seed matters most here: two
+ * founders paying themselves nothing genuinely do burn almost nothing, so a
+ * seed-shaped default made the tool read as nonsense at that stage.
+ */
+export const STAGE_DEFAULTS: Record<Stage, Omit<RoundPlanState, "stage">> = {
+  preseed: {
+    currentCash: 20,
+    currentBurn: 2,
+    founders: 2,
+    founderSalary: 3.5,
+    monthsToMilestone: 9,
+    fundraiseMonths: 4,
+    targetMonths: 15,
+    bufferPct: 0.25,
+    rampMonths: 4,
+    hires: { eng: 1, product: 0, design: 0, sales: 0, marketing: 0, ops: 0 },
+    spend: { marketing: 1, infra: 1, tooling: 0.5, legal: 1, other: 0.5 },
+  },
+  seed: {
     currentCash: 150,
-    currentBurn: 35,
+    currentBurn: 8,
+    founders: 2,
+    founderSalary: 6,
+    monthsToMilestone: 12,
+    fundraiseMonths: 5,
     targetMonths: 18,
     bufferPct: 0.25,
     rampMonths: 6,
     hires: { eng: 3, product: 1, design: 0, sales: 1, marketing: 1, ops: 0 },
     spend: { marketing: 8, infra: 4, tooling: 2, legal: 3, other: 2 },
-  };
+  },
+  seriesa: {
+    currentCash: 800,
+    currentBurn: 60,
+    founders: 2,
+    founderSalary: 9,
+    monthsToMilestone: 14,
+    fundraiseMonths: 5,
+    targetMonths: 20,
+    bufferPct: 0.25,
+    rampMonths: 8,
+    hires: { eng: 8, product: 2, design: 2, sales: 4, marketing: 2, ops: 2 },
+    spend: { marketing: 40, infra: 15, tooling: 8, legal: 8, other: 6 },
+  },
+  seriesb: {
+    currentCash: 3000,
+    currentBurn: 220,
+    founders: 2,
+    founderSalary: 12,
+    monthsToMilestone: 15,
+    fundraiseMonths: 6,
+    targetMonths: 21,
+    bufferPct: 0.25,
+    rampMonths: 9,
+    hires: { eng: 15, product: 4, design: 3, sales: 12, marketing: 5, ops: 4 },
+    spend: { marketing: 120, infra: 40, tooling: 20, legal: 15, other: 12 },
+  },
+};
+
+export function initialRoundPlan(stage: Stage = "seed"): RoundPlanState {
+  return { stage, ...STAGE_DEFAULTS[stage] };
 }
 
 /* ── Model ───────────────────────────────────────────────────── */
@@ -172,7 +231,23 @@ export type Allocation = { key: AllocationKey; label: string; amount: number; sh
 
 export type Flag = { level: "warn" | "note" | "ok"; text: string; sources: string[] };
 
+export type Phase = { key: "build" | "raise" | "safety" | "gap"; label: string; start: number; months: number };
+
+export type Timeline = {
+  phases: Phase[];
+  /** Month at which the next raise should start. */
+  startRaisingAt: number;
+  /** Month the money runs out. */
+  cashOutAt: number;
+  /** Runway this plan actually needs: milestone + raise + a safety margin. */
+  recommendedMonths: number;
+  /** True when the money runs out before the next round could close. */
+  raisesOnFumes: boolean;
+};
+
 export type RoundPlan = {
+  timeline: Timeline;
+  founderCost: number;
   /** k€ per month once every hire has landed. */
   steadyBurn: number;
   /** k€ per month averaged across the plan, accounting for the ramp. */
@@ -195,7 +270,10 @@ export type RoundPlan = {
 export function computePlan(s: RoundPlanState): RoundPlan {
   const hireMonthly = ROLES.reduce((a, r) => a + (s.hires[r.key] ?? 0) * r.monthly, 0);
   const spendMonthly = SPEND.reduce((a, k) => a + (s.spend[k.key] ?? 0), 0);
-  const steadyBurn = s.currentBurn + hireMonthly + spendMonthly;
+  // Founders start drawing a salary the day the money lands, so unlike hires
+  // this is not ramped. It is the line pre-seed founders most often forget.
+  const founderCost = s.founders * s.founderSalary;
+  const steadyBurn = s.currentBurn + founderCost + hireMonthly + spendMonthly;
 
   /*
    * Hires land over the ramp rather than on day one, so the plan costs less
@@ -205,7 +283,7 @@ export function computePlan(s: RoundPlanState): RoundPlan {
   let planCost = 0;
   for (let m = 1; m <= s.targetMonths; m++) {
     const rampFactor = s.rampMonths > 0 ? Math.min(1, m / s.rampMonths) : 1;
-    planCost += s.currentBurn + spendMonthly + hireMonthly * rampFactor;
+    planCost += s.currentBurn + founderCost + spendMonthly + hireMonthly * rampFactor;
   }
   const avgBurn = s.targetMonths > 0 ? planCost / s.targetMonths : 0;
 
@@ -220,7 +298,7 @@ export function computePlan(s: RoundPlanState): RoundPlan {
   const byBucket: Record<AllocationKey, number> = { team: 0, product: 0, gtm: 0, admin: 0, buffer: 0 };
   // The burn you already carry is overwhelmingly the existing team, and it has
   // to appear somewhere or the buckets won't reconcile to the raise.
-  byBucket.team += s.currentBurn * s.targetMonths;
+  byBucket.team += (s.currentBurn + founderCost) * s.targetMonths;
   ROLES.forEach((r) => {
     const months = rampAdjustedMonths(s, r.key);
     byBucket[r.bucket] += (s.hires[r.key] ?? 0) * r.monthly * months;
@@ -243,7 +321,11 @@ export function computePlan(s: RoundPlanState): RoundPlan {
   const operatingTotal = total - byBucket.buffer || 1;
   const teamShare = byBucket.team / operatingTotal;
 
+  const timeline = buildTimeline(s);
+
   return {
+    timeline,
+    founderCost,
     steadyBurn,
     avgBurn,
     hireMonthly,
@@ -254,8 +336,62 @@ export function computePlan(s: RoundPlanState): RoundPlan {
     runwayAtFullBurn,
     allocation,
     teamShare,
-    flags: buildFlags(s, { raise, runwayAtFullBurn, teamShare }),
+    flags: buildFlags(s, { raise, runwayAtFullBurn, teamShare, timeline }),
     typicalRound: TYPICAL_ROUND[s.stage],
+  };
+}
+
+/**
+ * Turns the plan into a schedule. This is the part that answers "when do I
+ * start raising again": you begin the next raise once the milestone is in
+ * hand, and the money has to outlast the raise itself — not end when it
+ * starts. The safety margin is what's left over.
+ */
+export function buildTimeline(s: RoundPlanState): Timeline {
+  const startRaisingAt = s.monthsToMilestone;
+  const closeAt = startRaisingAt + s.fundraiseMonths;
+  const recommendedMonths = Math.ceil(closeAt + 3);
+
+  const phases: Phase[] = [
+    {
+      key: "build",
+      label: `Build to the milestone`,
+      start: 0,
+      months: Math.min(s.monthsToMilestone, s.targetMonths),
+    },
+  ];
+
+  if (s.targetMonths > startRaisingAt) {
+    phases.push({
+      key: "raise",
+      label: "Raise the next round",
+      start: startRaisingAt,
+      months: Math.min(s.fundraiseMonths, s.targetMonths - startRaisingAt),
+    });
+  }
+  if (s.targetMonths > closeAt) {
+    phases.push({
+      key: "safety",
+      label: "Safety margin",
+      start: closeAt,
+      months: s.targetMonths - closeAt,
+    });
+  } else if (s.targetMonths < closeAt) {
+    // Cash runs out mid-raise: show the shortfall rather than hiding it.
+    phases.push({
+      key: "gap",
+      label: "Out of cash before the round closes",
+      start: s.targetMonths,
+      months: closeAt - s.targetMonths,
+    });
+  }
+
+  return {
+    phases,
+    startRaisingAt,
+    cashOutAt: s.targetMonths,
+    recommendedMonths,
+    raisesOnFumes: s.targetMonths < closeAt,
   };
 }
 
@@ -270,18 +406,36 @@ function rampAdjustedMonths(s: RoundPlanState, _role: RoleKey): number {
 
 function buildFlags(
   s: RoundPlanState,
-  d: { raise: number; runwayAtFullBurn: number; teamShare: number },
+  d: { raise: number; runwayAtFullBurn: number; teamShare: number; timeline: Timeline },
 ): Flag[] {
   const flags: Flag[] = [];
   const [rLo, rHi] = BENCH.runwayMonths;
+  const t = d.timeline;
 
-  if (d.runwayAtFullBurn < rLo) {
+  /* The schedule check comes first, because it is the one that actually
+     bites: a plan can sit inside the 18–24 month convention and still run
+     out of money halfway through the next raise. */
+  if (t.raisesOnFumes) {
     flags.push({
       level: "warn",
-      text: `At full-team burn this funds ${d.runwayAtFullBurn.toFixed(0)} months, under the ${rLo}–${rHi} month convention. You would be back out raising before the milestone lands — which is the position staged financing is designed to avoid.`,
+      text: `The money runs out in month ${s.targetMonths}, but the next round would not close until month ${t.startRaisingAt + s.fundraiseMonths} — you would be raising on fumes, which is when terms get worst. ${t.recommendedMonths} months of runway covers the milestone, the raise and a margin.`,
       sources: ["gompers95", "sahlman90"],
     });
-  } else if (d.runwayAtFullBurn > rHi + 8) {
+  } else if (s.targetMonths - (t.startRaisingAt + s.fundraiseMonths) < 2) {
+    flags.push({
+      level: "note",
+      text: `The round closes with under two months to spare. Raises slip more often than they run early, so a little more margin here is cheap insurance.`,
+      sources: ["buehler94", "gompers95"],
+    });
+  } else {
+    flags.push({
+      level: "ok",
+      text: `You hit the milestone in month ${t.startRaisingAt}, start raising then, and close in month ${t.startRaisingAt + s.fundraiseMonths} with ${(s.targetMonths - t.startRaisingAt - s.fundraiseMonths).toFixed(0)} months of margin.`,
+      sources: ["gompers95"],
+    });
+  }
+
+  if (d.runwayAtFullBurn > rHi + 8) {
     flags.push({
       level: "note",
       text: `${d.runwayAtFullBurn.toFixed(0)} months is well past the usual ${rLo}–${rHi}. Raising more than the next milestone needs costs dilution now for information you don't have yet; the cheaper-experimentation literature argues for raising less, more often.`,

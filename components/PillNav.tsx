@@ -8,7 +8,7 @@ export type ToolId = "planner" | "network" | "ready" | "round";
 export const TOOLS: { id: ToolId; label: string }[] = [
   { id: "ready", label: "Ready to Raise" },
   { id: "round", label: "Round Planner" },
-  { id: "planner", label: "Funding Planner" },
+  { id: "planner", label: "Dilution Planner" },
   { id: "network", label: "Network Strategy" },
 ];
 
