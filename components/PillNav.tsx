@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./PillNav.module.css";
 
-export type ToolId = "planner" | "network" | "ready";
+export type ToolId = "planner" | "network" | "ready" | "round";
 
 export const TOOLS: { id: ToolId; label: string }[] = [
   { id: "ready", label: "Ready to Raise" },
+  { id: "round", label: "Round Planner" },
   { id: "planner", label: "Funding Planner" },
   { id: "network", label: "Network Strategy" },
 ];
