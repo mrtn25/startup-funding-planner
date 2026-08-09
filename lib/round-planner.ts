@@ -128,6 +128,26 @@ export const SRC: Record<string, [string, string]> = {
     "Kerr, Nanda & Rhodes-Kropf (2014). Entrepreneurship as experimentation. <em>Journal of Economic Perspectives</em> 28(3), 25–48.",
     scholar("Entrepreneurship as experimentation Kerr Nanda Rhodes-Kropf"),
   ],
+  sarasvathy01: [
+    "Sarasvathy (2001). Causation and effectuation: toward a theoretical shift from economic inevitability to entrepreneurial contingency. <em>Academy of Management Review</em> 26(2), 243–263.",
+    scholar("Causation and effectuation toward a theoretical shift from economic inevitability to entrepreneurial contingency"),
+  ],
+  read09: [
+    "Read, Song & Smit (2009). A meta-analytic review of effectuation and venture performance. <em>Journal of Business Venturing</em> 24(6), 573–587.",
+    scholar("A meta-analytic review of effectuation and venture performance"),
+  ],
+  wiltbank06: [
+    "Wiltbank, Dew, Read & Sarasvathy (2006). What to do next? The case for non-predictive strategy. <em>Strategic Management Journal</em> 27(10), 981–998.",
+    scholar("What to do next the case for non-predictive strategy"),
+  ],
+  brinckmann10: [
+    "Brinckmann, Grichnik & Kapsa (2010). Should entrepreneurs plan or just storm the castle? A meta-analysis on contextual factors impacting the business planning–performance relationship. <em>Journal of Business Venturing</em> 25(1), 24–40.",
+    scholar("Should entrepreneurs plan or just storm the castle meta-analysis business planning performance"),
+  ],
+  delmar03: [
+    "Delmar & Shane (2003). Does business planning facilitate the development of new ventures? <em>Strategic Management Journal</em> 24(12), 1165–1185.",
+    scholar("Does business planning facilitate the development of new ventures"),
+  ],
   davila03: [
     "Davila, Foster & Gupta (2003). Venture capital financing and the growth of startup firms. <em>Journal of Business Venturing</em> 18(6), 689–708.",
     scholar("Venture capital financing and the growth of startup firms Davila Foster Gupta"),
@@ -136,7 +156,37 @@ export const SRC: Record<string, [string, string]> = {
 
 /* ── State ───────────────────────────────────────────────────── */
 
+/**
+ * Two ways to arrive at a number, and the tool runs both.
+ *
+ * `plan` is means-first: here is the team I want, here is what it costs.
+ * `goal` is goal-first: here is the metric the next round wants, here is the
+ * capacity that reaches it. Sarasvathy's distinction between effectuation and
+ * causation — and the reason both are offered is that the evidence cuts both
+ * ways. Expert entrepreneurs work from means under genuine uncertainty; the
+ * planning meta-analyses find formal planning does help on average. Which one
+ * is honest depends on whether you actually know your conversion rates yet.
+ */
+export type PlanMode = "plan" | "goal";
+
+export type GoalState = {
+  /** Recurring revenue today, k€ per year. */
+  currentARR: number;
+  /** What the next round needs to see, k€ per year. */
+  targetARR: number;
+  /** Average contract value, k€ per year. */
+  acv: number;
+  /** What one rep closes per year once productive, k€. */
+  quotaPerRep: number;
+  /** Blended cost to acquire one customer, k€. */
+  cac: number;
+  /** Engineers carried per sales rep, to build what gets sold. */
+  engPerRep: number;
+};
+
 export type RoundPlanState = {
+  mode: PlanMode;
+  goal: GoalState;
   stage: Stage;
   /** Cash in the bank today, k€. */
   currentCash: number;
@@ -166,7 +216,7 @@ export type RoundPlanState = {
  * founders paying themselves nothing genuinely do burn almost nothing, so a
  * seed-shaped default made the tool read as nonsense at that stage.
  */
-export const STAGE_DEFAULTS: Record<Stage, Omit<RoundPlanState, "stage">> = {
+export const STAGE_DEFAULTS: Record<Stage, Omit<RoundPlanState, "stage" | "mode" | "goal">> = {
   preseed: {
     currentCash: 20,
     currentBurn: 2,
@@ -221,8 +271,78 @@ export const STAGE_DEFAULTS: Record<Stage, Omit<RoundPlanState, "stage">> = {
   },
 };
 
+export const GOAL_DEFAULTS: Record<Stage, GoalState> = {
+  preseed: { currentARR: 0, targetARR: 150, acv: 12, quotaPerRep: 250, cac: 4, engPerRep: 2 },
+  seed: { currentARR: 120, targetARR: 1000, acv: 20, quotaPerRep: 400, cac: 6, engPerRep: 1.5 },
+  seriesa: { currentARR: 1200, targetARR: 5000, acv: 35, quotaPerRep: 550, cac: 10, engPerRep: 1.2 },
+  seriesb: { currentARR: 6000, targetARR: 20000, acv: 55, quotaPerRep: 700, cac: 16, engPerRep: 1 },
+};
+
 export function initialRoundPlan(stage: Stage = "seed"): RoundPlanState {
-  return { stage, ...STAGE_DEFAULTS[stage] };
+  return { ...STAGE_DEFAULTS[stage], mode: "plan", goal: GOAL_DEFAULTS[stage], stage };
+}
+
+/* ── Goal-first capacity model ───────────────────────────────── */
+
+export type Capacity = {
+  netNewARR: number;
+  customersNeeded: number;
+  repsNeeded: number;
+  engineersNeeded: number;
+  /** Monthly marketing spend implied by CAC × customers over the horizon. */
+  marketingMonthly: number;
+  /** Months a rep is actually productive, after ramping. */
+  productiveMonths: number;
+  /** Net burn per € of new recurring revenue. The capital-efficiency check. */
+  burnMultiple: number;
+};
+
+/** A rep is not productive on day one; three months is the usual assumption. */
+const REP_RAMP_MONTHS = 3;
+
+/**
+ * The way an FP&A team actually sizes a plan: start from the revenue the next
+ * round expects, convert it into selling capacity and pipeline spend, and let
+ * headcount fall out of that. This is the causal direction — it only works
+ * when you know your ACV, quota and CAC well enough for the arithmetic to
+ * mean anything, which is exactly the condition early companies fail.
+ */
+export function computeCapacity(s: RoundPlanState, planCost: number): Capacity {
+  const g = s.goal;
+  const netNewARR = Math.max(0, g.targetARR - g.currentARR);
+  const customersNeeded = g.acv > 0 ? netNewARR / g.acv : 0;
+
+  const productiveMonths = Math.max(1, s.monthsToMilestone - REP_RAMP_MONTHS);
+  const perRepOverHorizon = (g.quotaPerRep / 12) * productiveMonths;
+  const repsNeeded = perRepOverHorizon > 0 ? Math.ceil(netNewARR / perRepOverHorizon) : 0;
+  const engineersNeeded = Math.max(1, Math.round(repsNeeded * g.engPerRep));
+
+  const marketingMonthly = s.monthsToMilestone > 0 ? (customersNeeded * g.cac) / s.monthsToMilestone : 0;
+
+  return {
+    netNewARR,
+    customersNeeded,
+    repsNeeded,
+    engineersNeeded,
+    marketingMonthly,
+    productiveMonths,
+    burnMultiple: netNewARR > 0 ? planCost / netNewARR : Infinity,
+  };
+}
+
+/** The hires and spend the goal implies, replacing the hand-made plan. */
+export function goalDrivenState(s: RoundPlanState): RoundPlanState {
+  const cap = computeCapacity(s, 0);
+  return {
+    ...s,
+    hires: {
+      ...s.hires,
+      sales: cap.repsNeeded,
+      eng: cap.engineersNeeded,
+      marketing: Math.max(1, Math.ceil(cap.repsNeeded / 3)),
+    },
+    spend: { ...s.spend, marketing: Math.round(cap.marketingMonthly * 10) / 10 },
+  };
 }
 
 /* ── Model ───────────────────────────────────────────────────── */
@@ -231,10 +351,22 @@ export type Allocation = { key: AllocationKey; label: string; amount: number; sh
 
 export type Flag = { level: "warn" | "note" | "ok"; text: string; sources: string[] };
 
-export type Phase = { key: "build" | "raise" | "safety" | "gap"; label: string; start: number; months: number };
+export type LaneTone = "runway" | "hire" | "build" | "gtm" | "raise" | "safety" | "gap";
+
+export type Lane = {
+  key: string;
+  label: string;
+  detail: string;
+  start: number;
+  months: number;
+  tone: LaneTone;
+};
+
+export type Conflict = { level: "warn" | "note"; text: string };
 
 export type Timeline = {
-  phases: Phase[];
+  lanes: Lane[];
+  conflicts: Conflict[];
   /** Month at which the next raise should start. */
   startRaisingAt: number;
   /** Month the money runs out. */
@@ -246,6 +378,11 @@ export type Timeline = {
 };
 
 export type RoundPlan = {
+  /** The state actually costed — derived from the goal when in goal mode. */
+  effective: RoundPlanState;
+  capacity: Capacity;
+  /** What the other planning direction says, for comparison. */
+  alternate: number | null;
   timeline: Timeline;
   founderCost: number;
   /** k€ per month once every hire has landed. */
@@ -267,7 +404,9 @@ export type RoundPlan = {
   typicalRound: [number, number];
 };
 
-export function computePlan(s: RoundPlanState): RoundPlan {
+export function computePlan(input: RoundPlanState, withAlternate = true): RoundPlan {
+  // In goal mode the headcount and pipeline spend are derived, not entered.
+  const s = input.mode === "goal" ? goalDrivenState(input) : input;
   const hireMonthly = ROLES.reduce((a, r) => a + (s.hires[r.key] ?? 0) * r.monthly, 0);
   const spendMonthly = SPEND.reduce((a, k) => a + (s.spend[k.key] ?? 0), 0);
   // Founders start drawing a salary the day the money lands, so unlike hires
@@ -322,8 +461,17 @@ export function computePlan(s: RoundPlanState): RoundPlan {
   const teamShare = byBucket.team / operatingTotal;
 
   const timeline = buildTimeline(s);
+  const capacity = computeCapacity(s, planCost);
+
+  // The other direction's answer, so the two can be read against each other.
+  const alternate = withAlternate
+    ? computePlan({ ...input, mode: input.mode === "goal" ? "plan" : "goal" }, false).raise
+    : null;
 
   return {
+    effective: s,
+    capacity,
+    alternate,
     timeline,
     founderCost,
     steadyBurn,
@@ -336,7 +484,7 @@ export function computePlan(s: RoundPlanState): RoundPlan {
     runwayAtFullBurn,
     allocation,
     teamShare,
-    flags: buildFlags(s, { raise, runwayAtFullBurn, teamShare, timeline }),
+    flags: buildFlags(s, { raise, runwayAtFullBurn, teamShare, timeline, capacity }),
     typicalRound: TYPICAL_ROUND[s.stage],
   };
 }
@@ -351,48 +499,92 @@ export function buildTimeline(s: RoundPlanState): Timeline {
   const startRaisingAt = s.monthsToMilestone;
   const closeAt = startRaisingAt + s.fundraiseMonths;
   const recommendedMonths = Math.ceil(closeAt + 3);
+  const raisesOnFumes = s.targetMonths < closeAt;
 
-  const phases: Phase[] = [
+  /*
+   * One lane per workstream rather than one track, because these genuinely
+   * run in parallel — you are hiring while building while starting to raise.
+   * Stacking them is the only way the overlaps are visible, and the overlaps
+   * are the part worth looking at.
+   */
+  const lanes: Lane[] = [
+    {
+      key: "runway",
+      label: "Cash runway",
+      detail: `${s.targetMonths} months funded`,
+      start: 0,
+      months: s.targetMonths,
+      tone: "runway",
+    },
+    {
+      key: "hire",
+      label: "Hiring ramp",
+      detail: `team fully on board by month ${s.rampMonths}`,
+      start: 0,
+      months: Math.max(s.rampMonths, 0.5),
+      tone: "hire",
+    },
     {
       key: "build",
-      label: `Build to the milestone`,
+      label: "Build to the milestone",
+      detail: `milestone in hand at month ${s.monthsToMilestone}`,
       start: 0,
-      months: Math.min(s.monthsToMilestone, s.targetMonths),
+      months: s.monthsToMilestone,
+      tone: "build",
+    },
+    {
+      key: "raise",
+      label: "Raise the next round",
+      detail: `month ${startRaisingAt} to ${closeAt}`,
+      start: startRaisingAt,
+      months: s.fundraiseMonths,
+      tone: "raise",
     },
   ];
 
-  if (s.targetMonths > startRaisingAt) {
-    phases.push({
-      key: "raise",
-      label: "Raise the next round",
-      start: startRaisingAt,
-      months: Math.min(s.fundraiseMonths, s.targetMonths - startRaisingAt),
-    });
-  }
-  if (s.targetMonths > closeAt) {
-    phases.push({
+  if (!raisesOnFumes && s.targetMonths > closeAt) {
+    lanes.push({
       key: "safety",
       label: "Safety margin",
+      detail: `${(s.targetMonths - closeAt).toFixed(0)} months spare after close`,
       start: closeAt,
       months: s.targetMonths - closeAt,
+      tone: "safety",
     });
-  } else if (s.targetMonths < closeAt) {
-    // Cash runs out mid-raise: show the shortfall rather than hiding it.
-    phases.push({
+  }
+  if (raisesOnFumes) {
+    lanes.push({
       key: "gap",
-      label: "Out of cash before the round closes",
+      label: "Funding gap",
+      detail: `${(closeAt - s.targetMonths).toFixed(0)} months with no cash`,
       start: s.targetMonths,
       months: closeAt - s.targetMonths,
+      tone: "gap",
     });
   }
 
-  return {
-    phases,
-    startRaisingAt,
-    cashOutAt: s.targetMonths,
-    recommendedMonths,
-    raisesOnFumes: s.targetMonths < closeAt,
-  };
+  /* Overlaps that mean something, rather than every intersection. */
+  const conflicts: Conflict[] = [];
+  if (raisesOnFumes) {
+    conflicts.push({
+      level: "warn",
+      text: `The raise lane runs past the end of the runway lane — you are out of cash for ${(closeAt - s.targetMonths).toFixed(0)} months before the round could close.`,
+    });
+  }
+  if (s.rampMonths > s.monthsToMilestone) {
+    conflicts.push({
+      level: "warn",
+      text: `The hiring ramp finishes after the milestone. You would be paying for a team that arrives too late to have produced the thing you are raising on.`,
+    });
+  }
+  if (s.fundraiseMonths >= s.monthsToMilestone && s.monthsToMilestone > 0) {
+    conflicts.push({
+      level: "note",
+      text: `Raising takes about as long as building the milestone. Worth starting investor conversations early — advice-first, before you need the money.`,
+    });
+  }
+
+  return { lanes, conflicts, startRaisingAt, cashOutAt: s.targetMonths, recommendedMonths, raisesOnFumes };
 }
 
 /** Average months a role is on payroll across the horizon, given the ramp. */
@@ -406,7 +598,7 @@ function rampAdjustedMonths(s: RoundPlanState, _role: RoleKey): number {
 
 function buildFlags(
   s: RoundPlanState,
-  d: { raise: number; runwayAtFullBurn: number; teamShare: number; timeline: Timeline },
+  d: { raise: number; runwayAtFullBurn: number; teamShare: number; timeline: Timeline; capacity: Capacity },
 ): Flag[] {
   const flags: Flag[] = [];
   const [rLo, rHi] = BENCH.runwayMonths;
@@ -470,6 +662,28 @@ function buildFlags(
       text: `Team is only ${(d.teamShare * 100).toFixed(0)}% of operating spend, below the ${tLo * 100}–${tHi * 100}% typical for software. Heavy non-personnel spend this early is worth a second look.`,
       sources: ["davila03"],
     });
+  }
+
+  /*
+   * Burn multiple — net burn per € of new recurring revenue. A practitioner
+   * benchmark rather than an academic one, but the standard capital-efficiency
+   * read, and the number an investor will compute about you anyway.
+   */
+  if (s.mode === "goal" && isFinite(d.capacity.burnMultiple) && d.capacity.burnMultiple > 0) {
+    const bm = d.capacity.burnMultiple;
+    if (bm > 3) {
+      flags.push({
+        level: "warn",
+        text: `A burn multiple of ${bm.toFixed(1)} means ${bm.toFixed(1)}€ of burn per €1 of new recurring revenue. Under about 2 reads as efficient; above 3 an investor will ask whether the motion works at all. At the earliest stages this number is usually meaningless — which is itself a sign that costing from a revenue target is the wrong direction here.`,
+        sources: ["sarasvathy01", "wiltbank06"],
+      });
+    } else {
+      flags.push({
+        level: "ok",
+        text: `Burn multiple of ${bm.toFixed(1)} — ${bm.toFixed(1)}€ of burn per €1 of new recurring revenue, which reads as ${bm < 1.5 ? "efficient" : "reasonable"} for this stage.`,
+        sources: ["brinckmann10"],
+      });
+    }
   }
 
   const [lo, hi] = TYPICAL_ROUND[s.stage];

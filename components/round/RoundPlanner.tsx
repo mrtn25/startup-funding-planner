@@ -7,6 +7,7 @@ import {
   computePlan,
   fmtK,
   initialRoundPlan,
+  GOAL_DEFAULTS,
   ROLES,
   STAGE_DEFAULTS,
   SPEND,
@@ -17,7 +18,18 @@ import {
   type RoundPlanState,
   type SpendKey,
   type Stage,
+  type LaneTone,
 } from "@/lib/round-planner";
+
+const LANE_TONE: Record<LaneTone, string> = {
+  runway: "barRunway",
+  hire: "barHire",
+  build: "barBuild",
+  gtm: "barGtm",
+  raise: "barRaise",
+  safety: "barSafety",
+  gap: "barGap",
+};
 
 const ALLOC_COLOR: Record<AllocationKey, string> = {
   team: "#2200FF",
@@ -39,9 +51,12 @@ export default function RoundPlanner({ onModelDilution }: Props) {
   const set = <K extends keyof RoundPlanState>(k: K, v: RoundPlanState[K]) => setS((p) => ({ ...p, [k]: v }));
   const setHire = (k: RoleKey, v: number) => setS((p) => ({ ...p, hires: { ...p.hires, [k]: Math.max(0, v) } }));
   const setSpend = (k: SpendKey, v: number) => setS((p) => ({ ...p, spend: { ...p.spend, [k]: Math.max(0, v) } }));
+  const setGoal = <K extends keyof typeof s.goal>(k: K, v: (typeof s.goal)[K]) =>
+    setS((p) => ({ ...p, goal: { ...p.goal, [k]: v } }));
 
   const stage = STAGES.find((x) => x.key === s.stage)!;
-  const totalHires = ROLES.reduce((a, r) => a + (s.hires[r.key] ?? 0), 0);
+  const eff = plan.effective;
+  const totalHires = ROLES.reduce((a, r) => a + (eff.hires[r.key] ?? 0), 0);
   // The axis has to show the overrun when the plan ends mid-raise.
   const ganttMax = Math.max(s.targetMonths, s.monthsToMilestone + s.fundraiseMonths) + 1;
 
@@ -64,7 +79,7 @@ export default function RoundPlanner({ onModelDilution }: Props) {
             type="button"
             aria-pressed={s.stage === st.key}
             className={`${styles.stageBtn}${s.stage === st.key ? ` ${styles.stageBtnOn}` : ""}`}
-            onClick={() => setS({ stage: st.key, ...STAGE_DEFAULTS[st.key] })}
+            onClick={() => setS((p) => ({ ...STAGE_DEFAULTS[st.key], mode: p.mode, goal: GOAL_DEFAULTS[st.key], stage: st.key }))}
           >
             {st.label}
           </button>
@@ -72,8 +87,80 @@ export default function RoundPlanner({ onModelDilution }: Props) {
       </div>
       <span className={styles.goal}>What this round has to buy: {stage.goal}</span>
 
+      <div className={styles.modeRow}>
+        <div className={styles.modeBtns} role="group" aria-label="Planning direction">
+          <button
+            type="button"
+            aria-pressed={s.mode === "plan"}
+            className={`${styles.modeBtn}${s.mode === "plan" ? ` ${styles.modeBtnOn}` : ""}`}
+            onClick={() => set("mode", "plan")}
+          >
+            From the plan
+          </button>
+          <button
+            type="button"
+            aria-pressed={s.mode === "goal"}
+            className={`${styles.modeBtn}${s.mode === "goal" ? ` ${styles.modeBtnOn}` : ""}`}
+            onClick={() => set("mode", "goal")}
+          >
+            From the goal
+          </button>
+        </div>
+        <p className={styles.modeNote}>
+          {s.mode === "plan"
+            ? "Means first: you say what team you want, the tool costs it. Honest when you don't yet know your conversion rates well enough for the arithmetic to mean anything."
+            : "Goal first: you say what the next round needs to see, the tool derives the selling capacity and headcount that reach it. This is how an FP&A team sizes a plan — and it only works if your ACV, quota and CAC are real numbers."}
+        </p>
+      </div>
+
       <div className={styles.layout}>
         <div>
+          {s.mode === "goal" && (
+            <div className={styles.group}>
+              <div className={styles.groupTitle}>Where you want to get to</div>
+              <Field label="Recurring revenue today" hint="ARR, k€ per year">
+                <input type="number" className={styles.num} min={0} step={10} value={s.goal.currentARR}
+                  onChange={(e) => setGoal("currentARR", Math.max(0, +e.target.value))} aria-label="Current ARR" />
+                <span className={styles.unit}>k€ ARR</span>
+              </Field>
+              <Field label="Recurring revenue the next round wants" hint="The number that makes the round fundable">
+                <input type="number" className={styles.num} min={0} step={50} value={s.goal.targetARR}
+                  onChange={(e) => setGoal("targetARR", Math.max(0, +e.target.value))} aria-label="Target ARR" />
+                <span className={styles.unit}>k€ ARR</span>
+              </Field>
+              <Field label="Average contract value" hint="Annual, per customer">
+                <input type="number" className={styles.num} min={1} step={1} value={s.goal.acv}
+                  onChange={(e) => setGoal("acv", Math.max(1, +e.target.value))} aria-label="ACV" />
+                <span className={styles.unit}>k€ / yr</span>
+              </Field>
+              <Field label="Quota per rep" hint="What one rep closes per year once productive">
+                <input type="number" className={styles.num} min={1} step={25} value={s.goal.quotaPerRep}
+                  onChange={(e) => setGoal("quotaPerRep", Math.max(1, +e.target.value))} aria-label="Quota per rep" />
+                <span className={styles.unit}>k€ / yr</span>
+              </Field>
+              <Field label="Cost to acquire a customer" hint="Blended CAC">
+                <input type="number" className={styles.num} min={0} step={1} value={s.goal.cac}
+                  onChange={(e) => setGoal("cac", Math.max(0, +e.target.value))} aria-label="CAC" />
+                <span className={styles.unit}>k€</span>
+              </Field>
+              <Field label="Engineers per rep" hint="To build what gets sold">
+                <input type="number" className={styles.num} min={0} step={0.1} value={s.goal.engPerRep}
+                  onChange={(e) => setGoal("engPerRep", Math.max(0, +e.target.value))} aria-label="Engineers per rep" />
+                <span className={styles.unit}>×</span>
+              </Field>
+
+              <div className={styles.derived}>
+                <strong>{fmtK(plan.capacity.netNewARR)} of new ARR</strong> means about{" "}
+                {Math.ceil(plan.capacity.customersNeeded)} customers, which needs{" "}
+                <strong>{plan.capacity.repsNeeded} reps</strong> (each productive for{" "}
+                {plan.capacity.productiveMonths} of the {s.monthsToMilestone} months) and{" "}
+                <strong>{plan.capacity.engineersNeeded} engineers</strong> behind them, plus{" "}
+                {fmtK(plan.capacity.marketingMonthly)}/mo of pipeline spend. Those numbers replace the hiring plan
+                below.
+              </div>
+            </div>
+          )}
+
           {/* ── Today ── */}
           <div className={styles.group}>
             <div className={styles.groupTitle}>Where you are today</div>
@@ -217,7 +304,9 @@ export default function RoundPlanner({ onModelDilution }: Props) {
 
           {/* ── Hires ── */}
           <div className={styles.group}>
-            <div className={styles.groupTitle}>Who you hire ({totalHires})</div>
+            <div className={styles.groupTitle}>
+              Who you hire ({totalHires}){s.mode === "goal" ? " — derived from the goal" : ""}
+            </div>
             {ROLES.map((r) => (
               <Field key={r.key} label={r.label}>
                 <span className={styles.roleCost}>{r.monthly} k€/mo</span>
@@ -230,7 +319,7 @@ export default function RoundPlanner({ onModelDilution }: Props) {
                   >
                     −
                   </button>
-                  <span className={styles.stepVal}>{s.hires[r.key] ?? 0}</span>
+                  <span className={styles.stepVal}>{eff.hires[r.key] ?? 0}</span>
                   <button
                     type="button"
                     className={styles.stepBtn}
@@ -273,6 +362,33 @@ export default function RoundPlanner({ onModelDilution }: Props) {
             {fmtK(s.currentCash)} you already hold. Typical {stage.label} round is {plan.typicalRound[0]}–
             {plan.typicalRound[1]} M€.
           </p>
+
+          {plan.alternate !== null && (
+            <div className={styles.compare}>
+              <div className={styles.compareRow}>
+                <span>{s.mode === "goal" ? "From the goal" : "From the plan"}</span>
+                <strong>{fmtK(plan.raise)}</strong>
+              </div>
+              <div className={styles.compareRow}>
+                <span>{s.mode === "goal" ? "From the plan" : "From the goal"}</span>
+                <strong>{fmtK(plan.alternate)}</strong>
+              </div>
+              <p className={styles.compareNote}>
+                {/* Compare goal against plan explicitly — which of the two is
+                    `raise` and which is `alternate` flips with the mode. */}
+                {(() => {
+                  const goalNum = s.mode === "goal" ? plan.raise : plan.alternate!;
+                  const planNum = s.mode === "goal" ? plan.alternate! : plan.raise;
+                  const diff = fmtK(Math.abs(goalNum - planNum));
+                  if (Math.abs(goalNum - planNum) < 50)
+                    return "The two directions agree — the team you want is about the team the target needs.";
+                  return goalNum > planNum
+                    ? `Reaching the target costs ${diff} more than the team you sketched. Either the goal is out of reach on this plan, or the plan is short of people.`
+                    : `The team you sketched costs ${diff} more than the target strictly requires. Fine if it buys optionality — worth knowing that it is a choice.`;
+                })()}
+              </p>
+            </div>
+          )}
 
           <div className={styles.statRow}>
             <div className={styles.stat}>
@@ -327,70 +443,78 @@ export default function RoundPlanner({ onModelDilution }: Props) {
         </p>
 
         <div className={styles.gantt}>
-          <div className={styles.ganttTrack}>
-            {plan.timeline.phases.map((ph) => (
-              <div
-                key={ph.key}
-                className={`${styles.ganttBar} ${
-                  ph.key === "build"
-                    ? styles.barBuild
-                    : ph.key === "raise"
-                      ? styles.barRaise
-                      : ph.key === "safety"
-                        ? styles.barSafety
-                        : styles.barGap
-                }`}
-                style={{
-                  left: `${(ph.start / ganttMax) * 100}%`,
-                  width: `${(ph.months / ganttMax) * 100}%`,
-                }}
-                title={`${ph.label}: month ${ph.start}–${ph.start + ph.months}`}
-              >
-                <span className={styles.ganttLabel}>{ph.label}</span>
+          {plan.timeline.lanes.map((ln) => (
+            <div className={styles.laneRow} key={ln.key}>
+              <div className={styles.laneName}>
+                {ln.label}
+                <span className={styles.laneDetail}>{ln.detail}</span>
               </div>
-            ))}
+              <div className={styles.laneTrack}>
+                <div
+                  className={`${styles.laneBar} ${styles[LANE_TONE[ln.tone]]}`}
+                  style={{
+                    left: `${(ln.start / ganttMax) * 100}%`,
+                    width: `${Math.max(ln.months / ganttMax, 0.01) * 100}%`,
+                  }}
+                  title={`${ln.label}: month ${ln.start}–${ln.start + ln.months}`}
+                />
+                {/* Shared guides so the overlaps between lanes are readable. */}
+                <span className={styles.guide} style={{ left: `${(plan.timeline.startRaisingAt / ganttMax) * 100}%` }} />
+                <span
+                  className={`${styles.guide} ${styles.guideEnd}`}
+                  style={{ left: `${(plan.timeline.cashOutAt / ganttMax) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
 
-            <span className={styles.marker} style={{ left: `${(plan.timeline.startRaisingAt / ganttMax) * 100}%` }}>
-              <span className={styles.markerDot} />
-              <span
-                className={`${styles.markerText}${
-                  plan.timeline.startRaisingAt / ganttMax > 0.75 ? ` ${styles.markerTextEnd}` : ""
-                }`}
-              >
-                start raising · month {plan.timeline.startRaisingAt}
-              </span>
-            </span>
-            {/* Near the right edge the label has to hang left or it clips. */}
-            <span className={styles.markerLow} style={{ left: `${(plan.timeline.cashOutAt / ganttMax) * 100}%` }}>
-              <span className={styles.markerDot} />
-              <span
-                className={`${styles.markerText}${
-                  plan.timeline.cashOutAt / ganttMax > 0.75 ? ` ${styles.markerTextEnd}` : ""
-                }`}
-              >
-                cash out · month {plan.timeline.cashOutAt}
-              </span>
-            </span>
-          </div>
-
-          <div className={styles.ganttAxis}>
-            {Array.from({ length: Math.floor(ganttMax / 3) + 1 }, (_, i) => i * 3).map((m) => (
-              <span key={m} style={{ left: `${(m / ganttMax) * 100}%` }}>
-                {m}
-              </span>
-            ))}
+          <div className={styles.laneRow}>
+            <div className={styles.laneName} />
+            <div className={styles.ganttAxis}>
+              {Array.from({ length: Math.floor(ganttMax / 3) + 1 }, (_, i) => i * 3).map((m) => (
+                <span key={m} style={{ left: `${(m / ganttMax) * 100}%` }}>
+                  {m}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
+        <div className={styles.guideKey}>
+          <span>
+            <i className={styles.guideSwatch} /> start raising · month {plan.timeline.startRaisingAt}
+          </span>
+          <span>
+            <i className={`${styles.guideSwatch} ${styles.guideSwatchEnd}`} /> cash out · month{" "}
+            {plan.timeline.cashOutAt}
+          </span>
+        </div>
+
+        {plan.timeline.conflicts.length > 0 && (
+          <div className={styles.conflicts}>
+            {plan.timeline.conflicts.map((c, i) => (
+              <p key={i} className={c.level === "warn" ? styles.conflictWarn : styles.conflictNote}>
+                {c.text}
+              </p>
+            ))}
+          </div>
+        )}
+
         <div className={styles.legend}>
           <span>
-            <i className={`${styles.swatch} ${styles.barBuild}`} /> Build to the milestone
+            <i className={`${styles.swatch} ${styles.barRunway}`} /> Cash runway
           </span>
           <span>
-            <i className={`${styles.swatch} ${styles.barRaise}`} /> Raise the next round
+            <i className={`${styles.swatch} ${styles.barHire}`} /> Hiring ramp
           </span>
           <span>
-            <i className={`${styles.swatch} ${styles.barSafety}`} /> Safety margin
+            <i className={`${styles.swatch} ${styles.barBuild}`} /> Build
+          </span>
+          <span>
+            <i className={`${styles.swatch} ${styles.barRaise}`} /> Raise
+          </span>
+          <span>
+            <i className={`${styles.swatch} ${styles.barSafety}`} /> Margin
           </span>
         </div>
       </div>
