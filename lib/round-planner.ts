@@ -169,7 +169,35 @@ export const SRC: Record<string, [string, string]> = {
  */
 export type PlanMode = "plan" | "goal";
 
+/**
+ * What the next round actually gates on. Revenue is the dominant gate for
+ * B2B software from Seed onward, but it is the wrong question at pre-seed and
+ * for anything where the risk is technical rather than commercial — there the
+ * milestone is a shipped product or a working proof, and no revenue-capacity
+ * arithmetic applies.
+ */
+export type MilestoneKind = "revenue" | "users" | "product";
+
+export const MILESTONE_KINDS: { key: MilestoneKind; label: string; note: string }[] = [
+  {
+    key: "revenue",
+    label: "Revenue",
+    note: "The dominant gate for B2B software from Seed onward. Capacity is derivable: contract value, quota and CAC turn a target into headcount.",
+  },
+  {
+    key: "users",
+    label: "Users & engagement",
+    note: "Consumer and bottom-up products, where the round gates on adoption and retention rather than booked revenue.",
+  },
+  {
+    key: "product",
+    label: "Product or technical proof",
+    note: "Pre-seed and deep tech, where the risk is whether the thing works at all. There is no capacity model here — the goal converts to engineering months, and little else.",
+  },
+];
+
 export type GoalState = {
+  kind: MilestoneKind;
   /** Recurring revenue today, k€ per year. */
   currentARR: number;
   /** What the next round needs to see, k€ per year. */
@@ -182,6 +210,15 @@ export type GoalState = {
   cac: number;
   /** Engineers carried per sales rep, to build what gets sold. */
   engPerRep: number;
+
+  /** Users milestone. */
+  currentUsers: number;
+  targetUsers: number;
+  /** Blended cost to acquire one user, €. */
+  cpa: number;
+
+  /** Product milestone: engineer-months to build the thing. */
+  engMonths: number;
 };
 
 export type RoundPlanState = {
@@ -272,10 +309,12 @@ export const STAGE_DEFAULTS: Record<Stage, Omit<RoundPlanState, "stage" | "mode"
 };
 
 export const GOAL_DEFAULTS: Record<Stage, GoalState> = {
-  preseed: { currentARR: 0, targetARR: 150, acv: 12, quotaPerRep: 250, cac: 4, engPerRep: 2 },
-  seed: { currentARR: 120, targetARR: 1000, acv: 20, quotaPerRep: 400, cac: 6, engPerRep: 1.5 },
-  seriesa: { currentARR: 1200, targetARR: 5000, acv: 35, quotaPerRep: 550, cac: 10, engPerRep: 1.2 },
-  seriesb: { currentARR: 6000, targetARR: 20000, acv: 55, quotaPerRep: 700, cac: 16, engPerRep: 1 },
+  // Pre-seed defaults to a product milestone, because that is what pre-seed
+  // rounds actually gate on.
+  preseed: { kind: "product", currentARR: 0, targetARR: 150, acv: 12, quotaPerRep: 250, cac: 4, engPerRep: 2, currentUsers: 0, targetUsers: 2000, cpa: 8, engMonths: 24 },
+  seed: { kind: "revenue", currentARR: 120, targetARR: 1000, acv: 20, quotaPerRep: 400, cac: 6, engPerRep: 1.5, currentUsers: 2000, targetUsers: 25000, cpa: 6, engMonths: 48 },
+  seriesa: { kind: "revenue", currentARR: 1200, targetARR: 5000, acv: 35, quotaPerRep: 550, cac: 10, engPerRep: 1.2, currentUsers: 25000, targetUsers: 150000, cpa: 5, engMonths: 120 },
+  seriesb: { kind: "revenue", currentARR: 6000, targetARR: 20000, acv: 55, quotaPerRep: 700, cac: 16, engPerRep: 1, currentUsers: 150000, targetUsers: 600000, cpa: 4, engMonths: 240 },
 };
 
 export function initialRoundPlan(stage: Stage = "seed"): RoundPlanState {
@@ -285,6 +324,9 @@ export function initialRoundPlan(stage: Stage = "seed"): RoundPlanState {
 /* ── Goal-first capacity model ───────────────────────────────── */
 
 export type Capacity = {
+  kind: MilestoneKind;
+  /** Human-readable one-liner for whichever milestone kind is active. */
+  summary: string;
   netNewARR: number;
   customersNeeded: number;
   repsNeeded: number;
@@ -309,24 +351,57 @@ const REP_RAMP_MONTHS = 3;
  */
 export function computeCapacity(s: RoundPlanState, planCost: number): Capacity {
   const g = s.goal;
-  const netNewARR = Math.max(0, g.targetARR - g.currentARR);
-  const customersNeeded = g.acv > 0 ? netNewARR / g.acv : 0;
-
   const productiveMonths = Math.max(1, s.monthsToMilestone - REP_RAMP_MONTHS);
-  const perRepOverHorizon = (g.quotaPerRep / 12) * productiveMonths;
-  const repsNeeded = perRepOverHorizon > 0 ? Math.ceil(netNewARR / perRepOverHorizon) : 0;
-  const engineersNeeded = Math.max(1, Math.round(repsNeeded * g.engPerRep));
 
-  const marketingMonthly = s.monthsToMilestone > 0 ? (customersNeeded * g.cac) / s.monthsToMilestone : 0;
+  if (g.kind === "revenue") {
+    const netNewARR = Math.max(0, g.targetARR - g.currentARR);
+    const customersNeeded = g.acv > 0 ? netNewARR / g.acv : 0;
+    const perRep = (g.quotaPerRep / 12) * productiveMonths;
+    const repsNeeded = perRep > 0 ? Math.ceil(netNewARR / perRep) : 0;
+    return {
+      kind: "revenue",
+      netNewARR,
+      customersNeeded,
+      repsNeeded,
+      engineersNeeded: Math.max(1, Math.round(repsNeeded * g.engPerRep)),
+      marketingMonthly: s.monthsToMilestone > 0 ? (customersNeeded * g.cac) / s.monthsToMilestone : 0,
+      productiveMonths,
+      burnMultiple: netNewARR > 0 ? planCost / netNewARR : Infinity,
+      summary: `${Math.round(netNewARR)} k€ of new ARR ≈ ${Math.ceil(customersNeeded)} customers`,
+    };
+  }
 
+  if (g.kind === "users") {
+    // Acquisition-led: the money goes into the channel, not into quota.
+    const newUsers = Math.max(0, g.targetUsers - g.currentUsers);
+    const acquisitionCost = (newUsers * g.cpa) / 1000; // € → k€
+    return {
+      kind: "users",
+      netNewARR: 0,
+      customersNeeded: newUsers,
+      repsNeeded: 0,
+      engineersNeeded: Math.max(2, Math.ceil(newUsers / 15000) + 1),
+      marketingMonthly: s.monthsToMilestone > 0 ? acquisitionCost / s.monthsToMilestone : 0,
+      productiveMonths,
+      burnMultiple: Infinity,
+      summary: `${newUsers.toLocaleString("en")} new users at ${g.cpa} € each`,
+    };
+  }
+
+  /* Product milestone: there is no capacity arithmetic to do. The goal
+     converts into engineering months and stops — which is the honest answer,
+     and the reason the two directions cannot disagree by much here. */
+  const engineersNeeded = s.monthsToMilestone > 0 ? Math.max(1, Math.ceil(g.engMonths / s.monthsToMilestone)) : 1;
   return {
-    netNewARR,
-    customersNeeded,
-    repsNeeded,
+    kind: "product",
+    netNewARR: 0,
+    customersNeeded: 0,
+    repsNeeded: 0,
     engineersNeeded,
-    marketingMonthly,
+    marketingMonthly: 0,
     productiveMonths,
-    burnMultiple: netNewARR > 0 ? planCost / netNewARR : Infinity,
+    burnMultiple: Infinity,
+    summary: `${g.engMonths} engineer-months over ${s.monthsToMilestone} months`,
   };
 }
 
@@ -339,10 +414,34 @@ export function goalDrivenState(s: RoundPlanState): RoundPlanState {
       ...s.hires,
       sales: cap.repsNeeded,
       eng: cap.engineersNeeded,
-      marketing: Math.max(1, Math.ceil(cap.repsNeeded / 3)),
+      marketing: cap.kind === "product" ? 0 : Math.max(1, Math.ceil(Math.max(cap.repsNeeded, 1) / 3)),
     },
     spend: { ...s.spend, marketing: Math.round(cap.marketingMonthly * 10) / 10 },
   };
+}
+
+/**
+ * What the hand-made plan can actually deliver, in the units of the goal.
+ * This is the other half of the reconciliation: the top-down number says what
+ * the target costs, this says what the team you sketched can reach. Where the
+ * two meet is the plan.
+ */
+export function planReach(s: RoundPlanState): { value: number; label: string } | null {
+  const g = s.goal;
+  const productiveMonths = Math.max(1, s.monthsToMilestone - REP_RAMP_MONTHS);
+
+  if (g.kind === "revenue") {
+    const reps = s.hires.sales ?? 0;
+    const reach = g.currentARR + reps * (g.quotaPerRep / 12) * productiveMonths;
+    return { value: Math.round(reach), label: `${Math.round(reach)} k€ ARR` };
+  }
+  if (g.kind === "users") {
+    const spend = (s.spend.marketing ?? 0) * s.monthsToMilestone * 1000; // k€ → €
+    const reach = g.currentUsers + (g.cpa > 0 ? spend / g.cpa : 0);
+    return { value: Math.round(reach), label: `${Math.round(reach).toLocaleString("en")} users` };
+  }
+  const engMonths = (s.hires.eng ?? 0) * s.monthsToMilestone;
+  return { value: engMonths, label: `${engMonths} engineer-months` };
 }
 
 /* ── Model ───────────────────────────────────────────────────── */
@@ -383,6 +482,19 @@ export type RoundPlan = {
   capacity: Capacity;
   /** What the other planning direction says, for comparison. */
   alternate: number | null;
+  /** Both sides of the reconciliation, in goal units and in euros. */
+  converge: {
+    goalRaise: number;
+    planRaise: number;
+    gap: number;
+    /** What the target demands, in goal units. */
+    targetLabel: string;
+    /** What the sketched plan can actually deliver, same units. */
+    reachLabel: string;
+    reachValue: number;
+    targetValue: number;
+    agreed: boolean;
+  } | null;
   timeline: Timeline;
   founderCost: number;
   /** k€ per month once every hire has landed. */
@@ -468,10 +580,13 @@ export function computePlan(input: RoundPlanState, withAlternate = true): RoundP
     ? computePlan({ ...input, mode: input.mode === "goal" ? "plan" : "goal" }, false).raise
     : null;
 
+  const converge = withAlternate ? buildConvergence(input, raise, alternate) : null;
+
   return {
     effective: s,
     capacity,
     alternate,
+    converge,
     timeline,
     founderCost,
     steadyBurn,
@@ -585,6 +700,42 @@ export function buildTimeline(s: RoundPlanState): Timeline {
   }
 
   return { lanes, conflicts, startRaisingAt, cashOutAt: s.targetMonths, recommendedMonths, raisesOnFumes };
+}
+
+/**
+ * The two directions are independent estimates of the same quantity, so a gap
+ * between them means one of the inputs is wrong — not that one method is.
+ * Closing it is the planning work: either the target comes down or the plan
+ * gets bigger.
+ */
+function buildConvergence(input: RoundPlanState, raise: number, alternate: number | null) {
+  if (alternate === null) return null;
+  const goalRaise = input.mode === "goal" ? raise : alternate;
+  const planRaise = input.mode === "goal" ? alternate : raise;
+
+  const g = input.goal;
+  const targetValue =
+    g.kind === "revenue" ? g.targetARR : g.kind === "users" ? g.targetUsers : g.engMonths;
+  const targetLabel =
+    g.kind === "revenue"
+      ? `${g.targetARR} k€ ARR`
+      : g.kind === "users"
+        ? `${g.targetUsers.toLocaleString("en")} users`
+        : `${g.engMonths} engineer-months`;
+
+  // Reach is measured against the hand-made plan, whichever mode is showing.
+  const reach = planReach({ ...input, mode: "plan" }) ?? { value: 0, label: "—" };
+
+  return {
+    goalRaise,
+    planRaise,
+    gap: goalRaise - planRaise,
+    targetLabel,
+    targetValue,
+    reachLabel: reach.label,
+    reachValue: reach.value,
+    agreed: Math.abs(goalRaise - planRaise) < Math.max(50, goalRaise * 0.05),
+  };
 }
 
 /** Average months a role is on payroll across the horizon, given the ramp. */

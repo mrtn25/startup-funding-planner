@@ -712,29 +712,134 @@
 }
 
 
-/* ── The two directions, side by side ── */
-.compare {
-  border: 1px dashed var(--rp-line2);
-  border-radius: 10px;
-  padding: 11px 13px;
-  margin-bottom: 1rem;
-}
-.compareRow {
+
+
+/* ── Milestone kind ── */
+.kindBtns {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.kindBtn {
+  font: inherit;
   font-size: 12.5px;
+  padding: 6px 13px;
+  border: 1px solid var(--rp-line2);
+  border-radius: 20px;
+  background: transparent;
   color: var(--rp-fg2);
-  margin-bottom: 3px;
+  cursor: pointer;
 }
-.compareRow strong {
+.kindBtn:hover {
   color: var(--rp-fg);
-  font-variant-numeric: tabular-nums;
 }
-.compareNote {
+.kindBtnOn {
+  background: var(--rp-sel);
+  border-color: var(--rp-sel-line);
+  color: #17210a;
+  font-weight: 500;
+}
+.kindNote {
   font-size: 11.5px;
   line-height: 1.55;
   color: var(--rp-fg3);
-  margin: 7px 0 0;
+  margin: 0 0 12px;
+}
+
+/* ── Top-down meets bottom-up ──
+   Two pyramids pointing at each other. They narrow toward the middle; where
+   they meet is the number, and any gap between them is the planning work. */
+.converge {
+  border: 1px dashed var(--rp-line2);
+  border-radius: 10px;
+  padding: 13px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.convergeTop,
+.convergeBottom {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.convergeLabel {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rp-fg3);
+}
+.convergeTop strong,
+.convergeBottom strong {
+  font-size: 19px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.convergeSub {
+  font-size: 11.5px;
+  color: var(--rp-fg3);
+}
+
+.pyramidWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  margin: 8px 0;
+}
+.pyramidDown,
+.pyramidUp {
+  width: 120px;
+  height: 22px;
+  background: color-mix(in srgb, var(--rp-accent) 32%, transparent);
+}
+/* Wide at the top, narrowing down toward the meeting point. */
+.pyramidDown {
+  clip-path: polygon(0 0, 100% 0, 62% 100%, 38% 100%);
+}
+/* Wide at the bottom, narrowing up. */
+.pyramidUp {
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+  background: color-mix(in srgb, var(--rp-sel-line) 40%, transparent);
+}
+.meet {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 12px;
+  border-radius: 20px;
+  background: var(--rp-warn);
+  color: #fff;
+  white-space: nowrap;
+}
+.meetAgreed {
+  background: var(--rp-sel);
+  color: #17210a;
+}
+
+.convergeNote {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--rp-fg3);
+  margin: 10px 0 0;
+  text-align: left;
+}
+.convergeActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 9px;
+}
+.convergeBtn {
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 12px;
+  border: 1px solid var(--rp-line2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rp-fg2);
+  cursor: pointer;
+}
+.convergeBtn:hover {
+  border-color: var(--rp-accent);
+  color: var(--rp-accent);
 }

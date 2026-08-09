@@ -8,6 +8,8 @@ import {
   fmtK,
   initialRoundPlan,
   GOAL_DEFAULTS,
+  MILESTONE_KINDS,
+  goalDrivenState,
   ROLES,
   STAGE_DEFAULTS,
   SPEND,
@@ -118,6 +120,52 @@ export default function RoundPlanner({ onModelDilution }: Props) {
           {s.mode === "goal" && (
             <div className={styles.group}>
               <div className={styles.groupTitle}>Where you want to get to</div>
+
+              <div className={styles.kindBtns} role="group" aria-label="Milestone type">
+                {MILESTONE_KINDS.map((k) => (
+                  <button
+                    key={k.key}
+                    type="button"
+                    aria-pressed={s.goal.kind === k.key}
+                    className={`${styles.kindBtn}${s.goal.kind === k.key ? ` ${styles.kindBtnOn}` : ""}`}
+                    onClick={() => setGoal("kind", k.key)}
+                  >
+                    {k.label}
+                  </button>
+                ))}
+              </div>
+              <p className={styles.kindNote}>{MILESTONE_KINDS.find((k) => k.key === s.goal.kind)!.note}</p>
+
+              {s.goal.kind === "users" && (
+                <>
+                  <Field label="Active users today">
+                    <input type="number" className={styles.num} min={0} step={100} value={s.goal.currentUsers}
+                      onChange={(e) => setGoal("currentUsers", Math.max(0, +e.target.value))} aria-label="Current users" />
+                    <span className={styles.unit}>users</span>
+                  </Field>
+                  <Field label="Users the next round wants">
+                    <input type="number" className={styles.num} min={0} step={500} value={s.goal.targetUsers}
+                      onChange={(e) => setGoal("targetUsers", Math.max(0, +e.target.value))} aria-label="Target users" />
+                    <span className={styles.unit}>users</span>
+                  </Field>
+                  <Field label="Cost per acquired user" hint="Blended across channels">
+                    <input type="number" className={styles.num} min={0} step={1} value={s.goal.cpa}
+                      onChange={(e) => setGoal("cpa", Math.max(0, +e.target.value))} aria-label="Cost per user" />
+                    <span className={styles.unit}>€</span>
+                  </Field>
+                </>
+              )}
+
+              {s.goal.kind === "product" && (
+                <Field label="Engineering to build it" hint="Engineer-months — 3 engineers for 8 months is 24">
+                  <input type="number" className={styles.num} min={1} step={2} value={s.goal.engMonths}
+                    onChange={(e) => setGoal("engMonths", Math.max(1, +e.target.value))} aria-label="Engineer months" />
+                  <span className={styles.unit}>eng-mo</span>
+                </Field>
+              )}
+
+              {s.goal.kind === "revenue" && (
+                <>
               <Field label="Recurring revenue today" hint="ARR, k€ per year">
                 <input type="number" className={styles.num} min={0} step={10} value={s.goal.currentARR}
                   onChange={(e) => setGoal("currentARR", Math.max(0, +e.target.value))} aria-label="Current ARR" />
@@ -148,15 +196,15 @@ export default function RoundPlanner({ onModelDilution }: Props) {
                   onChange={(e) => setGoal("engPerRep", Math.max(0, +e.target.value))} aria-label="Engineers per rep" />
                 <span className={styles.unit}>×</span>
               </Field>
+                </>
+              )}
 
               <div className={styles.derived}>
-                <strong>{fmtK(plan.capacity.netNewARR)} of new ARR</strong> means about{" "}
-                {Math.ceil(plan.capacity.customersNeeded)} customers, which needs{" "}
-                <strong>{plan.capacity.repsNeeded} reps</strong> (each productive for{" "}
-                {plan.capacity.productiveMonths} of the {s.monthsToMilestone} months) and{" "}
-                <strong>{plan.capacity.engineersNeeded} engineers</strong> behind them, plus{" "}
-                {fmtK(plan.capacity.marketingMonthly)}/mo of pipeline spend. Those numbers replace the hiring plan
-                below.
+                <strong>{plan.capacity.summary}</strong> — which needs{" "}
+                {plan.capacity.repsNeeded > 0 && <><strong>{plan.capacity.repsNeeded} reps</strong> and </>}
+                <strong>{plan.capacity.engineersNeeded} engineers</strong>
+                {plan.capacity.marketingMonthly > 0 && <>, plus {fmtK(plan.capacity.marketingMonthly)}/mo of acquisition spend</>}.
+                Those replace the hiring plan below.
               </div>
             </div>
           )}
@@ -363,30 +411,67 @@ export default function RoundPlanner({ onModelDilution }: Props) {
             {plan.typicalRound[1]} M€.
           </p>
 
-          {plan.alternate !== null && (
-            <div className={styles.compare}>
-              <div className={styles.compareRow}>
-                <span>{s.mode === "goal" ? "From the goal" : "From the plan"}</span>
-                <strong>{fmtK(plan.raise)}</strong>
+          {plan.converge && (
+            <div className={styles.converge}>
+              <div className={styles.convergeTop}>
+                <span className={styles.convergeLabel}>Top-down · from the goal</span>
+                <strong>{fmtK(plan.converge.goalRaise)}</strong>
+                <span className={styles.convergeSub}>to reach {plan.converge.targetLabel}</span>
               </div>
-              <div className={styles.compareRow}>
-                <span>{s.mode === "goal" ? "From the plan" : "From the goal"}</span>
-                <strong>{fmtK(plan.alternate)}</strong>
+
+              <div className={styles.pyramidWrap}>
+                <span className={styles.pyramidDown} />
+                <span className={`${styles.meet}${plan.converge.agreed ? ` ${styles.meetAgreed}` : ""}`}>
+                  {plan.converge.agreed
+                    ? `they meet · ${fmtK(plan.converge.goalRaise)}`
+                    : `gap · ${fmtK(Math.abs(plan.converge.gap))}`}
+                </span>
+                <span className={styles.pyramidUp} />
               </div>
-              <p className={styles.compareNote}>
-                {/* Compare goal against plan explicitly — which of the two is
-                    `raise` and which is `alternate` flips with the mode. */}
-                {(() => {
-                  const goalNum = s.mode === "goal" ? plan.raise : plan.alternate!;
-                  const planNum = s.mode === "goal" ? plan.alternate! : plan.raise;
-                  const diff = fmtK(Math.abs(goalNum - planNum));
-                  if (Math.abs(goalNum - planNum) < 50)
-                    return "The two directions agree — the team you want is about the team the target needs.";
-                  return goalNum > planNum
-                    ? `Reaching the target costs ${diff} more than the team you sketched. Either the goal is out of reach on this plan, or the plan is short of people.`
-                    : `The team you sketched costs ${diff} more than the target strictly requires. Fine if it buys optionality — worth knowing that it is a choice.`;
-                })()}
-              </p>
+
+              <div className={styles.convergeBottom}>
+                <span className={styles.convergeLabel}>Bottom-up · from the plan</span>
+                <strong>{fmtK(plan.converge.planRaise)}</strong>
+                <span className={styles.convergeSub}>which reaches {plan.converge.reachLabel}</span>
+              </div>
+
+              {!plan.converge.agreed && (
+                <>
+                  <p className={styles.convergeNote}>
+                    Two estimates of the same number, so the gap means an input is wrong — not that one method is.
+                    Close it from either end.
+                  </p>
+                  <div className={styles.convergeActions}>
+                    <button
+                      type="button"
+                      className={styles.convergeBtn}
+                      onClick={() => setS((p) => ({ ...goalDrivenState(p), mode: "plan" }))}
+                    >
+                      Staff the plan for the goal
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.convergeBtn}
+                      onClick={() =>
+                        setS((p) => ({
+                          ...p,
+                          mode: "plan",
+                          goal: {
+                            ...p.goal,
+                            ...(p.goal.kind === "revenue"
+                              ? { targetARR: plan.converge!.reachValue }
+                              : p.goal.kind === "users"
+                                ? { targetUsers: plan.converge!.reachValue }
+                                : { engMonths: plan.converge!.reachValue }),
+                          },
+                        }))
+                      }
+                    >
+                      Lower the goal to what the plan reaches
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
