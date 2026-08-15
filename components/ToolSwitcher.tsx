@@ -2,16 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { RoundId } from "@/lib/planner";
+import GrowthPlanner from "./growth/GrowthPlanner";
 import NetworkStrategy from "./network/NetworkStrategy";
 import PillNav, { TOOLS, type ToolId } from "./PillNav";
 import Planner from "./planner/Planner";
 import RoundPlanner from "./round/RoundPlanner";
 import ReadyToRaise from "./ready/ReadyToRaise";
 
-const DEFAULT_TOOL: ToolId = "ready";
+const DEFAULT_TOOL: ToolId = "growth";
 
 /**
- * All four tools stay mounted and the inactive ones are `hidden`, so
+ * All five tools stay mounted and the inactive ones are `hidden`, so
  * switching tabs never discards what you entered. The choice is mirrored
  * into `?tool=` so a tab can be linked to directly.
  */
@@ -67,6 +68,10 @@ export default function ToolSwitcher() {
   return (
     <>
       <PillNav active={active} onChange={select} />
+
+      <div id="panel-growth" role="tabpanel" aria-labelledby="tab-growth" hidden={active !== "growth"}>
+        <GrowthPlanner onOpenTool={openTool} />
+      </div>
 
       <div id="panel-ready" role="tabpanel" aria-labelledby="tab-ready" hidden={active !== "ready"}>
         <ReadyToRaise onOpenTool={openTool} isActive={active === "ready"} />
