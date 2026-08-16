@@ -8,8 +8,11 @@ import {
   DEFAULT_GOAL,
   arpaFor,
   computeGoal,
+  callLoad,
   growthForTarget,
   interviewsPerYear,
+  newCustomersAt,
+  routesToTarget,
   ltvCacVerdict,
   startForTarget,
   unitEconomics,
@@ -31,6 +34,10 @@ const BASE: GoalInputs = {
   campaignsPerYear: 4,
   startNewCustomers: 1,
   acquisitionGrowth: 0,
+  newCustomerOverrides: {},
+  conversionRate: 0.2,
+  callsToClose: 3,
+  callMinutes: 30,
   cac: 5,
   costPerInterview: 0,
   churnPerYear: 0,
@@ -301,4 +308,111 @@ test("der Zielanteil sagt, wie weit man kommt, wenn es nicht reicht", () => {
   assert.ok(r.targetShare > 0 && r.targetShare < 1);
   assert.equal(round2(r.targetShare), round2(r.endARR / 1000));
   assert.equal(r.reach.all, null);
+});
+
+/* ── Neukunden je Monat: Formel, aber überschreibbar ─────────── */
+
+test("ohne Eintrag schreibt die Wachstumsformel fort", () => {
+  const i = { ...BASE, startNewCustomers: 2, acquisitionGrowth: 0.1 };
+  assert.equal(newCustomersAt(i, 0), 2);
+  assert.equal(round2(newCustomersAt(i, 3)), round2(2 * Math.pow(1.1, 3)));
+});
+
+test("ein von Hand gesetzter Monat schlägt die Formel — nur dieser", () => {
+  const i = { ...BASE, startNewCustomers: 2, acquisitionGrowth: 0.1, newCustomerOverrides: { 2: 9 } };
+  assert.equal(newCustomersAt(i, 2), 9);
+  assert.equal(round2(newCustomersAt(i, 3)), round2(2 * Math.pow(1.1, 3)));
+
+  const { months } = computeGoal(i);
+  assert.equal(months[2].newCustomers, 9);
+  assert.equal(months[2].overridden, true);
+  assert.equal(months[3].overridden, false);
+});
+
+test("gesetzte Monate wirken sich auf Bestand und Umsatz aus", () => {
+  const plain = computeGoal({ ...BASE, startNewCustomers: 1 });
+  const spike = computeGoal({ ...BASE, startNewCustomers: 1, newCustomerOverrides: { 0: 11 } });
+  assert.equal(round2(spike.months[0].customers - plain.months[0].customers), 10);
+  assert.ok(spike.endARR > plain.endARR);
+});
+
+/* ── Vom Kunden zum Termin ───────────────────────────────────── */
+
+test("Erstgespräche folgen aus der Conversion", () => {
+  // Zwei Abschlüsse bei 20 % brauchen zehn Erstgespräche.
+  const l = callLoad({ ...BASE, conversionRate: 0.2, callsToClose: 1 }, 2);
+  assert.equal(l.firstCalls, 10);
+  assert.equal(l.totalCalls, 10);
+});
+
+test("Nachfassen kommt oben drauf, aber nur für die Abschlüsse", () => {
+  const l = callLoad({ ...BASE, conversionRate: 0.2, callsToClose: 3 }, 2);
+  assert.equal(l.firstCalls, 10);
+  assert.equal(l.totalCalls, 10 + 2 * 2); // zwei Abschlüsse, je zwei Nachfass-Calls
+});
+
+test("Calls pro Woche und Stunden folgen aus der Call-Länge", () => {
+  const l = callLoad({ ...BASE, conversionRate: 0.25, callsToClose: 1, callMinutes: 30 }, 13);
+  assert.equal(l.totalCalls, 52); // 13 / 0,25
+  assert.equal(round2(l.callsPerWeek), 12); // 52 / (52/12)
+  assert.equal(round2(l.hoursPerWeek), 6); // 12 × 30 min
+});
+
+test("eine bessere Conversion senkt die Termine, nicht die Abschlüsse", () => {
+  const bad = callLoad({ ...BASE, conversionRate: 0.1 }, 5);
+  const good = callLoad({ ...BASE, conversionRate: 0.4 }, 5);
+  assert.ok(good.firstCalls < bad.firstCalls);
+  assert.equal(round2(good.firstCalls * 4), round2(bad.firstCalls));
+});
+
+test("die Termine wachsen mit der Neukundenrate mit", () => {
+  const { months } = computeGoal({ ...BASE, startNewCustomers: 1, acquisitionGrowth: 0.1 });
+  assert.ok(months[23].callsPerWeek > months[0].callsPerWeek * 5);
+});
+
+/* ── Wege zum Ziel ───────────────────────────────────────────── */
+
+test("drei Wege zum selben Ziel, und jede Motion nimmt Vertriebsdruck ab", () => {
+  const i: GoalInputs = {
+    ...BASE,
+    targetARR: 800,
+    horizonMonths: 18,
+    expandOn: true,
+    upgradeSharePerYear: 0.5,
+    upgradeUplift: 0.6,
+    channelOn: true,
+    partnersPerYear: 6,
+    endCustomersPerPartner: 8,
+  };
+  const [land, landExpand, all] = routesToTarget(i);
+
+  assert.equal(land.key, "land");
+  assert.ok(land.growth !== null && landExpand.growth !== null && all.growth !== null);
+  assert.ok(landExpand.growth! < land.growth!, "Expand muss entlasten");
+  assert.ok(all.growth! < landExpand.growth!, "Channel muss zusätzlich entlasten");
+
+  // Weniger Akquisedruck heißt auch weniger Termine.
+  assert.ok(all.callsPerWeek < land.callsPerWeek);
+});
+
+test("jeder Weg lässt sich anwenden und trifft das Ziel dann wirklich", () => {
+  const i: GoalInputs = {
+    ...BASE,
+    targetARR: 800,
+    horizonMonths: 18,
+    upgradeSharePerYear: 0.5,
+    upgradeUplift: 0.6,
+    partnersPerYear: 6,
+    endCustomersPerPartner: 8,
+  };
+  for (const route of routesToTarget(i)) {
+    if (route.growth == null) continue;
+    const applied = computeGoal({ ...i, ...route.apply });
+    assert.ok(applied.endARR >= i.targetARR - 1, `${route.key} erreicht nur ${round2(applied.endARR)}`);
+  }
+});
+
+test("ein Weg, der nicht trägt, meldet das statt zu schummeln", () => {
+  const brutal: GoalInputs = { ...BASE, targetARR: 1e9, horizonMonths: 3 };
+  for (const route of routesToTarget(brutal)) assert.equal(route.growth, null);
 });

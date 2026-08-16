@@ -79,6 +79,21 @@ export type GoalInputs = {
   startNewCustomers: number;
   /** Monatliches Wachstum der Neukundenrate. */
   acquisitionGrowth: number;
+  /** Einzelne Monate von Hand gesetzt — schlägt die Wachstumsformel.
+      Damit ist die Kurve kein Modellartefakt mehr: wo du weißt, was
+      kommt, trägst du es ein, und nur der Rest wird fortgeschrieben. */
+  newCustomerOverrides: Record<number, number>;
+
+  /* ── Vertriebstrichter ──
+     Was „zwei Neukunden im Monat" an Terminen bedeutet. Die Kette bricht
+     bis auf Calls pro Woche herunter, weil das die Einheit ist, in der
+     man merkt, ob ein Plan an der Wirklichkeit vorbeigeht. */
+  /** Anteil der Erstgespräche, aus denen ein Abschluss wird. */
+  conversionRate: number;
+  /** Calls, die ein gewonnener Abschluss insgesamt braucht. */
+  callsToClose: number;
+  /** Länge eines Calls in Minuten. */
+  callMinutes: number;
 
   /** Was ein Neukunde kosten darf, k€. */
   cac: number;
@@ -136,6 +151,8 @@ export type GoalMonth = {
   label: string;
   /** Neukunden in diesem Monat — wächst über die Zeit. */
   newCustomers: number;
+  /** Ob dieser Monat von Hand gesetzt ist. */
+  overridden: boolean;
   customers: number;
   /** Davon bereits hochgestuft. */
   upgraded: number;
@@ -147,6 +164,14 @@ export type GoalMonth = {
   total: number;
   /** Vertriebsbudget dieses Monats, k€. */
   salesSpend: number;
+
+  /* ── Was das an Terminen heißt ── */
+  /** Erstgespräche, die es für die Neukunden dieses Monats braucht. */
+  firstCalls: number;
+  /** Alle Calls, Nachfassen eingerechnet. */
+  totalCalls: number;
+  callsPerWeek: number;
+  hoursPerWeek: number;
 };
 
 export type GoalResult = {
@@ -215,6 +240,36 @@ export function unitEconomics(i: GoalInputs, model: PricingModel = i.pricing): U
 const ramp = (monthsActive: number, rampMonths: number) =>
   rampMonths <= 1 ? 1 : Math.min(1, (monthsActive + 1) / rampMonths);
 
+/** Neukunden im Monat m: der von Hand gesetzte Wert, sonst fortgeschrieben. */
+export function newCustomersAt(i: GoalInputs, m: number): number {
+  const override = i.newCustomerOverrides[m];
+  if (override != null && isFinite(override)) return Math.max(0, override);
+  return i.startNewCustomers * Math.pow(1 + i.acquisitionGrowth, m);
+}
+
+const WEEKS_PER_MONTH = 52 / 12;
+
+/**
+ * Was eine Zahl Neukunden an Gesprächen kostet.
+ *
+ * Erstgespräche folgen aus der Conversion — für zwei Abschlüsse bei 20 %
+ * braucht es zehn. Dazu kommt das Nachfassen, das nur die Abschlüsse
+ * verursachen, die auch weiterkommen; die verlorenen Gespräche stecken
+ * bereits in der Conversion.
+ */
+export function callLoad(i: GoalInputs, newCustomers: number) {
+  const firstCalls = i.conversionRate > 0 ? newCustomers / i.conversionRate : 0;
+  const followUps = newCustomers * Math.max(0, i.callsToClose - 1);
+  const totalCalls = firstCalls + followUps;
+  const callsPerWeek = totalCalls / WEEKS_PER_MONTH;
+  return {
+    firstCalls,
+    totalCalls,
+    callsPerWeek,
+    hoursPerWeek: (callsPerWeek * i.callMinutes) / 60,
+  };
+}
+
 /* ── Der Verlauf ─────────────────────────────────────────────── */
 
 export function computeGoal(i: GoalInputs): GoalResult {
@@ -233,7 +288,9 @@ export function computeGoal(i: GoalInputs): GoalResult {
 
   for (let m = 0; m < n; m++) {
     // Die Neukundenrate wächst selbst — das ist die Krümmung der Land-Kurve.
-    const newCustomers = i.startNewCustomers * Math.pow(1 + i.acquisitionGrowth, m);
+    // Wo ein Monat von Hand gesetzt ist, gilt der Wert statt der Formel.
+    const newCustomers = newCustomersAt(i, m);
+    const overridden = i.newCustomerOverrides[m] != null;
 
     customers = customers * (1 - monthlyChurn) + newCustomers;
 
@@ -270,6 +327,7 @@ export function computeGoal(i: GoalInputs): GoalResult {
       key,
       label: monthLabel(key),
       newCustomers,
+      overridden,
       customers,
       upgraded,
       endCustomers,
@@ -279,6 +337,7 @@ export function computeGoal(i: GoalInputs): GoalResult {
       channel,
       total: land + expand + channel,
       salesSpend: newCustomers * i.cac,
+      ...callLoad(i, newCustomers),
     });
   }
 
@@ -327,6 +386,58 @@ export function growthForTarget(i: GoalInputs): number | null {
   return hi;
 }
 
+/* ── Wege zum Ziel ───────────────────────────────────────────────
+   Ein Ziel hat nie nur einen Weg. Dieselbe Zahl lässt sich über
+   Neukunden erreichen, über mehr Umsatz bei denen, die man schon hat,
+   oder über Partner — und in aller Regel über eine Mischung. Die drei
+   Wege rechnen jeweils aus, wie stark die Akquise wachsen müsste, wenn
+   die jeweiligen Motions mitspielen. Der Abstand zwischen ihnen ist,
+   was eine Motion an Vertriebsdruck abnimmt.
+
+   Bewusst mit deinen eigenen Expand- und Channel-Zahlen gerechnet, nicht
+   mit erfundenen Musterwerten — sonst wäre der Vorschlag nur eine
+   andere Art zu raten. */
+
+export type RouteKey = "land" | "landExpand" | "all";
+
+export type Route = {
+  key: RouteKey;
+  label: string;
+  /** Nötiges Wachstum der Neukundenrate, oder null wenn unerreichbar. */
+  growth: number | null;
+  /** Neukunden im letzten Monat unter diesem Weg. */
+  endRate: number;
+  /** Calls pro Woche im letzten Monat — der Realitätstest. */
+  callsPerWeek: number;
+  hoursPerWeek: number;
+  /** Eingaben, die dieser Weg setzt. */
+  apply: Partial<GoalInputs>;
+};
+
+export function routesToTarget(i: GoalInputs): Route[] {
+  const variants: { key: RouteKey; label: string; over: Partial<GoalInputs> }[] = [
+    { key: "land", label: "Nur Neukunden", over: { expandOn: false, channelOn: false } },
+    { key: "landExpand", label: "Mit Expand", over: { expandOn: true, channelOn: false } },
+    { key: "all", label: "Mit Expand und Channel", over: { expandOn: true, channelOn: true } },
+  ];
+
+  return variants.map(({ key, label, over }) => {
+    const base = { ...i, ...over };
+    const growth = growthForTarget(base);
+    const solved = computeGoal({ ...base, acquisitionGrowth: growth ?? base.acquisitionGrowth });
+    const last = solved.months[solved.months.length - 1];
+    return {
+      key,
+      label,
+      growth,
+      endRate: last.newCustomers,
+      callsPerWeek: last.callsPerWeek,
+      hoursPerWeek: last.hoursPerWeek,
+      apply: { ...over, ...(growth != null ? { acquisitionGrowth: growth } : {}) },
+    };
+  });
+}
+
 /** Wie viele Neukunden im ersten Monat es bräuchte, bei unveränderter
     Wachstumsrate. Die Alternative zu „schneller wachsen": größer anfangen. */
 export function startForTarget(i: GoalInputs): number | null {
@@ -360,6 +471,13 @@ export const DEFAULT_GOAL: GoalInputs = {
 
   startNewCustomers: 1,
   acquisitionGrowth: 0.08,
+  newCustomerOverrides: {},
+
+  // 20 % aus dem Erstgespräch und drei Calls bis zur Unterschrift sind für
+  // erklärungsbedürftiges B2B eher zügig als vorsichtig gerechnet.
+  conversionRate: 0.2,
+  callsToClose: 3,
+  callMinutes: 30,
   // Rund die Hälfte des ersten Jahresumsatzes — für B2B-Mittelstand eher
   // optimistisch als großzügig.
   cac: 8,

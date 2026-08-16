@@ -17,12 +17,16 @@ import { fmtK, fmtPct } from "@/lib/inplicit/plan";
 import {
   DEFAULT_GOAL,
   PRICING,
+  callLoad,
   computeGoal,
   growthForTarget,
+  newCustomersAt,
+  routesToTarget,
   ltvCacVerdict,
   startForTarget,
   unitEconomics,
   type GoalInputs,
+  type GoalMonth,
 } from "@/lib/inplicit/goal";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
@@ -57,7 +61,7 @@ export default function GoalPlanner() {
       borderWidth: 2,
       pointRadius: 0,
       fill: "origin" as const,
-      tension: 0.25,
+      stepped: true as const,
     },
     ...(g.expandOn
       ? [
@@ -69,7 +73,7 @@ export default function GoalPlanner() {
             borderWidth: 2,
             pointRadius: 0,
             fill: "-1" as const,
-            tension: 0.25,
+            stepped: true as const,
           },
         ]
       : []),
@@ -83,7 +87,7 @@ export default function GoalPlanner() {
             borderWidth: 2,
             pointRadius: 0,
             fill: "-1" as const,
-            tension: 0.25,
+            stepped: true as const,
           },
         ]
       : []),
@@ -164,11 +168,13 @@ export default function GoalPlanner() {
             {g.channelOn && <Reach label="Mit Channel" value={when(reach.all)} color={CHANNEL} />}
           </div>
           <p className={styles.chartFoot}>
-            Der Abstand zwischen zwei Linien ist der Beitrag dieser Motion. Land krümmt sich, weil die Neukundenrate
-            selbst wächst — im letzten Monat kommen {fmtNum(months[months.length - 1].newCustomers)} Kunden dazu statt{" "}
-            {fmtNum(g.startNewCustomers)} am Anfang. Expand wächst auf dem Bestand, den Land schon bezahlt hat, ohne
-            einen einzigen Neukunden; Channel bringt je Abschluss eine ganze Mandantenliste.
+            Der Abstand zwischen zwei Linien ist der Beitrag dieser Motion. Jede Stufe ist ein Monat: Land steigt in
+            Sprüngen, weil Kunden einzeln dazukommen — im letzten Monat {fmtNum(months[months.length - 1].newCustomers)}{" "}
+            statt {fmtNum(g.startNewCustomers)} am Anfang. Expand wächst auf dem Bestand, den Land schon bezahlt hat,
+            ohne einen einzigen Neukunden; Channel bringt je Abschluss eine ganze Mandantenliste.
           </p>
+
+          <AcquisitionTable g={g} months={months} onSet={setG} />
         </div>
 
         {/* ── Rechts: Ziel und Runterbrechung ── */}
@@ -304,6 +310,33 @@ export default function GoalPlanner() {
             unit="% / Monat"
           />
           <Num label="CAC" hint="Was ein Neukunde kosten darf" v={g.cac} set={(v) => set("cac", v)} step={0.5} unit="k€" />
+
+          {/* Von Kunden auf Termine — die Einheit, in der man merkt,
+              ob ein Plan an der Wirklichkeit vorbeigeht. */}
+          <div className={styles.groupTitle}>Was das an Terminen heißt</div>
+          <Pct
+            label="Conversion Erstgespräch → Kunde"
+            v={g.conversionRate}
+            set={(v) => set("conversionRate", Math.max(0.01, v))}
+            max={0.6}
+            step={0.01}
+          />
+          <Num
+            label="Calls bis zum Abschluss"
+            hint="Inklusive Erstgespräch"
+            v={g.callsToClose}
+            set={(v) => set("callsToClose", Math.max(1, v))}
+            step={1}
+            unit="Calls"
+          />
+          <Num
+            label="Länge eines Calls"
+            v={g.callMinutes}
+            set={(v) => set("callMinutes", v)}
+            step={15}
+            unit="Minuten"
+          />
+          <CallLoad g={g} months={months} />
           <Num
             label="Vollkosten je Interview"
             v={g.costPerInterview}
@@ -404,6 +437,139 @@ export default function GoalPlanner() {
   );
 }
 
+/* ── Neukunden je Monat, von Hand ──────────────────────────────
+   Die Formel schreibt fort, was du nicht besser weißt. Wo du es besser
+   weißt — ein Abschluss, der feststeht, ein Monat im Sommerloch —,
+   trägst du die Zahl ein und die Formel hält sich da heraus. */
+
+function AcquisitionTable({
+  g,
+  months,
+  onSet,
+}: {
+  g: GoalInputs;
+  months: GoalMonth[];
+  onSet: (next: GoalInputs) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const overrides = Object.keys(g.newCustomerOverrides).length;
+
+  const setMonth = (m: number, raw: string) => {
+    const next = { ...g.newCustomerOverrides };
+    if (raw.trim() === "") delete next[m];
+    else next[m] = Math.max(0, Number(raw));
+    onSet({ ...g, newCustomerOverrides: next });
+  };
+
+  return (
+    <div className={styles.acq}>
+      <div className={styles.acqHead}>
+        <button type="button" className={styles.acqToggle} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          {open ? "▾" : "▸"} Neukunden je Monat
+        </button>
+        <span className={styles.acqNote}>
+          {overrides > 0 ? (
+            <>
+              {overrides} Monat{overrides === 1 ? "" : "e"} von Hand gesetzt
+              <button type="button" className={styles.acqReset} onClick={() => onSet({ ...g, newCustomerOverrides: {} })}>
+                zurücksetzen
+              </button>
+            </>
+          ) : (
+            "alle aus der Wachstumsrate fortgeschrieben"
+          )}
+        </span>
+      </div>
+
+      {open && (
+        <div className={styles.acqScroll}>
+          <table className={styles.acqTable}>
+            <thead>
+              <tr>
+                <th>Monat</th>
+                <th>Neu</th>
+                <th>Kunden</th>
+                <th>Calls / Wo.</th>
+                <th>Std. / Wo.</th>
+                <th>ARR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {months.map((m) => (
+                <tr key={m.key} className={m.overridden ? styles.acqRowSet : undefined}>
+                  <td className={styles.acqMonth}>{m.label}</td>
+                  <td>
+                    <input
+                      className={styles.acqInput}
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={g.newCustomerOverrides[m.index] ?? ""}
+                      placeholder={fmtNum(newCustomersAt({ ...g, newCustomerOverrides: {} }, m.index))}
+                      onChange={(e) => setMonth(m.index, e.target.value)}
+                      aria-label={`Neukunden ${m.label}`}
+                    />
+                  </td>
+                  <td>{fmtNum(m.customers)}</td>
+                  <td>{fmtNum(m.callsPerWeek)}</td>
+                  <td>{fmtNum(m.hoursPerWeek)}</td>
+                  <td>{fmtK(m.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Was das an Terminen heißt ─────────────────────────────── */
+
+function CallLoad({ g, months }: { g: GoalInputs; months: GoalMonth[] }) {
+  const last = months[months.length - 1];
+  const first = months[0];
+  // Grob die Hälfte einer Arbeitswoche in Gesprächen ist die Grenze, ab der
+  // neben dem Verkaufen niemand mehr liefert.
+  const heavy = last.hoursPerWeek > 20;
+
+  return (
+    <div className={`${styles.calls} ${heavy ? styles.callsWarn : ""}`}>
+      <div className={styles.callsRow}>
+        <span>Erstgespräche</span>
+        <strong>
+          {fmtNum(first.firstCalls / (52 / 12))} → {fmtNum(last.firstCalls / (52 / 12))} / Woche
+        </strong>
+      </div>
+      <div className={styles.callsRow}>
+        <span>Alle Calls</span>
+        <strong>
+          {fmtNum(first.callsPerWeek)} → {fmtNum(last.callsPerWeek)} / Woche
+        </strong>
+      </div>
+      <div className={styles.callsRow}>
+        <span>Zeit am Telefon</span>
+        <strong>
+          {fmtNum(first.hoursPerWeek)} → {fmtNum(last.hoursPerWeek)} Std. / Woche
+        </strong>
+      </div>
+      <p className={styles.callsNote}>
+        {heavy ? (
+          <>
+            Über 20 Stunden Gespräche pro Woche im letzten Monat — daneben liefert niemand mehr. Entweder braucht es
+            jemanden im Vertrieb, eine bessere Conversion oder ein größeres Ticket je Kunde.
+          </>
+        ) : (
+          <>
+            Bei {fmtPct(g.conversionRate)} Conversion braucht ein Abschluss {fmtNum(1 / g.conversionRate)}{" "}
+            Erstgespräche und {g.callsToClose} Calls insgesamt.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 /* ── Auf das Ziel rechnen ──────────────────────────────────────
    Der eigentliche Zweck des Tools: nicht melden, dass ein Ziel verfehlt
    wird, sondern ausrechnen, welche Steigung es bräuchte — und was diese
@@ -417,16 +583,21 @@ function GoalSeek({ g, onApply }: { g: GoalInputs; onApply: (next: GoalInputs) =
   const hit = r.reach.all;
   const lastLabel = r.months[r.months.length - 1].label;
 
+  /* Die Wege stehen in beiden Fällen. Wird das Ziel verfehlt, sagen sie, was
+     es bräuchte; wird es erreicht, sagen sie, wie viel Luft jeder Weg lässt —
+     und dass es billiger ginge, wenn eine Motion mitträgt. */
   if (hit != null) {
     return (
       <div className={`${styles.seek} ${styles.seekOk}`}>
         <div className={styles.seekMain}>
           Ziel steht in <strong>{r.months[hit].label}</strong>
+          <span className={styles.seekShare}>{Math.round(r.targetShare * 100)} % am Ende</span>
         </div>
         <p className={styles.seekNote}>
-          Am Ende des Zeitraums sind es {fmtK(r.endARR)} — {Math.round(r.targetShare * 100)} % des Ziels. Setz das Ziel
-          höher oder den Zeitraum kürzer, um zu sehen, wo es kippt.
+          Am Ende des Zeitraums sind es {fmtK(r.endARR)}. So viel Akquise-Wachstum bräuchte jeder Weg, um genau auf
+          das Ziel zu kommen — alles darüber ist Puffer.
         </p>
+        <Routes g={g} onApply={onApply} />
       </div>
     );
   }
@@ -450,10 +621,9 @@ function GoalSeek({ g, onApply }: { g: GoalInputs; onApply: (next: GoalInputs) =
       ) : (
         <>
           <p className={styles.seekNote}>
-            Dafür bräuchte die Neukundenrate <strong>{fmtPct(needed, 1)} Wachstum im Monat</strong> statt{" "}
-            {fmtPct(g.acquisitionGrowth, 1)} — also von {fmtNum(g.startNewCustomers)} auf{" "}
-            <strong>{fmtNum(endRate)} Neukunden im Monat</strong> bis {lastLabel}, bei dann {fmtK(endSpend)}{" "}
-            Vertriebsbudget monatlich.
+            Über Neukunden allein bräuchte es <strong>{fmtPct(needed, 1)} Wachstum im Monat</strong> statt{" "}
+            {fmtPct(g.acquisitionGrowth, 1)} — von {fmtNum(g.startNewCustomers)} auf{" "}
+            <strong>{fmtNum(endRate)} Neukunden im Monat</strong>, bei {fmtK(endSpend)} Vertriebsbudget monatlich.
             {bigStart != null && (
               <>
                 {" "}
@@ -461,26 +631,83 @@ function GoalSeek({ g, onApply }: { g: GoalInputs; onApply: (next: GoalInputs) =
               </>
             )}
           </p>
-          <div className={styles.seekBtns}>
-            <button
-              type="button"
-              className={styles.seekBtn}
-              onClick={() => onApply({ ...g, acquisitionGrowth: needed })}
-            >
-              Auf das Ziel rechnen
-            </button>
-            {bigStart != null && (
+
+          {/* Alle drei Motions, nicht nur die Akquise: der Abstand zwischen
+              den Zeilen ist, was eine Motion an Vertriebsdruck abnimmt. */}
+          <Routes g={g} onApply={onApply} />
+
+          {bigStart != null && (
+            <div className={styles.seekBtns}>
               <button
                 type="button"
                 className={styles.seekBtnGhost}
                 onClick={() => onApply({ ...g, startNewCustomers: bigStart })}
               >
-                stattdessen größer starten
+                stattdessen mit {fmtNum(bigStart)} Kunden starten
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+/* ── Wege zum Ziel ─────────────────────────────────────────────
+   Ein Ziel hat nie nur einen Weg, und in aller Regel ist es eine
+   Mischung. Jede Zeile rechnet mit deinen eigenen Expand- und
+   Channel-Zahlen aus, wie stark die Akquise dann noch wachsen müsste —
+   und was das an Terminen pro Woche bedeutet, damit sich die Zeilen
+   nicht nur rechnerisch, sondern auch praktisch vergleichen lassen. */
+
+function Routes({ g, onApply }: { g: GoalInputs; onApply: (next: GoalInputs) => void }) {
+  const routes = useMemo(() => routesToTarget(g), [g]);
+
+  /* Wenn alle drei Wege fast dieselbe Steigung verlangen, liegt das nicht an
+     schwachen Motions, sondern daran, dass der Zeitraum ihnen keine Zeit
+     lässt — und das ist die nützlichere Auskunft. */
+  const land = routes[0].growth;
+  const all = routes[2].growth;
+  const flat = land != null && all != null && land > 0 && (land - all) / land < 0.1;
+
+  return (
+    <div className={styles.routes}>
+      <div className={styles.routesHead}>
+        <span>Weg</span>
+        <span>Akquise-Wachstum</span>
+        <span>Calls / Woche</span>
+        <span />
+      </div>
+      {routes.map((route) => (
+        <div key={route.key} className={styles.routeRow}>
+          <span className={styles.routeLabel}>{route.label}</span>
+          <span className={styles.routeNum}>{route.growth == null ? "reicht nicht" : fmtPct(route.growth, 1)}</span>
+          <span className={styles.routeNum}>
+            {route.growth == null ? "—" : `${fmtNum(route.callsPerWeek)}`}
+          </span>
+          <span>
+            {route.growth != null && (
+              <button type="button" className={styles.routeBtn} onClick={() => onApply({ ...g, ...route.apply })}>
+                anwenden
+              </button>
+            )}
+          </span>
+        </div>
+      ))}
+      <p className={styles.routesNote}>
+        {flat ? (
+          <>
+            Auf {g.horizonMonths} Monate nehmen Expand und Channel kaum Druck ab — beide brauchen Bestand
+            beziehungsweise Partner, die erst entstehen müssen. Auf diese Frist trägt nur die Akquise. Verläng den
+            Zeitraum, und der Abstand zwischen den Zeilen wird groß.
+          </>
+        ) : (
+          <>
+            Gerechnet mit deinen eigenen Expand- und Channel-Werten, nicht mit Musterzahlen. Was die Motions
+            abnehmen, muss der Vertrieb nicht aufbringen.
+          </>
+        )}
+      </p>
     </div>
   );
 }
