@@ -79,7 +79,16 @@ access, so they can be exercised without a browser.
 ## Unlisted route
 
 `/inplicit` is a company-specific revenue planner rather than one of the
-public tools. It has **no access control**: it is excluded in `robots.txt`,
+public tools. It has two views of the same company:
+
+- **Ziel** — top-down. Set a target ARR; it divides back to the customers
+  needed, compares the three pricing models (per interview, per campaign,
+  annual licence) and reports CAC, LTV, LTV:CAC and payback. One chart shows
+  Land, Expand and Channel as stacked layers, so the gap between two lines
+  is that motion's contribution and each crosses the target on a different
+  month. Plain arithmetic throughout — `lib/inplicit/goal.ts`.
+- **Monatsplan** — bottom-up from the named pipeline, with delivery capacity
+  and the financing phase switch — `lib/inplicit/plan.ts`. It has **no access control**: it is excluded in `robots.txt`,
 absent from `sitemap.xml`, carries `noindex` and is not in the tool
 navigation — so search engines skip it, but anyone with the URL can read it.
 

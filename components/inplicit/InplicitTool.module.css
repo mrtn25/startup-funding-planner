@@ -1,0 +1,51 @@
+.wrap {
+  padding-top: 1.5rem;
+}
+
+.bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.tab {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 13.5px;
+  padding: 8px 18px;
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  text-align: left;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tabOn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+.tabHint {
+  font-size: 10.5px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+@media (max-width: 620px) {
+  .bar {
+    padding: 0 0.875rem;
+  }
+  .tab {
+    flex: 1;
+    padding: 7px 12px;
+  }
+}
