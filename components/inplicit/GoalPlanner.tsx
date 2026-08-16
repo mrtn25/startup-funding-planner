@@ -18,11 +18,11 @@ import {
   DEFAULT_GOAL,
   PRICING,
   computeGoal,
-  customersPerMonthFor,
+  growthForTarget,
   ltvCacVerdict,
+  startForTarget,
   unitEconomics,
   type GoalInputs,
-  type PricingModel,
 } from "@/lib/inplicit/goal";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
@@ -164,9 +164,10 @@ export default function GoalPlanner() {
             {g.channelOn && <Reach label="Mit Channel" value={when(reach.all)} color={CHANNEL} />}
           </div>
           <p className={styles.chartFoot}>
-            Der Abstand zwischen zwei Linien ist der Beitrag dieser Motion. Land steigt linear mit der Akquise;
-            Expand wächst auf dem Bestand, den Land schon bezahlt hat, und wird darum von allein steiler; Channel
-            bringt je Abschluss gleich eine ganze Mandantenliste.
+            Der Abstand zwischen zwei Linien ist der Beitrag dieser Motion. Land krümmt sich, weil die Neukundenrate
+            selbst wächst — im letzten Monat kommen {fmtNum(months[months.length - 1].newCustomers)} Kunden dazu statt{" "}
+            {fmtNum(g.startNewCustomers)} am Anfang. Expand wächst auf dem Bestand, den Land schon bezahlt hat, ohne
+            einen einzigen Neukunden; Channel bringt je Abschluss eine ganze Mandantenliste.
           </p>
         </div>
 
@@ -192,6 +193,8 @@ export default function GoalPlanner() {
               <strong>{fmtK(unit.acquisitionBudget)}</strong> Vertriebsbudget, bis das Ziel steht.
             </div>
           </div>
+
+          <GoalSeek g={g} onApply={setG} />
 
           <div className={styles.groupTitle}>Preismodell</div>
           <div className={styles.pricingBtns} role="group" aria-label="Preismodell">
@@ -282,19 +285,25 @@ export default function GoalPlanner() {
 
           <div className={styles.groupTitle}>Akquise & Bindung</div>
           <Num
-            label="Neukunden je Monat"
-            v={g.newCustomersPerMonth}
-            set={(v) => set("newCustomersPerMonth", v)}
+            label="Neukunden im ersten Monat"
+            v={g.startNewCustomers}
+            set={(v) => set("startNewCustomers", v)}
             step={0.5}
-            unit="/ Monat"
+            unit="Kunden"
           />
-          <Num
-            label="Vertrieb & Marketing"
-            v={g.salesSpendPerMonth}
-            set={(v) => set("salesSpendPerMonth", v)}
-            step={0.5}
-            unit="k€ / Mon."
+          {/* Zahlenfeld, kein Regler: die Ziel-Rechnung kann hier dreistellige
+              Prozentsätze eintragen, und ein Regler würde sie stillschweigend
+              auf sein Maximum kappen. */}
+          <PctNum
+            label="Wachstum der Neukundenrate"
+            hint={`Aus ${fmtNum(g.startNewCustomers)} werden bis ${months[months.length - 1].label} ${fmtNum(
+              months[months.length - 1].newCustomers,
+            )} Neukunden im Monat`}
+            v={g.acquisitionGrowth}
+            set={(v) => set("acquisitionGrowth", v)}
+            unit="% / Monat"
           />
+          <Num label="CAC" hint="Was ein Neukunde kosten darf" v={g.cac} set={(v) => set("cac", v)} step={0.5} unit="k€" />
           <Num
             label="Vollkosten je Interview"
             v={g.costPerInterview}
@@ -330,13 +339,30 @@ export default function GoalPlanner() {
             onChange={(v) => set("expandOn", v)}
           />
           {g.expandOn && (
-            <Pct
-              label="Bestandswachstum"
-              v={g.expandPerYear}
-              set={(v) => set("expandPerYear", v)}
-              max={1}
-              unit="/ Jahr"
-            />
+            <>
+              <Pct
+                label="Anteil, den wir hochstufen"
+                hint="Wie viel des Bestands im Jahr auf ein größeres Paket wechselt"
+                v={g.upgradeSharePerYear}
+                set={(v) => set("upgradeSharePerYear", v)}
+                max={1}
+                unit="/ Jahr"
+              />
+              <Pct
+                label="um welchen Satz"
+                hint={`${fmtK(unit.arpa)} → ${fmtK(unit.upgradedArpa)} im Jahr${
+                  g.pricing !== "subscription" ? ` · als Jahreslizenz wären es ${fmtK(g.subscriptionACV)}` : ""
+                }`}
+                v={g.upgradeUplift}
+                set={(v) => set("upgradeUplift", v)}
+                max={3}
+                step={0.05}
+              />
+              <p className={styles.motionNote}>
+                Am Ende des Zeitraums sind das <strong>{fmtNum(months[months.length - 1].upgraded)}</strong> von{" "}
+                {fmtNum(months[months.length - 1].customers)} Kunden — kein einziger davon neu gewonnen.
+              </p>
+            </>
           )}
           <Toggle
             on={g.channelOn}
@@ -372,49 +398,89 @@ export default function GoalPlanner() {
             </>
           )}
 
-          <div className={styles.groupTitle}>Was müsste passieren?</div>
-          <AskBox g={g} />
         </div>
       </div>
     </section>
   );
 }
 
-/* ── Umkehrfrage ── */
+/* ── Auf das Ziel rechnen ──────────────────────────────────────
+   Der eigentliche Zweck des Tools: nicht melden, dass ein Ziel verfehlt
+   wird, sondern ausrechnen, welche Steigung es bräuchte — und was diese
+   Steigung konkret bedeutet, damit man sie beurteilen kann. */
 
-function AskBox({ g }: { g: GoalInputs }) {
-  const [byMonth, setByMonth] = useState(11);
-  const needed = useMemo(() => customersPerMonthFor(g, byMonth), [g, byMonth]);
+function GoalSeek({ g, onApply }: { g: GoalInputs; onApply: (next: GoalInputs) => void }) {
   const r = useMemo(() => computeGoal(g), [g]);
+  const needed = useMemo(() => growthForTarget(g), [g]);
+  const bigStart = useMemo(() => startForTarget(g), [g]);
+
+  const hit = r.reach.all;
+  const lastLabel = r.months[r.months.length - 1].label;
+
+  if (hit != null) {
+    return (
+      <div className={`${styles.seek} ${styles.seekOk}`}>
+        <div className={styles.seekMain}>
+          Ziel steht in <strong>{r.months[hit].label}</strong>
+        </div>
+        <p className={styles.seekNote}>
+          Am Ende des Zeitraums sind es {fmtK(r.endARR)} — {Math.round(r.targetShare * 100)} % des Ziels. Setz das Ziel
+          höher oder den Zeitraum kürzer, um zu sehen, wo es kippt.
+        </p>
+      </div>
+    );
+  }
+
+  const solved = needed == null ? null : computeGoal({ ...g, acquisitionGrowth: needed });
+  const endRate = solved?.months[solved.months.length - 1].newCustomers ?? 0;
+  const endSpend = solved?.months[solved.months.length - 1].salesSpend ?? 0;
 
   return (
-    <div className={styles.askBox}>
-      <Num
-        label="Ziel erreicht bis Monat"
-        v={byMonth + 1}
-        set={(v) => setByMonth(clamp(Math.round(v) - 1, 0, g.horizonMonths - 1))}
-        step={1}
-        unit={r.months[byMonth]?.label ?? ""}
-      />
-      <p className={styles.askAnswer}>
-        {needed == null ? (
-          <>
-            Bis dahin ist {fmtK(g.targetARR)} auch mit sehr viel Vertrieb nicht zu schaffen — der Engpass ist nicht
-            die Akquiserate, sondern das Preismodell oder der Zeitraum.
-          </>
-        ) : needed <= g.newCustomersPerMonth ? (
-          <>
-            Dafür reichen <strong>{needed.toFixed(1)} Neukunden im Monat</strong>. Mit den geplanten{" "}
-            {g.newCustomersPerMonth.toFixed(1)} liegst du bereits darüber.
-          </>
-        ) : (
-          <>
-            Dafür bräuchte es <strong>{needed.toFixed(1)} Neukunden im Monat</strong> statt der geplanten{" "}
-            {g.newCustomersPerMonth.toFixed(1)} — bei {fmtK(unitEconomics(g).cac)} CAC also{" "}
-            {fmtK(needed * unitEconomics(g).cac)} Vertriebsbudget im Monat.
-          </>
-        )}
-      </p>
+    <div className={`${styles.seek} ${styles.seekWarn}`}>
+      <div className={styles.seekMain}>
+        Reicht nicht: <strong>{fmtK(r.endARR)}</strong> bis {lastLabel}
+        <span className={styles.seekShare}>{Math.round(r.targetShare * 100)} % des Ziels</span>
+      </div>
+
+      {needed == null ? (
+        <p className={styles.seekNote}>
+          Auch mit beliebig viel Vertrieb ist {fmtK(g.targetARR)} bis {lastLabel} nicht zu erreichen. Der Engpass ist
+          nicht die Akquise, sondern der Preis je Kunde oder der Zeitraum.
+        </p>
+      ) : (
+        <>
+          <p className={styles.seekNote}>
+            Dafür bräuchte die Neukundenrate <strong>{fmtPct(needed, 1)} Wachstum im Monat</strong> statt{" "}
+            {fmtPct(g.acquisitionGrowth, 1)} — also von {fmtNum(g.startNewCustomers)} auf{" "}
+            <strong>{fmtNum(endRate)} Neukunden im Monat</strong> bis {lastLabel}, bei dann {fmtK(endSpend)}{" "}
+            Vertriebsbudget monatlich.
+            {bigStart != null && (
+              <>
+                {" "}
+                Alternativ gleich mit <strong>{fmtNum(bigStart)}</strong> Neukunden im ersten Monat starten.
+              </>
+            )}
+          </p>
+          <div className={styles.seekBtns}>
+            <button
+              type="button"
+              className={styles.seekBtn}
+              onClick={() => onApply({ ...g, acquisitionGrowth: needed })}
+            >
+              Auf das Ziel rechnen
+            </button>
+            {bigStart != null && (
+              <button
+                type="button"
+                className={styles.seekBtnGhost}
+                onClick={() => onApply({ ...g, startNewCustomers: bigStart })}
+              >
+                stattdessen größer starten
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -485,33 +551,67 @@ function Num({
   );
 }
 
+/** Prozent als Zahlenfeld — für Werte ohne sinnvolle Obergrenze. */
+function PctNum({
+  label,
+  hint,
+  v,
+  set,
+  unit,
+}: {
+  label: string;
+  hint?: string;
+  v: number;
+  set: (v: number) => void;
+  unit: string;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <input
+        className={styles.num}
+        type="number"
+        min={0}
+        step={0.5}
+        value={Math.round(v * 1000) / 10}
+        onChange={(e) => set(Math.max(0, +e.target.value) / 100)}
+        aria-label={label}
+      />
+      <span className={styles.unit}>{unit}</span>
+    </Field>
+  );
+}
+
 function Pct({
   label,
+  hint,
   v,
   set,
   max = 1,
+  step = 0.01,
   unit = "",
 }: {
   label: string;
+  hint?: string;
   v: number;
   set: (v: number) => void;
   max?: number;
+  step?: number;
   unit?: string;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} hint={hint}>
       <input
         className={styles.range}
         type="range"
         min={0}
         max={max}
-        step={0.01}
+        step={step}
         value={v}
         onChange={(e) => set(+e.target.value)}
         aria-label={label}
       />
       <span className={styles.pctVal}>
-        {fmtPct(v)} {unit}
+        {fmtPct(v, v < 0.1 ? 1 : 0)} {unit}
       </span>
     </Field>
   );
@@ -555,4 +655,10 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 function fmtCount(n: number): string {
   if (!isFinite(n)) return "–";
   return n < 10 ? n.toFixed(1).replace(".", ",") : String(Math.ceil(n));
+}
+
+/** Wie fmtCount, aber ohne Aufrunden — für Bestände, die im Fluss sind. */
+function fmtNum(n: number): string {
+  if (!isFinite(n)) return "–";
+  return (n < 10 ? n.toFixed(1) : String(Math.round(n))).replace(".", ",");
 }

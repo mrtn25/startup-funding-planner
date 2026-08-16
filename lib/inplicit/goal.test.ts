@@ -8,9 +8,10 @@ import {
   DEFAULT_GOAL,
   arpaFor,
   computeGoal,
-  customersPerMonthFor,
+  growthForTarget,
   interviewsPerYear,
   ltvCacVerdict,
+  startForTarget,
   unitEconomics,
   type GoalInputs,
 } from "./goal.ts";
@@ -28,11 +29,14 @@ const BASE: GoalInputs = {
   subscriptionACV: 40, //               40 k€
   interviewsPerCampaign: 12,
   campaignsPerYear: 4,
-  newCustomersPerMonth: 1,
-  salesSpendPerMonth: 5,
+  startNewCustomers: 1,
+  acquisitionGrowth: 0,
+  cac: 5,
   costPerInterview: 0,
-  churnPerYear: 0.2,
+  churnPerYear: 0,
   expandOn: false,
+  upgradeSharePerYear: 0,
+  upgradeUplift: 0,
   channelOn: false,
 };
 
@@ -40,25 +44,24 @@ const BASE: GoalInputs = {
 
 test("jedes Preismodell rechnet den Jahresumsatz je Kunde anders aus", () => {
   assert.equal(interviewsPerYear(BASE), 48);
-  assert.equal(arpaFor(BASE, "perInterview"), 24); // 48 × 500 €
-  assert.equal(arpaFor(BASE, "perCampaign"), 20); // 4 × 5 k€
+  assert.equal(arpaFor(BASE, "perInterview"), 24);
+  assert.equal(arpaFor(BASE, "perCampaign"), 20);
   assert.equal(arpaFor(BASE, "subscription"), 40);
 });
 
 test("dasselbe Ziel bedeutet je nach Abrechnung eine andere Kundenzahl", () => {
   const need = (m: Parameters<typeof arpaFor>[1]) => unitEconomics(BASE, m).customersNeeded;
   assert.equal(need("perInterview"), 100 / 24);
-  assert.equal(need("perCampaign"), 5); // 100 / 20
-  assert.equal(need("subscription"), 2.5); // 100 / 40
-  // Der Punkt der ganzen Übung: gleiche ARR, sehr verschiedene Firmen.
+  assert.equal(need("perCampaign"), 5);
+  assert.equal(need("subscription"), 2.5);
   assert.ok(need("perInterview") > need("subscription"));
 });
 
 test("mehr Kampagnen je Kunde heben nutzungsabhängige Preise, nicht die Lizenz", () => {
   const busy = { ...BASE, campaignsPerYear: 8 };
-  assert.equal(arpaFor(busy, "perCampaign"), 40); // verdoppelt
-  assert.equal(arpaFor(busy, "perInterview"), 48); // verdoppelt
-  assert.equal(arpaFor(busy, "subscription"), 40); // unverändert
+  assert.equal(arpaFor(busy, "perCampaign"), 40);
+  assert.equal(arpaFor(busy, "perInterview"), 48);
+  assert.equal(arpaFor(busy, "subscription"), 40);
 });
 
 /* ── Unit Economics ──────────────────────────────────────────── */
@@ -71,18 +74,11 @@ test("Lieferkosten schlagen auf den Deckungsbeitrag durch, nicht auf den Umsatz"
   assert.equal(round2(u.grossMargin), 0.76);
 });
 
-test("CAC ist der Vertriebsaufwand je gewonnenem Kunden", () => {
-  const u = unitEconomics(BASE); // 5 k€ im Monat, 1 Kunde im Monat
-  assert.equal(u.cac, 5);
-  const cheaper = unitEconomics({ ...BASE, newCustomersPerMonth: 5 });
-  assert.equal(cheaper.cac, 1);
-});
-
 test("LTV ist der Deckungsbeitrag über die erwartete Lebensdauer", () => {
-  const u = unitEconomics(BASE); // 20 % Churn → 5 Jahre, DB 20 k€
+  const u = unitEconomics({ ...BASE, churnPerYear: 0.2 }); // 5 Jahre, DB 20 k€
   assert.equal(u.lifetimeYears, 5);
   assert.equal(u.ltv, 100);
-  assert.equal(u.ltvCac, 20); // 100 / 5
+  assert.equal(u.ltvCac, 20); // 100 / CAC 5
 });
 
 test("höherer Churn verkürzt die Lebensdauer und damit den LTV", () => {
@@ -101,7 +97,7 @@ test("Payback ist erreicht, wenn der Deckungsbeitrag die Akquise eingespielt hat
 test("das Akquisebudget bis zum Ziel ist Kundenzahl mal CAC", () => {
   const u = unitEconomics(BASE);
   assert.equal(u.customersNeeded, 5);
-  assert.equal(u.acquisitionBudget, 25); // 5 × 5 k€
+  assert.equal(u.acquisitionBudget, 25);
 });
 
 test("das LTV:CAC-Urteil trennt verbrennen, tragen und skalieren", () => {
@@ -110,137 +106,199 @@ test("das LTV:CAC-Urteil trennt verbrennen, tragen und skalieren", () => {
   assert.equal(ltvCacVerdict(4).tone, "ok");
 });
 
-/* ── Verlauf und Motions ─────────────────────────────────────── */
+/* ── Akquise wächst, die Kurve krümmt sich ───────────────────── */
 
-test("ohne Churn wächst Land linear mit der Akquise", () => {
-  const { months } = computeGoal({ ...BASE, churnPerYear: 0, newCustomersPerMonth: 1 });
-  assert.equal(months[0].customers, 1);
-  assert.equal(months[4].customers, 5);
-  assert.equal(months[4].land, 100); // 5 Kunden × 20 k€
+test("ohne Wachstum ist die Neukundenrate konstant und Land eine Gerade", () => {
+  const { months } = computeGoal({ ...BASE, acquisitionGrowth: 0, startNewCustomers: 2 });
+  assert.equal(months[0].newCustomers, 2);
+  assert.equal(months[11].newCustomers, 2);
+  // Gleiche Zuwächse heißt konstante Steigung.
+  const d1 = months[5].land - months[4].land;
+  const d2 = months[20].land - months[19].land;
+  assert.equal(round2(d1), round2(d2));
 });
 
-test("Churn bremst den Bestand", () => {
-  const withChurn = computeGoal({ ...BASE, churnPerYear: 0.6 }).months[11].customers;
-  const without = computeGoal({ ...BASE, churnPerYear: 0 }).months[11].customers;
-  assert.ok(withChurn < without);
+test("mit Wachstum kommen später mehr Kunden pro Monat dazu als am Anfang", () => {
+  const { months } = computeGoal({ ...BASE, startNewCustomers: 1, acquisitionGrowth: 0.1 });
+  assert.equal(months[0].newCustomers, 1);
+  assert.equal(round2(months[1].newCustomers), 1.1);
+  assert.equal(round2(months[12].newCustomers), round2(Math.pow(1.1, 12)));
+  // 1, 2 oder 10 Neukunden im Monat — genau das soll möglich sein.
+  assert.ok(months[24].newCustomers > 9);
 });
 
-test("Expand liegt über Land und wird von allein steiler", () => {
-  const flat = computeGoal({ ...BASE, expandOn: false });
-  const bent = computeGoal({ ...BASE, expandOn: true, expandPerYear: 0.5 });
-
-  assert.equal(flat.months[23].expand, 0);
-  assert.ok(bent.months[23].expand > 0);
-  // Kein einziger Kunde mehr, trotzdem mehr ARR.
-  assert.equal(round2(bent.months[23].customers), round2(flat.months[23].customers));
-  assert.ok(bent.months[23].total > flat.months[23].total);
-  // Und der Abstand wächst, statt konstant zu bleiben.
-  const gapEarly = bent.months[5].total - flat.months[5].total;
-  const gapLate = bent.months[23].total - flat.months[23].total;
-  assert.ok(gapLate > gapEarly * 2, `Steigung sollte zunehmen: ${gapEarly} → ${gapLate}`);
+test("wachsende Akquise krümmt die Land-Kurve nach oben", () => {
+  const { months } = computeGoal({ ...BASE, startNewCustomers: 1, acquisitionGrowth: 0.1 });
+  const early = months[5].land - months[4].land;
+  const late = months[25].land - months[24].land;
+  assert.ok(late > early * 3, `Steigung muss zunehmen: ${round2(early)} → ${round2(late)}`);
 });
 
-test("Channel bringt Endkunden, an die wir nie verkauft haben", () => {
+test("Churn bremst den Bestand, nicht die Neukundenrate", () => {
+  const a = computeGoal({ ...BASE, churnPerYear: 0.6 });
+  const b = computeGoal({ ...BASE, churnPerYear: 0 });
+  assert.equal(a.months[11].newCustomers, b.months[11].newCustomers);
+  assert.ok(a.months[11].customers < b.months[11].customers);
+});
+
+test("das Vertriebsbudget wächst mit der Neukundenrate mit", () => {
+  const { months } = computeGoal({ ...BASE, startNewCustomers: 2, acquisitionGrowth: 0.1, cac: 5 });
+  assert.equal(months[0].salesSpend, 10);
+  assert.equal(round2(months[1].salesSpend), 11);
+});
+
+/* ── Expand: Anteil × Satz ───────────────────────────────────── */
+
+test("Expand stuft einen Anteil des Bestands hoch, nicht den ganzen", () => {
+  const r = computeGoal({
+    ...BASE,
+    expandOn: true,
+    upgradeSharePerYear: 1.2, // 10 % im Monat
+    upgradeUplift: 0.5,
+    startNewCustomers: 10,
+  });
+  // Nach dem ersten Monat sind 10 % der zehn Kunden hochgestuft.
+  assert.equal(round2(r.months[0].upgraded), 1);
+  assert.ok(r.months[0].upgraded < r.months[0].customers);
+  // Und der Anteil wächst, ohne die Kundenzahl je zu überholen.
+  for (const m of r.months) assert.ok(m.upgraded <= m.customers + 1e-9);
+});
+
+test("nur der Aufschlag zählt zu Expand — der Grundumsatz steckt in Land", () => {
+  const r = computeGoal({
+    ...BASE,
+    expandOn: true,
+    upgradeSharePerYear: 12, // sofort alle
+    upgradeUplift: 0.5,
+    startNewCustomers: 1,
+  });
+  const m = r.months[0];
+  assert.equal(round2(m.upgraded), 1);
+  assert.equal(round2(m.land), 20); // 1 Kunde × 20 k€
+  assert.equal(round2(m.expand), 10); // 50 % Aufschlag auf 20 k€
+  assert.equal(round2(m.total), 30);
+});
+
+test("der Satz skaliert den Aufschlag linear", () => {
+  const at = (uplift: number) =>
+    computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 12, upgradeUplift: uplift, startNewCustomers: 1 })
+      .months[0].expand;
+  assert.equal(round2(at(0.5)), 10);
+  assert.equal(round2(at(1)), 20);
+  assert.equal(at(0), 0);
+});
+
+test("ein größerer hochgestufter Anteil bringt mehr, ohne einen Kunden mehr", () => {
+  const few = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 0.2, upgradeUplift: 0.6 });
+  const many = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 0.8, upgradeUplift: 0.6 });
+  assert.equal(round2(few.months[23].customers), round2(many.months[23].customers));
+  assert.ok(many.months[23].expand > few.months[23].expand);
+});
+
+test("Expand aus heißt Aufschlag null", () => {
+  const r = computeGoal({ ...BASE, expandOn: false, upgradeSharePerYear: 1, upgradeUplift: 1 });
+  assert.equal(r.contribution.expand, 0);
+  assert.equal(r.months.reduce((a, m) => a + m.upgraded, 0), 0);
+});
+
+/* ── Channel ─────────────────────────────────────────────────── */
+
+test("ein Partner bringt Endkunden, an die wir nie verkauft haben", () => {
   const r = computeGoal({
     ...BASE,
     channelOn: true,
-    partnersPerYear: 12, // einer im Monat
+    partnersPerYear: 12,
     endCustomersPerPartner: 10,
     partnerRampMonths: 1,
     partnerShare: 0.5,
   });
   assert.equal(r.months[0].partners, 1);
   assert.equal(r.months[0].endCustomers, 10);
-  assert.equal(r.months[0].channel, 10 * 20 * 0.5); // 100 k€
-  assert.equal(r.months[1].endCustomers, 20);
+  assert.equal(r.months[0].channel, 10 * 20 * 0.5);
 });
 
 test("die Partner-Hochlaufkurve staffelt die Reichweite", () => {
-  const r = computeGoal({
-    ...BASE,
-    channelOn: true,
-    partnersPerYear: 12,
-    endCustomersPerPartner: 8,
-    partnerRampMonths: 4,
-  });
-  assert.equal(r.months[0].endCustomers, 2); // ein Partner, viertel hochgelaufen
+  const r = computeGoal({ ...BASE, channelOn: true, partnersPerYear: 12, endCustomersPerPartner: 8, partnerRampMonths: 4 });
+  assert.equal(r.months[0].endCustomers, 2);
   assert.equal(r.months[3].endCustomers, 8 + 6 + 4 + 2);
 });
 
-test("abgeschaltete Motions steuern exakt nichts bei", () => {
-  const r = computeGoal({ ...BASE, expandOn: false, channelOn: false });
-  assert.equal(r.contribution.expand, 0);
-  assert.equal(r.contribution.channel, 0);
-  assert.ok(r.contribution.land > 0);
-  assert.equal(r.months.reduce((a, m) => a + m.endCustomers, 0), 0);
-});
-
-test("jede zugeschaltete Motion bringt das Ziel näher, nie weiter weg", () => {
-  const slow = { ...BASE, newCustomersPerMonth: 0.4, horizonMonths: 60 };
-  const land = computeGoal(slow).reach.land;
-  const withExpand = computeGoal({ ...slow, expandOn: true, expandPerYear: 0.4 }).reach.landExpand;
-  const withBoth = computeGoal({
-    ...slow,
-    expandOn: true,
-    expandPerYear: 0.4,
-    channelOn: true,
-    partnersPerYear: 2,
-    endCustomersPerPartner: 6,
-  }).reach.all;
-
-  assert.ok(land != null && withExpand != null && withBoth != null);
-  assert.ok(withExpand! <= land!, `Expand sollte nicht bremsen: ${withExpand} vs ${land}`);
-  assert.ok(withBoth! <= withExpand!, `Channel sollte nicht bremsen: ${withBoth} vs ${withExpand}`);
-});
-
 test("eine Motion verändert nur ihre eigene Schicht, nicht die darunter", () => {
-  const base = { ...BASE, expandOn: true, expandPerYear: 0.4 };
+  const base = { ...BASE, expandOn: true, upgradeSharePerYear: 0.4, upgradeUplift: 0.5 };
   const off = computeGoal({ ...base, channelOn: false });
-  const on = computeGoal({
-    ...base,
-    channelOn: true,
-    partnersPerYear: 6,
-    endCustomersPerPartner: 10,
-  });
+  const on = computeGoal({ ...base, channelOn: true, partnersPerYear: 6, endCustomersPerPartner: 10 });
 
-  // Channel darf Land und Expand nicht anfassen — sonst wäre der Abstand
-  // zwischen den Linien nicht mehr der Beitrag der jeweiligen Motion.
   assert.equal(off.reach.land, on.reach.land);
   assert.equal(off.reach.landExpand, on.reach.landExpand);
   for (let m = 0; m < off.months.length; m++) {
     assert.equal(round2(on.months[m].land), round2(off.months[m].land));
     assert.equal(round2(on.months[m].expand), round2(off.months[m].expand));
   }
-  // Und Expand darf Land nicht anfassen.
   const noExpand = computeGoal({ ...BASE, expandOn: false });
   assert.equal(noExpand.reach.land, off.reach.land);
 });
 
-test("ein unerreichbares Ziel wird als unerreichbar gemeldet", () => {
-  const r = computeGoal({ ...BASE, targetARR: 1e6, horizonMonths: 12 });
-  assert.equal(r.reach.land, null);
-  assert.equal(r.reach.all, null);
-});
-
 test("die Monatszeilen addieren sich zur Gesamtlinie", () => {
-  const r = computeGoal({ ...BASE, expandOn: true, channelOn: true });
-  for (const m of r.months) {
-    assert.equal(round2(m.total), round2(m.land + m.expand + m.channel));
-  }
+  const r = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 0.3, upgradeUplift: 0.5, channelOn: true });
+  for (const m of r.months) assert.equal(round2(m.total), round2(m.land + m.expand + m.channel));
 });
 
-/* ── Umkehrfrage ─────────────────────────────────────────────── */
+/* ── Auf das Ziel rechnen ────────────────────────────────────── */
 
-test("die nötige Akquiserate für einen Zieltermin wird gefunden", () => {
-  const needed = customersPerMonthFor({ ...BASE, horizonMonths: 36 }, 11);
-  assert.ok(needed !== null && needed > 0);
-  const r = computeGoal({ ...BASE, newCustomersPerMonth: needed! });
-  assert.ok(r.reach.all != null && r.reach.all <= 11);
-  // Und knapp darunter reicht es nicht mehr — die Grenze ist scharf.
-  const short = computeGoal({ ...BASE, newCustomersPerMonth: needed! * 0.8 });
-  assert.ok(short.reach.all == null || short.reach.all > 11);
+test("ein ehrgeiziges Ziel liefert die nötige Wachstumsrate statt einer Fehlanzeige", () => {
+  // 1 Mio. in sechs Monaten: mit den Ausgangswerten unerreichbar.
+  const steep: GoalInputs = { ...BASE, targetARR: 1000, horizonMonths: 6, acquisitionGrowth: 0.05 };
+  assert.ok(computeGoal(steep).endARR < 1000);
+
+  const g = growthForTarget(steep);
+  assert.ok(g !== null && g > 0, "eine Rate muss gefunden werden");
+
+  // Und mit dieser Rate steht das Ziel am Ende des Zeitraums tatsächlich.
+  const solved = computeGoal({ ...steep, acquisitionGrowth: g! });
+  assert.ok(solved.endARR >= 1000 - 1, `erreicht ${round2(solved.endARR)}`);
+  assert.ok(solved.reach.all != null && solved.reach.all <= 5);
+  // Die Rate ist knapp, nicht großzügig: etwas weniger reicht nicht mehr.
+  assert.ok(computeGoal({ ...steep, acquisitionGrowth: g! * 0.9 }).endARR < 1000);
 });
 
-test("ein in der Zeit unmöglicher Termin liefert kein Ergebnis statt einer Fantasiezahl", () => {
-  assert.equal(customersPerMonthFor({ ...BASE, targetARR: 1e9 }, 1), null);
+test("wenn schon die Ausgangswerte reichen, ist kein Wachstum nötig", () => {
+  const easy = { ...BASE, targetARR: 20, horizonMonths: 12, startNewCustomers: 5 };
+  assert.equal(growthForTarget(easy), 0);
+});
+
+test("ein physikalisch unmögliches Ziel liefert null statt einer Fantasiezahl", () => {
+  assert.equal(growthForTarget({ ...BASE, targetARR: 1e12, horizonMonths: 2 }), null);
+  assert.equal(growthForTarget({ ...BASE, targetARR: 100, pricePerCampaign: 0, horizonMonths: 6 }), null);
+});
+
+test("größer anfangen ist die Alternative zu schneller wachsen", () => {
+  const steep: GoalInputs = { ...BASE, targetARR: 1000, horizonMonths: 6, acquisitionGrowth: 0.05 };
+  const s = startForTarget(steep);
+  assert.ok(s !== null && s > BASE.startNewCustomers);
+  const solved = computeGoal({ ...steep, startNewCustomers: s! });
+  assert.ok(solved.endARR >= 1000 - 1);
+});
+
+test("mehr Motions senken die nötige Akquise-Steigung", () => {
+  const bare: GoalInputs = { ...BASE, targetARR: 600, horizonMonths: 18 };
+  const withMotions: GoalInputs = {
+    ...bare,
+    expandOn: true,
+    upgradeSharePerYear: 0.5,
+    upgradeUplift: 0.6,
+    channelOn: true,
+    partnersPerYear: 6,
+    endCustomersPerPartner: 8,
+  };
+  const a = growthForTarget(bare);
+  const b = growthForTarget(withMotions);
+  assert.ok(a !== null && b !== null);
+  assert.ok(b! < a!, `Motions müssen entlasten: ${round2(b!)} gegen ${round2(a!)}`);
+});
+
+test("der Zielanteil sagt, wie weit man kommt, wenn es nicht reicht", () => {
+  const r = computeGoal({ ...BASE, targetARR: 1000, horizonMonths: 6, acquisitionGrowth: 0 });
+  assert.ok(r.targetShare > 0 && r.targetShare < 1);
+  assert.equal(round2(r.targetShare), round2(r.endARR / 1000));
+  assert.equal(r.reach.all, null);
 });
