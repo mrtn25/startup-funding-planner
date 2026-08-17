@@ -70,6 +70,15 @@ export type GoalInputs = {
   /** Wie oft ein Kunde im Jahr eine Kampagne fährt. */
   campaignsPerYear: number;
 
+  /* ── Kundengrößen ──
+     Ein Konzern zahlt nicht dasselbe wie ein Mittelständler. Ohne diese
+     Unterscheidung rechnet das Tool mit einem Durchschnittskunden, den es
+     nicht gibt, und die Kundenzahl zum Ziel wird beliebig. */
+  /** Anteil der Kunden im großen Segment. */
+  enterpriseShare: number;
+  /** Das Vielfache, das ein großer Kunde zahlt. */
+  enterpriseMultiple: number;
+
   /* ── Akquise ──
      Nicht eine feste Zahl Neukunden im Monat, sondern eine Rate, die selbst
      wächst: im ersten Monat einer, ein halbes Jahr später vielleicht drei.
@@ -103,15 +112,18 @@ export type GoalInputs = {
   churnPerYear: number;
 
   /* ── Expand ──
-     Zwei Zahlen statt einer Wachstumsrate: wie viele Bestandskunden wir im
-     Jahr hochstufen, und um welchen Satz. Beides ist etwas, worüber man eine
-     Aussage treffen kann — „25 % des Bestands, im Schnitt um 60 %" —, während
-     eine pauschale Bestandswachstumsrate nur ein Gefühl ist. */
+     Hochstufen heißt: auf die Jahreslizenz wechseln. Der Aufschlag folgt
+     also aus dem Lizenzpreis und muss nicht geraten werden — und der
+     Lizenzpreis wirkt damit auch dann auf den Plan, wenn nach Kampagne
+     abgerechnet wird. Zu sagen bleibt, wie viele der schon überzeugten
+     Kunden wechseln und ab wann sie überhaupt so weit sind. */
   expandOn: boolean;
-  /** Anteil des Bestands, der im Jahr hochgestuft wird. */
+  /** Anteil der hochstufbaren Kunden, der im Jahr hochstuft. */
   upgradeSharePerYear: number;
-  /** Um welchen Satz der Umsatz eines hochgestuften Kunden steigt. */
-  upgradeUplift: number;
+  /** Ab wann ein Kunde hochstufbar ist. Ein Pilot, der überzeugt, kann
+      nach ein, zwei Monaten auf die Jahreslizenz — nicht erst nach einem
+      Jahr, wie es ein pauschaler Bestandsanteil unterstellt. */
+  upgradeLagMonths: number;
 
   /* ── Channel ── */
   channelOn: boolean;
@@ -127,6 +139,9 @@ export type Unit = {
   arpa: number;
   /** Umsatz eines hochgestuften Kunden, k€ im Jahr. */
   upgradedArpa: number;
+  /** Was ein kleiner beziehungsweise großer Kunde im Jahr zahlt. */
+  arpaSmall: number;
+  arpaLarge: number;
   /** Lieferkosten je Kunde und Jahr, k€. */
   deliveryCost: number;
   contribution: number;
@@ -181,6 +196,11 @@ export type GoalResult = {
   contribution: Record<LayerKey, number>;
   /** ARR am Ende des Zeitraums. */
   endARR: number;
+  /** Kunden zu dem Zeitpunkt, an dem das Ziel steht — oder am Ende, wenn es
+      nicht steht. Anders als die reine Preisrechnung berücksichtigt diese
+      Zahl, dass Expand und Channel mittragen: wer hochstuft, zahlt mehr, und
+      dann braucht das Ziel weniger Köpfe. */
+  customersAtGoal: number;
   /** Anteil des Ziels, der erreicht wird. */
   targetShare: number;
   alternatives: { key: PricingModel; arpa: number; customersNeeded: number; ltvCac: number; grossMargin: number }[];
@@ -192,7 +212,8 @@ export function interviewsPerYear(i: GoalInputs): number {
   return i.interviewsPerCampaign * i.campaignsPerYear;
 }
 
-export function arpaFor(i: GoalInputs, model: PricingModel = i.pricing): number {
+/** Was ein Kunde im kleinen Segment im Jahr zahlt. */
+export function baseArpaFor(i: GoalInputs, model: PricingModel = i.pricing): number {
   switch (model) {
     case "perInterview":
       return (interviewsPerYear(i) * i.pricePerInterview) / 1000;
@@ -201,6 +222,36 @@ export function arpaFor(i: GoalInputs, model: PricingModel = i.pricing): number 
     case "subscription":
       return i.subscriptionACV;
   }
+}
+
+/** Der Aufschlag, den die Mischung aus großen und kleinen Kunden ergibt. */
+export function segmentFactor(i: GoalInputs): number {
+  return 1 + i.enterpriseShare * (i.enterpriseMultiple - 1);
+}
+
+/** Umsatz je Kunde und Jahr über beide Segmente gemittelt. */
+export function arpaFor(i: GoalInputs, model: PricingModel = i.pricing): number {
+  return baseArpaFor(i, model) * segmentFactor(i);
+}
+
+/**
+ * Worauf ein Upgrade führt.
+ *
+ * Hochstufen heißt: auf die Jahreslizenz wechseln. Damit hängt der
+ * Lizenzpreis auch dann an der Rechnung, wenn nach Kampagne oder Interview
+ * abgerechnet wird — er ist das Ziel des Upsells, nicht nur eine dritte
+ * Preisvariante. Wer schon auf der Lizenz sitzt, geht eine Stufe höher,
+ * und diese Stufe ist so groß wie der Abstand zwischen den Segmenten.
+ */
+export function upgradeValueFor(i: GoalInputs): number {
+  const current = arpaFor(i);
+  if (i.pricing === "subscription") return current * i.enterpriseMultiple;
+  return Math.max(current, i.subscriptionACV * segmentFactor(i));
+}
+
+/** Was ein Upgrade je Kunde und Jahr zusätzlich bringt. */
+export function upgradeUpliftFor(i: GoalInputs): number {
+  return Math.max(0, upgradeValueFor(i) - arpaFor(i));
 }
 
 /* ── Unit Economics ──────────────────────────────────────────── */
@@ -222,7 +273,9 @@ export function unitEconomics(i: GoalInputs, model: PricingModel = i.pricing): U
 
   return {
     arpa,
-    upgradedArpa: arpa * (1 + i.upgradeUplift),
+    upgradedArpa: upgradeValueFor(i),
+    arpaSmall: baseArpaFor(i, model),
+    arpaLarge: baseArpaFor(i, model) * i.enterpriseMultiple,
     deliveryCost,
     contribution,
     grossMargin,
@@ -279,6 +332,8 @@ export function computeGoal(i: GoalInputs): GoalResult {
   const monthlyChurn = i.churnPerYear / 12;
   const upgradeRate = i.expandOn ? i.upgradeSharePerYear / 12 : 0;
 
+  const upliftPerCustomer = upgradeUpliftFor(i);
+  const customerHistory: number[] = [];
   let customers = 0;
   let upgraded = 0;
   let partners = 0;
@@ -293,13 +348,18 @@ export function computeGoal(i: GoalInputs): GoalResult {
     const overridden = i.newCustomerOverrides[m] != null;
 
     customers = customers * (1 - monthlyChurn) + newCustomers;
+    customerHistory[m] = customers;
 
-    /* Expand: ein Teil derer, die noch nicht hochgestuft sind, wird es in
-       diesem Monat. Der Bestand an Hochgestuften churnt mit, sonst würde er
-       die Kundenzahl irgendwann überholen. */
+    /* Expand: hochstufbar ist, wer lange genug dabei ist. Ein Pilot, der
+       nach zwei Monaten überzeugt, kann dann auf die Lizenz — und nicht
+       erst, wenn ein pauschaler Jahresanteil ihn zufällig erwischt. Von
+       den Hochstufbaren wechselt ein Teil je Monat; der Bestand an
+       Hochgestuften churnt mit, sonst überholte er die Kundenzahl. */
     if (i.expandOn) {
+      const lag = Math.max(0, Math.round(i.upgradeLagMonths));
+      const eligible = m - lag >= 0 ? customerHistory[m - lag] : 0;
       upgraded = upgraded * (1 - monthlyChurn);
-      upgraded += Math.max(0, customers - upgraded) * upgradeRate;
+      upgraded += Math.max(0, eligible - upgraded) * upgradeRate;
     } else {
       upgraded = 0;
     }
@@ -318,7 +378,7 @@ export function computeGoal(i: GoalInputs): GoalResult {
 
     const land = customers * arpa;
     // Nur der Aufschlag zählt zu Expand — der Grundumsatz steckt schon in Land.
-    const expand = i.expandOn ? upgraded * arpa * i.upgradeUplift : 0;
+    const expand = i.expandOn ? upgraded * upliftPerCustomer : 0;
     const channel = endCustomers * arpa * i.partnerShare;
 
     const key = addMonths(i.startMonth, m);
@@ -357,6 +417,7 @@ export function computeGoal(i: GoalInputs): GoalResult {
     },
     contribution: { land: last.land, expand: last.expand, channel: last.channel },
     endARR: last.total,
+    customersAtGoal: months[first((r) => r.total) ?? months.length - 1].customers,
     targetShare: i.targetARR > 0 ? last.total / i.targetARR : 1,
     alternatives: PRICING.filter((p) => p.key !== i.pricing).map((p) => {
       const u = unitEconomics(i, p.key);
@@ -484,9 +545,13 @@ export const DEFAULT_GOAL: GoalInputs = {
   costPerInterview: 45,
   churnPerYear: 0.25,
 
+  enterpriseShare: 0.3,
+  enterpriseMultiple: 2.5,
+
   expandOn: true,
-  upgradeSharePerYear: 0.25,
-  upgradeUplift: 0.6,
+  upgradeSharePerYear: 0.5,
+  // Zwei Monate: so lange braucht ein Pilot, um zu überzeugen.
+  upgradeLagMonths: 2,
 
   channelOn: false,
   partnersPerYear: 3,

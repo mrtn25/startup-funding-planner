@@ -189,14 +189,24 @@ export default function GoalPlanner() {
             unit="Monate"
           />
 
-          {/* Die eigentliche Runterbrechung */}
+          {/* Die eigentliche Runterbrechung. Gerechnet auf dem Verlauf, nicht
+              nur auf dem Grundpreis — sonst bliebe die Zahl stehen, während
+              Lizenzpreis, Kundengrößen und Motions den Graphen daneben
+              längst verschoben haben. */}
           <div className={styles.breakdown}>
             <div className={styles.bdMain}>
-              <strong>{fmtCount(unit.customersNeeded)}</strong> Kunden
+              <strong>{fmtCount(r.customersAtGoal)}</strong> Kunden
             </div>
             <div className={styles.bdSub}>
-              bei {fmtK(unit.arpa)} Umsatz je Kunde und Jahr. Zu {fmtK(unit.cac)} Akquisekosten sind das{" "}
-              <strong>{fmtK(unit.acquisitionBudget)}</strong> Vertriebsbudget, bis das Ziel steht.
+              wenn das Ziel steht, bei {fmtK(unit.arpa)} Grundumsatz je Kunde und Jahr. Zu {fmtK(unit.cac)}{" "}
+              Akquisekosten sind das <strong>{fmtK(r.customersAtGoal * unit.cac)}</strong> Vertriebsbudget.
+              {g.expandOn && r.contribution.expand > 0 && (
+                <>
+                  {" "}
+                  Ohne Upgrades wären es {fmtCount(unit.customersNeeded)} — Expand nimmt{" "}
+                  {fmtCount(Math.max(0, unit.customersNeeded - r.customersAtGoal))} Kunden ab.
+                </>
+              )}
             </div>
           </div>
 
@@ -236,9 +246,24 @@ export default function GoalPlanner() {
               unit="k€"
             />
           )}
-          {g.pricing === "subscription" && (
-            <Num label="Jahreslizenz" v={g.subscriptionACV} set={(v) => set("subscriptionACV", v)} step={2} unit="k€" />
-          )}
+          {/* Die Lizenz steht immer da, nicht nur wenn danach abgerechnet wird:
+              sie ist auch das Ziel jedes Upgrades und wirkt darum immer auf
+              den Plan. Ein Feld, das folgenlos aussieht, ist schlimmer als
+              eines, das man erklären muss. */}
+          <Num
+            label="Jahreslizenz"
+            hint={
+              g.pricing === "subscription"
+                ? undefined
+                : g.expandOn
+                  ? "Ziel jedes Upgrades — wirkt auch bei dieser Abrechnung"
+                  : "Ziel jedes Upgrades, sobald Expand an ist"
+            }
+            v={g.subscriptionACV}
+            set={(v) => set("subscriptionACV", v)}
+            step={2}
+            unit="k€"
+          />
           <Num
             label="Kampagnen je Kunde"
             v={g.campaignsPerYear}
@@ -253,6 +278,27 @@ export default function GoalPlanner() {
             step={1}
             unit="Stück"
           />
+
+          {/* Kundengrößen: ohne sie rechnet alles mit einem Durchschnittskunden,
+              den es nicht gibt. */}
+          <div className={styles.groupTitle}>Kundengrößen</div>
+          <Pct
+            label="Anteil große Kunden"
+            v={g.enterpriseShare}
+            set={(v) => set("enterpriseShare", v)}
+            max={1}
+          />
+          <Num
+            label="Große zahlen das"
+            v={g.enterpriseMultiple}
+            set={(v) => set("enterpriseMultiple", Math.max(1, v))}
+            step={0.25}
+            unit="× fache"
+          />
+          <p className={styles.motionNote}>
+            Kleiner Kunde <strong>{fmtK(unit.arpaSmall)}</strong>, großer <strong>{fmtK(unit.arpaLarge)}</strong> im
+            Jahr — im Schnitt {fmtK(unit.arpa)}. Genau dieser Schnitt entscheidet, wie viele Kunden das Ziel braucht.
+          </p>
 
           {/* Vergleich der Modelle */}
           <div className={styles.compare}>
@@ -381,16 +427,22 @@ export default function GoalPlanner() {
                 max={1}
                 unit="/ Jahr"
               />
-              <Pct
-                label="um welchen Satz"
-                hint={`${fmtK(unit.arpa)} → ${fmtK(unit.upgradedArpa)} im Jahr${
-                  g.pricing !== "subscription" ? ` · als Jahreslizenz wären es ${fmtK(g.subscriptionACV)}` : ""
-                }`}
-                v={g.upgradeUplift}
-                set={(v) => set("upgradeUplift", v)}
-                max={3}
-                step={0.05}
+              <Num
+                label="Hochstufbar nach"
+                hint="So lange braucht ein Pilot, um zu überzeugen"
+                v={g.upgradeLagMonths}
+                set={(v) => set("upgradeLagMonths", clamp(v, 0, 24))}
+                step={1}
+                unit="Monaten"
               />
+              <p className={styles.motionNote}>
+                Ein Upgrade führt auf die <strong>Jahreslizenz</strong>: {fmtK(unit.arpa)} → {fmtK(unit.upgradedArpa)}{" "}
+                im Jahr, also <strong>{fmtK(unit.upgradedArpa - unit.arpa)}</strong> mehr je Kunde. Deshalb wirkt der
+                Lizenzpreis auf den Plan, auch wenn nach Kampagne abgerechnet wird.
+                {unit.upgradedArpa <= unit.arpa && (
+                  <> Aktuell liegt die Lizenz nicht über dem laufenden Umsatz — ein Upgrade brächte nichts.</>
+                )}
+              </p>
               <p className={styles.motionNote}>
                 Am Ende des Zeitraums sind das <strong>{fmtNum(months[months.length - 1].upgraded)}</strong> von{" "}
                 {fmtNum(months[months.length - 1].customers)} Kunden — kein einziger davon neu gewonnen.
@@ -672,9 +724,14 @@ function Routes({ g, onApply }: { g: GoalInputs; onApply: (next: GoalInputs) => 
 
   return (
     <div className={styles.routes}>
+      <p className={styles.routesLead}>
+        Jede Zeile ist derselbe Zielwert, nur anders erreicht. Rechts steht, was der Vertrieb dafür leisten muss:
+        wie viele Neukunden im letzten Monat — und wie viele Gespräche pro Woche das bedeutet.
+      </p>
       <div className={styles.routesHead}>
         <span>Weg</span>
-        <span>Akquise-Wachstum</span>
+        <span>Wachstum</span>
+        <span>Neukunden / Mon.</span>
         <span>Calls / Woche</span>
         <span />
       </div>
@@ -682,9 +739,8 @@ function Routes({ g, onApply }: { g: GoalInputs; onApply: (next: GoalInputs) => 
         <div key={route.key} className={styles.routeRow}>
           <span className={styles.routeLabel}>{route.label}</span>
           <span className={styles.routeNum}>{route.growth == null ? "reicht nicht" : fmtPct(route.growth, 1)}</span>
-          <span className={styles.routeNum}>
-            {route.growth == null ? "—" : `${fmtNum(route.callsPerWeek)}`}
-          </span>
+          <span className={styles.routeNum}>{route.growth == null ? "—" : fmtNum(route.endRate)}</span>
+          <span className={styles.routeNum}>{route.growth == null ? "—" : fmtNum(route.callsPerWeek)}</span>
           <span>
             {route.growth != null && (
               <button type="button" className={styles.routeBtn} onClick={() => onApply({ ...g, ...route.apply })}>
