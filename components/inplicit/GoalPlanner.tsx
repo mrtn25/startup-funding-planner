@@ -130,6 +130,16 @@ export default function GoalPlanner() {
           },
         ];
 
+  /** Was eine Schicht selbst beisteuert, unabhängig davon, worauf sie liegt. */
+  const layerOwnValue = (label: string, i: number): number | null => {
+    const m = months[i];
+    if (!m) return null;
+    if (label === "+ Expand") return m.expand;
+    if (label === "+ Channel") return m.channel;
+    if (label === "+ Endkunden über Partner") return m.endCustomers;
+    return null;
+  };
+
   const options: ChartOptions<"line"> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -139,8 +149,15 @@ export default function GoalPlanner() {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx) =>
-            `${ctx.dataset.label}: ${view === "revenue" ? fmtK(ctx.parsed.y ?? 0) : fmtNum(ctx.parsed.y ?? 0)}`,
+          /* Gestapelte Flächen werden kumuliert gezeichnet, aber kumuliert
+             gelesen ergeben sie Unsinn: „+ Endkunden über Partner: 24" liest
+             sich als 24 Endkunden, obwohl es 22 eigene plus 2 sind. Der
+             Tooltip zeigt darum den Beitrag der Schicht, nicht die Summe. */
+          label: (ctx) => {
+            const own = layerOwnValue(ctx.dataset.label ?? "", ctx.dataIndex);
+            const v = own ?? ctx.parsed.y ?? 0;
+            return `${ctx.dataset.label}: ${view === "revenue" ? fmtK(v) : fmtNum(v)}`;
+          },
         },
       },
     },
@@ -511,10 +528,10 @@ export default function GoalPlanner() {
           {g.expandOn && (
             <>
               <Pct
-                label="Anteil, den wir hochstufen"
-                hint="Wie viel des Bestands im Jahr auf ein größeres Paket wechselt"
-                v={g.upgradeSharePerYear}
-                set={(v) => set("upgradeSharePerYear", v)}
+                label="Anteil, der hochstuft"
+                hint="Von den Land-Kunden — wie beim Funnel eine Conversion, keine Jahresrate"
+                v={g.upgradeShare}
+                set={(v) => set("upgradeShare", v)}
                 max={1}
                 unit="/ Jahr"
               />

@@ -118,8 +118,11 @@ export type GoalInputs = {
      abgerechnet wird. Zu sagen bleibt, wie viele der schon überzeugten
      Kunden wechseln und ab wann sie überhaupt so weit sind. */
   expandOn: boolean;
-  /** Anteil der hochstufbaren Kunden, der im Jahr hochstuft. */
-  upgradeSharePerYear: number;
+  /** Anteil der Land-Kunden, die auf die Jahreslizenz wechseln. Eine
+      Conversion je Kohorte, keine Jahresrate über den Bestand: von zehn
+      Piloten werden bei 50 % fünf zu Lizenzkunden — die anderen fünf
+      bleiben es nicht irgendwann doch noch. */
+  upgradeShare: number;
   /** Ab wann ein Kunde hochstufbar ist. Ein Pilot, der überzeugt, kann
       nach ein, zwei Monaten auf die Jahreslizenz — nicht erst nach einem
       Jahr, wie es ein pauschaler Bestandsanteil unterstellt. */
@@ -384,10 +387,9 @@ export function computeGoal(i: GoalInputs): GoalResult {
   const unit = unitEconomics(i);
   const arpa = unit.arpa;
   const monthlyChurn = i.churnPerYear / 12;
-  const upgradeRate = i.expandOn ? i.upgradeSharePerYear / 12 : 0;
+  const upgradeShare = i.expandOn ? i.upgradeShare : 0;
 
   const upliftPerCustomer = upgradeUpliftFor(i);
-  const customerHistory: number[] = [];
   let customers = 0;
   let upgraded = 0;
   let partners = 0;
@@ -402,7 +404,6 @@ export function computeGoal(i: GoalInputs): GoalResult {
     const overridden = i.newCustomerOverrides[m] != null;
 
     customers = customers * (1 - monthlyChurn) + newCustomers;
-    customerHistory[m] = customers;
 
     /* Expand: hochstufbar ist, wer lange genug dabei ist. Ein Pilot, der
        nach zwei Monaten überzeugt, kann dann auf die Lizenz — und nicht
@@ -410,10 +411,14 @@ export function computeGoal(i: GoalInputs): GoalResult {
        den Hochstufbaren wechselt ein Teil je Monat; der Bestand an
        Hochgestuften churnt mit, sonst überholte er die Kundenzahl. */
     if (i.expandOn) {
+      /* Eine Conversion je Kohorte, kein Rinnsal über den Bestand: von den
+         Kunden, die vor `lag` Monaten eine Land-Kampagne gemacht haben,
+         wechselt dieser Anteil jetzt auf die Lizenz. Wer nicht wechselt,
+         wechselt auch später nicht — sonst hätte die Rate keine Bedeutung
+         und jeder Kunde landete irgendwann auf der Lizenz. */
       const lag = Math.max(0, Math.round(i.upgradeLagMonths));
-      const eligible = m - lag >= 0 ? customerHistory[m - lag] : 0;
-      upgraded = upgraded * (1 - monthlyChurn);
-      upgraded += Math.max(0, eligible - upgraded) * upgradeRate;
+      const cohort = m - lag >= 0 ? newCustomersAt(i, m - lag) : 0;
+      upgraded = upgraded * (1 - monthlyChurn) + cohort * upgradeShare;
     } else {
       upgraded = 0;
     }
@@ -603,7 +608,7 @@ export const DEFAULT_GOAL: GoalInputs = {
   enterpriseMultiple: 2.5,
 
   expandOn: true,
-  upgradeSharePerYear: 0.5,
+  upgradeShare: 0.4,
   // Zwei Monate: so lange braucht ein Pilot, um zu überzeugen.
   upgradeLagMonths: 2,
 

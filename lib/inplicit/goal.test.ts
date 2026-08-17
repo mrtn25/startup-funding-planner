@@ -48,7 +48,7 @@ const BASE: GoalInputs = {
   enterpriseShare: 0,      // ein Segment, damit die Zahlen rund bleiben
   enterpriseMultiple: 1,
   expandOn: false,
-  upgradeSharePerYear: 0,
+  upgradeShare: 0,
   upgradeLagMonths: 0,
   channelOn: false,
 };
@@ -178,7 +178,7 @@ test("wer schon auf der Lizenz sitzt, geht eine Segmentstufe höher", () => {
 });
 
 test("hochstufbar ist erst, wer lange genug dabei ist", () => {
-  const i = { ...BASE, expandOn: true, upgradeSharePerYear: 12, upgradeLagMonths: 2, startNewCustomers: 1 };
+  const i = { ...BASE, expandOn: true, upgradeShare: 1, upgradeLagMonths: 2, startNewCustomers: 1 };
   const { months } = computeGoal(i);
   // Der erste Kunde landet in Monat 0 und ist ab Monat 2 so weit.
   assert.equal(months[0].upgraded, 0);
@@ -187,7 +187,7 @@ test("hochstufbar ist erst, wer lange genug dabei ist", () => {
 });
 
 test("ohne Wartezeit stuft ein Pilot sofort hoch", () => {
-  const i = { ...BASE, expandOn: true, upgradeSharePerYear: 12, upgradeLagMonths: 0, startNewCustomers: 1 };
+  const i = { ...BASE, expandOn: true, upgradeShare: 1, upgradeLagMonths: 0, startNewCustomers: 1 };
   const { months } = computeGoal(i);
   assert.equal(round2(months[0].upgraded), 1);
   assert.equal(round2(months[0].land), 20);
@@ -196,13 +196,13 @@ test("ohne Wartezeit stuft ein Pilot sofort hoch", () => {
 });
 
 test("eine kürzere Wartezeit bringt Expand früher in Gang", () => {
-  const fast = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 1, upgradeLagMonths: 1 });
-  const slow = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 1, upgradeLagMonths: 9 });
+  const fast = computeGoal({ ...BASE, expandOn: true, upgradeShare: 1, upgradeLagMonths: 1 });
+  const slow = computeGoal({ ...BASE, expandOn: true, upgradeShare: 1, upgradeLagMonths: 9 });
   assert.ok(fast.months[6].expand > slow.months[6].expand);
 });
 
 test("nur der Aufschlag zählt zu Expand — der Grundumsatz steckt in Land", () => {
-  const r = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 12, upgradeLagMonths: 0, startNewCustomers: 1 });
+  const r = computeGoal({ ...BASE, expandOn: true, upgradeShare: 1, upgradeLagMonths: 0, startNewCustomers: 1 });
   const m = r.months[0];
   assert.equal(round2(m.land), 20);
   assert.equal(round2(m.expand), 20);
@@ -210,19 +210,19 @@ test("nur der Aufschlag zählt zu Expand — der Grundumsatz steckt in Land", ()
 });
 
 test("die Hochgestuften überholen nie die Kundenzahl", () => {
-  const r = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 12, upgradeLagMonths: 0, startNewCustomers: 10 });
+  const r = computeGoal({ ...BASE, expandOn: true, upgradeShare: 1, upgradeLagMonths: 0, startNewCustomers: 10 });
   for (const m of r.months) assert.ok(m.upgraded <= m.customers + 1e-9);
 });
 
 test("ein größerer hochgestufter Anteil bringt mehr, ohne einen Kunden mehr", () => {
-  const few = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 0.2 });
-  const many = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 0.8 });
+  const few = computeGoal({ ...BASE, expandOn: true, upgradeShare: 0.2 });
+  const many = computeGoal({ ...BASE, expandOn: true, upgradeShare: 0.8 });
   assert.equal(round2(few.months[23].customers), round2(many.months[23].customers));
   assert.ok(many.months[23].expand > few.months[23].expand);
 });
 
 test("Expand aus heißt Aufschlag null", () => {
-  const r = computeGoal({ ...BASE, expandOn: false, upgradeSharePerYear: 1 });
+  const r = computeGoal({ ...BASE, expandOn: false, upgradeShare: 1 });
   assert.equal(r.contribution.expand, 0);
   assert.equal(r.months.reduce((a, m) => a + m.upgraded, 0), 0);
 });
@@ -272,7 +272,7 @@ test("die Partner-Hochlaufkurve staffelt die Reichweite", () => {
 });
 
 test("eine Motion verändert nur ihre eigene Schicht, nicht die darunter", () => {
-  const base = { ...BASE, expandOn: true, upgradeSharePerYear: 0.4 };
+  const base = { ...BASE, expandOn: true, upgradeShare: 0.4 };
   const off = computeGoal({ ...base, channelOn: false });
   const on = computeGoal({ ...base, channelOn: true, partnersPerYear: 6, endCustomersPerPartner: 10 });
 
@@ -287,7 +287,7 @@ test("eine Motion verändert nur ihre eigene Schicht, nicht die darunter", () =>
 });
 
 test("die Monatszeilen addieren sich zur Gesamtlinie", () => {
-  const r = computeGoal({ ...BASE, expandOn: true, upgradeSharePerYear: 0.3, channelOn: true });
+  const r = computeGoal({ ...BASE, expandOn: true, upgradeShare: 0.3, channelOn: true });
   for (const m of r.months) assert.equal(round2(m.total), round2(m.land + m.expand + m.channel));
 });
 
@@ -332,7 +332,7 @@ test("mehr Motions senken die nötige Akquise-Steigung", () => {
   const withMotions: GoalInputs = {
     ...bare,
     expandOn: true,
-    upgradeSharePerYear: 0.5,
+    upgradeShare: 0.5,
     
     channelOn: true,
     partnersPerYear: 6,
@@ -419,7 +419,7 @@ test("drei Wege zum selben Ziel, und jede Motion nimmt Vertriebsdruck ab", () =>
     targetARR: 800,
     horizonMonths: 18,
     expandOn: true,
-    upgradeSharePerYear: 0.5,
+    upgradeShare: 0.5,
     
     channelOn: true,
     partnersPerYear: 6,
@@ -441,7 +441,7 @@ test("jeder Weg lässt sich anwenden und trifft das Ziel dann wirklich", () => {
     ...BASE,
     targetARR: 800,
     horizonMonths: 18,
-    upgradeSharePerYear: 0.5,
+    upgradeShare: 0.5,
     
     partnersPerYear: 6,
     endCustomersPerPartner: 8,
@@ -461,7 +461,7 @@ test("ein Weg, der nicht trägt, meldet das statt zu schummeln", () => {
 /* ── Die Kopfzahl folgt dem Verlauf, nicht nur dem Grundpreis ── */
 
 test("mehr Umsatz je Kunde senkt die Kundenzahl, die das Ziel braucht", () => {
-  const i = { ...BASE, targetARR: 200, horizonMonths: 36, startNewCustomers: 1, expandOn: true, upgradeSharePerYear: 1, upgradeLagMonths: 1 };
+  const i = { ...BASE, targetARR: 200, horizonMonths: 36, startNewCustomers: 1, expandOn: true, upgradeShare: 1, upgradeLagMonths: 1 };
   const cheap = computeGoal({ ...i, subscriptionACV: 25 }).customersAtGoal;
   const dear = computeGoal({ ...i, subscriptionACV: 80 }).customersAtGoal;
   assert.ok(dear < cheap, `teurere Lizenz muss Köpfe sparen: ${round2(dear)} gegen ${round2(cheap)}`);
