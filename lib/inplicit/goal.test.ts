@@ -10,6 +10,7 @@ import {
   baseArpaFor,
   computeGoal,
   callLoad,
+  callSummary,
   growthForTarget,
   interviewsPerYear,
   newCustomersAt,
@@ -479,4 +480,56 @@ test("ohne Motions deckt sich die Kopfzahl mit der reinen Preisrechnung", () => 
   // Beim Erreichen des Ziels steht der Bestand knapp über dem rechnerischen Bedarf.
   assert.ok(r.customersAtGoal >= r.unit.customersNeeded - 1e-9);
   assert.ok(r.customersAtGoal < r.unit.customersNeeded + 1.5);
+});
+
+/* ── Was das Ziel an Gesprächen kostet ───────────────────────── */
+
+test("die Call-Rechnung bezieht sich auf den Weg bis zum Ziel", () => {
+  const i = { ...BASE, targetARR: 100, horizonMonths: 36, startNewCustomers: 1, conversionRate: 0.2, callsToClose: 3 };
+  const r = computeGoal(i);
+  const c = callSummary(i, r);
+  assert.equal(c.reached, true);
+  // Fünf Kunden zu 20 k€ — das Ziel steht im fünften Monat.
+  assert.equal(c.monthsToGoal, 5);
+  assert.equal(r.reach.all, 4);
+});
+
+test("Calls pro Tag sind die Woche auf fünf Arbeitstage verteilt", () => {
+  const i = { ...BASE, startNewCustomers: 1, conversionRate: 0.2, callsToClose: 3 };
+  const c = callSummary(i, computeGoal(i));
+  assert.equal(round2(c.avgCallsPerDay), round2(c.avgCallsPerWeek / 5));
+  assert.equal(round2(c.peakCallsPerDay), round2(c.peakCallsPerWeek / 5));
+});
+
+test("bei wachsender Akquise liegt die Spitze über dem Schnitt", () => {
+  const i = { ...BASE, startNewCustomers: 1, acquisitionGrowth: 0.15, targetARR: 400, horizonMonths: 36 };
+  const c = callSummary(i, computeGoal(i));
+  assert.ok(c.peakCallsPerWeek > c.avgCallsPerWeek, "eine wachsende Rate muss eine Spitze haben");
+});
+
+test("bei konstanter Akquise sind Schnitt und Spitze gleich", () => {
+  const i = { ...BASE, startNewCustomers: 2, acquisitionGrowth: 0 };
+  const c = callSummary(i, computeGoal(i));
+  assert.equal(round2(c.avgCallsPerWeek), round2(c.peakCallsPerWeek));
+});
+
+test("eine bessere Conversion senkt die Gespräche bis zum Ziel", () => {
+  const mk = (cv: number) => {
+    const i = { ...BASE, conversionRate: cv, targetARR: 100, horizonMonths: 36 };
+    return callSummary(i, computeGoal(i));
+  };
+  const bad = mk(0.1);
+  const good = mk(0.4);
+  assert.equal(bad.firstCallsPerDeal, 10);
+  assert.equal(good.firstCallsPerDeal, 2.5);
+  assert.ok(good.totalCalls < bad.totalCalls);
+  // Die Abschlüsse selbst ändern sich dadurch nicht.
+  assert.equal(bad.monthsToGoal, good.monthsToGoal);
+});
+
+test("ein unerreichtes Ziel rechnet über den ganzen Zeitraum und sagt es", () => {
+  const i = { ...BASE, targetARR: 1e6, horizonMonths: 12 };
+  const c = callSummary(i, computeGoal(i));
+  assert.equal(c.reached, false);
+  assert.equal(c.monthsToGoal, 12);
 });

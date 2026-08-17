@@ -323,6 +323,60 @@ export function callLoad(i: GoalInputs, newCustomers: number) {
   };
 }
 
+const WORKDAYS_PER_WEEK = 5;
+
+export type CallSummary = {
+  /** Monate bis zum Ziel — oder der ganze Zeitraum, wenn es nicht steht. */
+  monthsToGoal: number;
+  /** Ob das Ziel im Zeitraum überhaupt erreicht wird. */
+  reached: boolean;
+  avgFirstCallsPerWeek: number;
+  avgCallsPerWeek: number;
+  avgCallsPerDay: number;
+  avgHoursPerWeek: number;
+  peakCallsPerWeek: number;
+  peakCallsPerDay: number;
+  peakHoursPerWeek: number;
+  /** Alle Gespräche bis zum Ziel. */
+  totalCalls: number;
+  /** Erstgespräche je Abschluss. */
+  firstCallsPerDeal: number;
+};
+
+/**
+ * Was das Ziel an Gesprächen kostet — nicht was der aktuelle Monat kostet.
+ *
+ * Gemittelt über die Monate bis zum Ziel, weil die Frage „wie viele Calls
+ * muss ich machen" sich auf den Weg dorthin bezieht und nicht auf einen
+ * Randmonat. Die Spitze steht daneben, weil ein Schnitt, der am Ende
+ * dreimal so hoch liegt, kein planbarer Kalender ist.
+ */
+export function callSummary(i: GoalInputs, result: GoalResult): CallSummary {
+  const reachIdx = result.reach.all;
+  const upTo = reachIdx != null ? reachIdx + 1 : result.months.length;
+  const window = result.months.slice(0, upTo);
+
+  const avg = (pick: (m: GoalMonth) => number) => window.reduce((a, m) => a + pick(m), 0) / window.length;
+  const peak = (pick: (m: GoalMonth) => number) => Math.max(...window.map(pick));
+
+  const avgCallsPerWeek = avg((m) => m.callsPerWeek);
+  const peakCallsPerWeek = peak((m) => m.callsPerWeek);
+
+  return {
+    monthsToGoal: upTo,
+    reached: reachIdx != null,
+    avgFirstCallsPerWeek: avg((m) => m.firstCalls / WEEKS_PER_MONTH),
+    avgCallsPerWeek,
+    avgCallsPerDay: avgCallsPerWeek / WORKDAYS_PER_WEEK,
+    avgHoursPerWeek: avg((m) => m.hoursPerWeek),
+    peakCallsPerWeek,
+    peakCallsPerDay: peakCallsPerWeek / WORKDAYS_PER_WEEK,
+    peakHoursPerWeek: peak((m) => m.hoursPerWeek),
+    totalCalls: window.reduce((a, m) => a + m.totalCalls, 0),
+    firstCallsPerDeal: i.conversionRate > 0 ? 1 / i.conversionRate : Infinity,
+  };
+}
+
 /* ── Der Verlauf ─────────────────────────────────────────────── */
 
 export function computeGoal(i: GoalInputs): GoalResult {

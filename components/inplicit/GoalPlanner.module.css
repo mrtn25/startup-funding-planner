@@ -747,3 +747,51 @@
   margin: 8px 0 0;
   opacity: 0.85;
 }
+
+/* ── Umschalter Umsatz / Kunden ── */
+
+.chartTop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.viewBtns {
+  display: inline-flex;
+  gap: 3px;
+  padding: 2px;
+  border: 1px solid var(--gl-line2);
+  border-radius: 20px;
+  flex: none;
+}
+.viewBtn {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 4px 13px;
+  border: none;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--gl-fg3);
+  cursor: pointer;
+}
+.viewBtn:hover {
+  color: var(--gl-fg);
+}
+.viewBtnOn {
+  background: var(--gl-accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.callsLead {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.callsPeak {
+  border-top: 1px solid var(--gl-line);
+  margin-top: 4px;
+  padding-top: 6px;
+  opacity: 0.8;
+}

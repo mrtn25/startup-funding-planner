@@ -17,7 +17,7 @@ import { fmtK, fmtPct } from "@/lib/inplicit/plan";
 import {
   DEFAULT_GOAL,
   PRICING,
-  callLoad,
+  callSummary,
   computeGoal,
   growthForTarget,
   newCustomersAt,
@@ -27,6 +27,7 @@ import {
   unitEconomics,
   type GoalInputs,
   type GoalMonth,
+  type GoalResult,
 } from "@/lib/inplicit/goal";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
@@ -39,70 +40,95 @@ const AXIS = "#8a8880";
 
 export default function GoalPlanner() {
   const [g, setG] = useState<GoalInputs>(DEFAULT_GOAL);
+  const [view, setView] = useState<"revenue" | "customers">("revenue");
   const set = <K extends keyof GoalInputs>(k: K, v: GoalInputs[K]) => setG((p) => ({ ...p, [k]: v }));
 
   const r = useMemo(() => computeGoal(g), [g]);
   const { unit, months, reach } = r;
   const verdict = ltvCacVerdict(unit.ltvCac);
 
-  /* Die drei Ausbaustufen als aufeinander liegende Flächen: jede Schicht
-     beginnt dort, wo die darunter aufhört, also ist der Abstand zwischen
-     zwei Linien genau der Beitrag dieser Motion. */
-  const sLand = months.map((m) => m.land);
-  const sExpand = months.map((m) => m.land + m.expand);
-  const sAll = months.map((m) => m.total);
+  /* Zwei Blicke auf denselben Verlauf. Im Umsatz liegen die Motions als
+     Flächen übereinander, und der Abstand zweier Linien ist der Beitrag
+     dieser Motion.
 
-  const datasets = [
-    {
-      label: "Land",
-      data: sLand,
-      borderColor: LAND,
-      backgroundColor: "rgba(34,0,255,0.14)",
-      borderWidth: 2,
-      pointRadius: 0,
-      fill: "origin" as const,
-      stepped: true as const,
-    },
-    ...(g.expandOn
+     Bei den Kunden geht das nicht, und das ist der Punkt: Expand bringt
+     keinen einzigen Kopf dazu, es macht die vorhandenen wertvoller. Also
+     wird es dort als Linie *innerhalb* der Kundenfläche gezeichnet — der
+     Anteil, der hochgestuft hat — statt obendrauf. Channel kommt oben
+     drauf, denn dessen Endkunden sind echte zusätzliche Köpfe. */
+  const stepArea = (label: string, data: number[], border: string, bg: string, fillTo: "origin" | "-1") => ({
+    label,
+    data,
+    borderColor: border,
+    backgroundColor: bg,
+    borderWidth: 2,
+    pointRadius: 0,
+    fill: fillTo,
+    stepped: true as const,
+  });
+
+  const datasets =
+    view === "revenue"
       ? [
+          stepArea("Land", months.map((m) => m.land), LAND, "rgba(34,0,255,0.14)", "origin"),
+          ...(g.expandOn
+            ? [stepArea("+ Expand", months.map((m) => m.land + m.expand), EXPAND, "rgba(168,207,18,0.22)", "-1")]
+            : []),
+          ...(g.channelOn
+            ? [stepArea("+ Channel", months.map((m) => m.total), CHANNEL, "rgba(0,181,173,0.20)", "-1")]
+            : []),
           {
-            label: "+ Expand",
-            data: sExpand,
-            borderColor: EXPAND,
-            backgroundColor: "rgba(168,207,18,0.22)",
-            borderWidth: 2,
+            label: `Ziel ${fmtK(g.targetARR)}`,
+            data: months.map(() => g.targetARR),
+            borderColor: TARGET,
+            backgroundColor: "transparent",
+            borderWidth: 1.5,
+            borderDash: [6, 4],
             pointRadius: 0,
-            fill: "-1" as const,
-            stepped: true as const,
+            fill: false,
+            tension: 0,
           },
         ]
-      : []),
-    ...(g.channelOn
-      ? [
+      : [
+          stepArea("Eigene Kunden", months.map((m) => m.customers), LAND, "rgba(34,0,255,0.14)", "origin"),
+          ...(g.channelOn
+            ? [
+                stepArea(
+                  "+ Endkunden über Partner",
+                  months.map((m) => m.customers + m.endCustomers),
+                  CHANNEL,
+                  "rgba(0,181,173,0.20)",
+                  "-1",
+                ),
+              ]
+            : []),
+          ...(g.expandOn
+            ? [
+                {
+                  label: "davon hochgestuft",
+                  data: months.map((m) => m.upgraded),
+                  borderColor: EXPAND,
+                  backgroundColor: "transparent",
+                  borderWidth: 2,
+                  borderDash: [5, 3],
+                  pointRadius: 0,
+                  fill: false,
+                  stepped: true as const,
+                },
+              ]
+            : []),
           {
-            label: "+ Channel",
-            data: sAll,
-            borderColor: CHANNEL,
-            backgroundColor: "rgba(0,181,173,0.20)",
-            borderWidth: 2,
+            label: `Kunden beim Ziel ${fmtCount(r.customersAtGoal)}`,
+            data: months.map(() => r.customersAtGoal),
+            borderColor: TARGET,
+            backgroundColor: "transparent",
+            borderWidth: 1.5,
+            borderDash: [6, 4],
             pointRadius: 0,
-            fill: "-1" as const,
-            stepped: true as const,
+            fill: false,
+            tension: 0,
           },
-        ]
-      : []),
-    {
-      label: `Ziel ${fmtK(g.targetARR)}`,
-      data: months.map(() => g.targetARR),
-      borderColor: TARGET,
-      backgroundColor: "transparent",
-      borderWidth: 1.5,
-      borderDash: [6, 4],
-      pointRadius: 0,
-      fill: false,
-      tension: 0,
-    },
-  ];
+        ];
 
   const options: ChartOptions<"line"> = {
     responsive: true,
@@ -111,13 +137,22 @@ export default function GoalPlanner() {
     interaction: { mode: "index", intersect: false },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtK(ctx.parsed.y ?? 0)}` } },
+      tooltip: {
+        callbacks: {
+          label: (ctx) =>
+            `${ctx.dataset.label}: ${view === "revenue" ? fmtK(ctx.parsed.y ?? 0) : fmtNum(ctx.parsed.y ?? 0)}`,
+        },
+      },
     },
     scales: {
       x: { ticks: { font: { size: 10 }, color: AXIS, maxRotation: 0 }, grid: { display: false } },
       y: {
         beginAtZero: true,
-        ticks: { font: { size: 10 }, color: AXIS, callback: (v) => fmtK(Number(v)) },
+        ticks: {
+          font: { size: 10 },
+          color: AXIS,
+          callback: (v) => (view === "revenue" ? fmtK(Number(v)) : fmtNum(Number(v))),
+        },
         grid: { color: "rgba(128,128,128,0.08)" },
       },
     },
@@ -139,23 +174,64 @@ export default function GoalPlanner() {
       <div className={styles.layout}>
         {/* ── Links: ein Graph ── */}
         <div className={styles.chartCol}>
-          <div className={styles.chartLegend}>
-            <span>
-              <i className={styles.swatch} style={{ background: LAND }} /> Land
-            </span>
-            {g.expandOn && (
+          <div className={styles.chartTop}>
+            <div className={styles.viewBtns} role="group" aria-label="Ansicht">
+              <button
+                type="button"
+                aria-pressed={view === "revenue"}
+                className={`${styles.viewBtn}${view === "revenue" ? ` ${styles.viewBtnOn}` : ""}`}
+                onClick={() => setView("revenue")}
+              >
+                Umsatz
+              </button>
+              <button
+                type="button"
+                aria-pressed={view === "customers"}
+                className={`${styles.viewBtn}${view === "customers" ? ` ${styles.viewBtnOn}` : ""}`}
+                onClick={() => setView("customers")}
+              >
+                Kunden
+              </button>
+            </div>
+
+            <div className={styles.chartLegend}>
+              {view === "revenue" ? (
+                <>
+                  <span>
+                    <i className={styles.swatch} style={{ background: LAND }} /> Land
+                  </span>
+                  {g.expandOn && (
+                    <span>
+                      <i className={styles.swatch} style={{ background: EXPAND }} /> + Expand
+                    </span>
+                  )}
+                  {g.channelOn && (
+                    <span>
+                      <i className={styles.swatch} style={{ background: CHANNEL }} /> + Channel
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span>
+                    <i className={styles.swatch} style={{ background: LAND }} /> Eigene Kunden
+                  </span>
+                  {g.channelOn && (
+                    <span>
+                      <i className={styles.swatch} style={{ background: CHANNEL }} /> + Endkunden
+                    </span>
+                  )}
+                  {g.expandOn && (
+                    <span>
+                      <i className={styles.swatchLine} style={{ borderColor: EXPAND }} /> davon hochgestuft
+                    </span>
+                  )}
+                </>
+              )}
               <span>
-                <i className={styles.swatch} style={{ background: EXPAND }} /> + Expand
+                <i className={styles.swatchLine} style={{ borderColor: TARGET }} /> Ziel
               </span>
-            )}
-            {g.channelOn && (
-              <span>
-                <i className={styles.swatch} style={{ background: CHANNEL }} /> + Channel
-              </span>
-            )}
-            <span>
-              <i className={styles.swatchLine} style={{ borderColor: TARGET }} /> Ziel
-            </span>
+            </div>
           </div>
 
           <div className={styles.chartBox}>
@@ -168,10 +244,25 @@ export default function GoalPlanner() {
             {g.channelOn && <Reach label="Mit Channel" value={when(reach.all)} color={CHANNEL} />}
           </div>
           <p className={styles.chartFoot}>
-            Der Abstand zwischen zwei Linien ist der Beitrag dieser Motion. Jede Stufe ist ein Monat: Land steigt in
-            Sprüngen, weil Kunden einzeln dazukommen — im letzten Monat {fmtNum(months[months.length - 1].newCustomers)}{" "}
-            statt {fmtNum(g.startNewCustomers)} am Anfang. Expand wächst auf dem Bestand, den Land schon bezahlt hat,
-            ohne einen einzigen Neukunden; Channel bringt je Abschluss eine ganze Mandantenliste.
+            {view === "revenue" ? (
+              <>
+                Der Abstand zwischen zwei Linien ist der Beitrag dieser Motion. Jede Stufe ist ein Monat: Land steigt
+                in Sprüngen, weil Kunden einzeln dazukommen — im letzten Monat{" "}
+                {fmtNum(months[months.length - 1].newCustomers)} statt {fmtNum(g.startNewCustomers)} am Anfang. Expand
+                wächst auf dem Bestand, den Land schon bezahlt hat, ohne einen einzigen Neukunden; Channel bringt je
+                Abschluss eine ganze Mandantenliste.
+              </>
+            ) : (
+              <>
+                Köpfe statt Umsatz. <strong>Expand liegt hier bewusst nicht obendrauf</strong> — Hochstufen bringt
+                keinen einzigen Kunden dazu, sondern macht vorhandene wertvoller, also läuft die Linie{" "}
+                <em>innerhalb</em> des Bestands: {fmtNum(months[months.length - 1].upgraded)} von{" "}
+                {fmtNum(months[months.length - 1].customers)} am Ende.{" "}
+                {g.channelOn
+                  ? "Endkunden über Partner kommen obendrauf, denn das sind echte zusätzliche Köpfe."
+                  : "Channel käme obendrauf, denn dessen Endkunden sind echte zusätzliche Köpfe."}
+              </>
+            )}
           </p>
 
           <AcquisitionTable g={g} months={months} onSet={setG} />
@@ -382,7 +473,7 @@ export default function GoalPlanner() {
             step={15}
             unit="Minuten"
           />
-          <CallLoad g={g} months={months} />
+          <CallLoad g={g} result={r} />
           <Num
             label="Vollkosten je Interview"
             v={g.costPerInterview}
@@ -578,49 +669,64 @@ function AcquisitionTable({
 
 /* ── Was das an Terminen heißt ─────────────────────────────── */
 
-function CallLoad({ g, months }: { g: GoalInputs; months: GoalMonth[] }) {
-  const last = months[months.length - 1];
-  const first = months[0];
+function CallLoad({ g, result }: { g: GoalInputs; result: GoalResult }) {
+  const c = useMemo(() => callSummary(g, result), [g, result]);
   // Grob die Hälfte einer Arbeitswoche in Gesprächen ist die Grenze, ab der
   // neben dem Verkaufen niemand mehr liefert.
-  const heavy = last.hoursPerWeek > 20;
+  const heavy = c.peakHoursPerWeek > 20;
 
   return (
     <div className={`${styles.calls} ${heavy ? styles.callsWarn : ""}`}>
+      <div className={styles.callsLead}>
+        {c.reached ? (
+          <>
+            Um {fmtK(g.targetARR)} in {c.monthsToGoal} Monaten zu erreichen:
+          </>
+        ) : (
+          <>Über die {c.monthsToGoal} Monate — das Ziel steht damit noch nicht:</>
+        )}
+      </div>
+
       <div className={styles.callsRow}>
         <span>Erstgespräche</span>
-        <strong>
-          {fmtNum(first.firstCalls / (52 / 12))} → {fmtNum(last.firstCalls / (52 / 12))} / Woche
-        </strong>
+        <strong>{fmtNum(c.avgFirstCallsPerWeek)} / Woche</strong>
       </div>
       <div className={styles.callsRow}>
         <span>Alle Calls</span>
         <strong>
-          {fmtNum(first.callsPerWeek)} → {fmtNum(last.callsPerWeek)} / Woche
+          {fmtNum(c.avgCallsPerWeek)} / Woche · {fmtNum(c.avgCallsPerDay)} / Tag
         </strong>
       </div>
       <div className={styles.callsRow}>
         <span>Zeit am Telefon</span>
+        <strong>{fmtNum(c.avgHoursPerWeek)} Std. / Woche</strong>
+      </div>
+      <div className={`${styles.callsRow} ${styles.callsPeak}`}>
+        <span>Spitze im stärksten Monat</span>
         <strong>
-          {fmtNum(first.hoursPerWeek)} → {fmtNum(last.hoursPerWeek)} Std. / Woche
+          {fmtNum(c.peakCallsPerWeek)} / Woche · {fmtNum(c.peakCallsPerDay)} / Tag
         </strong>
       </div>
+
       <p className={styles.callsNote}>
-        {heavy ? (
+        Im Schnitt über die Monate bis zum Ziel, bei {WORKDAYS} Arbeitstagen die Woche. Bei{" "}
+        {fmtPct(g.conversionRate)} Conversion braucht ein Abschluss {fmtNum(c.firstCallsPerDeal)} Erstgespräche und{" "}
+        {g.callsToClose} Calls insgesamt — macht {Math.round(c.totalCalls)} Gespräche bis zum Ziel.
+        {heavy && (
           <>
-            Über 20 Stunden Gespräche pro Woche im letzten Monat — daneben liefert niemand mehr. Entweder braucht es
-            jemanden im Vertrieb, eine bessere Conversion oder ein größeres Ticket je Kunde.
-          </>
-        ) : (
-          <>
-            Bei {fmtPct(g.conversionRate)} Conversion braucht ein Abschluss {fmtNum(1 / g.conversionRate)}{" "}
-            Erstgespräche und {g.callsToClose} Calls insgesamt.
+            {" "}
+            <strong>
+              In der Spitze über 20 Stunden Gespräche pro Woche — daneben liefert niemand mehr aus. Das braucht
+              jemanden im Vertrieb, eine bessere Conversion oder ein größeres Ticket.
+            </strong>
           </>
         )}
       </p>
     </div>
   );
 }
+
+const WORKDAYS = 5;
 
 /* ── Auf das Ziel rechnen ──────────────────────────────────────
    Der eigentliche Zweck des Tools: nicht melden, dass ein Ziel verfehlt
