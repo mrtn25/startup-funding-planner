@@ -8,6 +8,7 @@ type Props = {
   active: ToolId;
   onOpenTool: (id: ToolId) => void;
   onOpenInfos: () => void;
+  view: "tools" | "infos";
 };
 
 /**
@@ -18,7 +19,7 @@ type Props = {
  * outside click and on Escape, and the listeners only exist while it is
  * open so there is nothing bound to the document at rest.
  */
-export default function SiteHeader({ active, onOpenTool, onOpenInfos }: Props) {
+export default function SiteHeader({ active, onOpenTool, onOpenInfos, view }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -72,7 +73,7 @@ export default function SiteHeader({ active, onOpenTool, onOpenInfos }: Props) {
             <button
               key={t.id}
               type="button"
-              className={`${styles.item}${active === t.id ? ` ${styles.itemOn}` : ""}`}
+              className={`${styles.item}${view === "tools" && active === t.id ? ` ${styles.itemOn}` : ""}`}
               onClick={() => go(() => onOpenTool(t.id))}
             >
               {t.label}
@@ -82,7 +83,11 @@ export default function SiteHeader({ active, onOpenTool, onOpenInfos }: Props) {
 
         <div className={styles.group}>
           <div className={styles.groupTitle}>Infos</div>
-          <button type="button" className={styles.item} onClick={() => go(onOpenInfos)}>
+          <button
+            type="button"
+            className={`${styles.item}${view === "infos" ? ` ${styles.itemOn}` : ""}`}
+            onClick={() => go(onOpenInfos)}
+          >
             Term sheet glossary
           </button>
           <a

@@ -75,12 +75,22 @@
   flex-direction: column;
   gap: 1px;
 }
+/* The group labels carry the brand lime. Lime as *text* fails contrast
+   against both themes — it is a background colour in this system — so it
+   sits as a filled chip with the dark lime ink on it, which reads at this
+   size and keeps the colour. */
 .groupTitle {
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text3);
-  margin-bottom: 5px;
+  background: var(--lime);
+  color: var(--lime-ink);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-bottom: 7px;
 }
 .item {
   font: inherit;

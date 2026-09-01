@@ -1,6 +1,6 @@
 # backable
 
-Five free tools for founders and a plain-language term sheet glossary, in one
+Six free tools for founders and a plain-language term sheet glossary, in one
 Next.js app — **[startup-funding-planner.vercel.app](https://startup-funding-planner.vercel.app)**
 
 - **Bootstrap** — whether you need outside money at all, in two parts. First
@@ -22,6 +22,12 @@ Next.js app — **[startup-funding-planner.vercel.app](https://startup-funding-p
 - **Dilution Planner** — model dilution across FFF, Angels & VCs, handle grants and
   convertibles, build a cap table, and simulate exits under different liquidation
   preferences.
+- **Co-Founder Split** — who should get how much, by the weighted-factor method
+  (Demmler's Founders' Pie) rather than by handshake, plus a vesting simulation
+  showing what each founder keeps and forfeits if they leave in a given month.
+  Around three quarters of teams split equally; the research finding is not that
+  this is wrong but that arriving there *by default* rather than by argument
+  made teams markedly likelier to be unhappy later and less able to change it.
 - **Network Strategy** — a weighted three-layer model (founder attributes →
   mechanisms → strategies) built from the empirical fundraising literature, each
   strategy with a step-by-step playbook.
@@ -60,10 +66,11 @@ app/
 components/
   SiteHeader.tsx            wordmark and the one menu
   bootstrap/                bootstrap tool UI
+  split/                    co-founder split UI
   infos/                    term sheet glossary cards
   ScrollHero.tsx            scroll-driven word hero
   PillNav.tsx               tool switcher (dropdown on mobile)
-  ToolSwitcher.tsx          shell: header, hero, five mounted tools, glossary
+  ToolSwitcher.tsx          shell: header, hero, six mounted tools, glossary
   MotionButton.tsx          circle-that-grows-into-a-pill link
   SiteFooter.tsx            GitHub links + disclaimer
   ready/                    ready-to-raise UI
@@ -75,6 +82,7 @@ lib/
   bootstrap.ts              the eight conditions, weighted, with sources
   bootstrap-cash.ts         capacity, hiring gates, the capital verdict
   glossary.ts               term sheet vocabulary
+  equity-split.ts           founders pie, vesting, the warnings
   planner.ts                all planner maths — pure, no DOM
   network-strategy.ts       weights, citations, and the two-layer model
   ready-to-raise.ts         readiness dimensions, actions, archetypes

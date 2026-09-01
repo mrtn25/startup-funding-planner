@@ -9,13 +9,14 @@ import ScrollHero from "./ScrollHero";
 import SiteHeader from "./SiteHeader";
 import InfoCards from "./infos/InfoCards";
 import Planner from "./planner/Planner";
+import EquitySplit from "./split/EquitySplit";
 import RoundPlanner from "./round/RoundPlanner";
 import ReadyToRaise from "./ready/ReadyToRaise";
 
 const DEFAULT_TOOL: ToolId = "bootstrap";
 
 /**
- * All five tools stay mounted and the inactive ones are `hidden`, so
+ * All six tools stay mounted and the inactive ones are `hidden`, so
  * switching tabs never discards what you entered. The choice is mirrored
  * into `?tool=` so a tab can be linked to directly.
  */
@@ -29,19 +30,24 @@ const STAGE_TO_ROUND: Record<string, RoundId> = {
 
 export default function ToolSwitcher() {
   const [active, setActive] = useState<ToolId>(DEFAULT_TOOL);
+  const [view, setView] = useState<"tools" | "infos">("tools");
   /* Amount handed over from the Round Planner. The token makes a repeat
      hand-off of the same number still register as a new instruction. */
   const [seed, setSeed] = useState<{ roundId: RoundId; investM: number; token: number } | null>(null);
 
   // Read the deep link after mount — keeps the server render deterministic.
   useEffect(() => {
-    const param = new URLSearchParams(window.location.search).get("tool");
+    const q = new URLSearchParams(window.location.search);
+    const param = q.get("tool");
     if (TOOLS.some((t) => t.id === param)) setActive(param as ToolId);
+    if (q.get("view") === "infos") setView("infos");
   }, []);
 
   const select = useCallback((id: ToolId) => {
     setActive(id);
+    setView("tools");
     const url = new URL(window.location.href);
+    url.searchParams.delete("view");
     if (id === DEFAULT_TOOL) url.searchParams.delete("tool");
     else url.searchParams.set("tool", id);
     window.history.replaceState(null, "", url);
@@ -68,8 +74,16 @@ export default function ToolSwitcher() {
     [openTool],
   );
 
+  /* Infos is a view of its own, not an appendix under the tools: a glossary
+     you have to scroll past five planners to reach is a glossary nobody
+     reads. It shares the switcher so `?view=infos` links directly to it. */
   const openInfos = useCallback(() => {
-    document.getElementById("infos")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setView("infos");
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "infos");
+    url.searchParams.delete("tool");
+    window.history.replaceState(null, "", url);
+    requestAnimationFrame(() => document.getElementById("tools")?.scrollIntoView({ behavior: "smooth" }));
   }, []);
 
   return (
@@ -77,31 +91,37 @@ export default function ToolSwitcher() {
       {/* The wordmark has to sit above the hero, so the shell owns the whole
           page composition rather than only the tab strip — otherwise a header
           rendered after the hero is invisible until you scroll past it. */}
-      <SiteHeader active={active} onOpenTool={openTool} onOpenInfos={openInfos} />
+      <SiteHeader active={active} onOpenTool={openTool} onOpenInfos={openInfos} view={view} />
       <ScrollHero ctaHref="#tools" />
-      <PillNav active={active} onChange={select} />
+      <PillNav active={active} onChange={select} view={view} onOpenInfos={openInfos} />
 
-      <div id="panel-bootstrap" role="tabpanel" aria-labelledby="tab-bootstrap" hidden={active !== "bootstrap"}>
+      <div id="panel-bootstrap" role="tabpanel" aria-labelledby="tab-bootstrap" hidden={view !== "tools" || active !== "bootstrap"}>
         <BootstrapPlanner onOpenTool={openTool} />
       </div>
 
-      <div id="panel-ready" role="tabpanel" aria-labelledby="tab-ready" hidden={active !== "ready"}>
+      <div id="panel-ready" role="tabpanel" aria-labelledby="tab-ready" hidden={view !== "tools" || active !== "ready"}>
         <ReadyToRaise onOpenTool={openTool} isActive={active === "ready"} />
       </div>
 
-      <div id="panel-round" role="tabpanel" aria-labelledby="tab-round" hidden={active !== "round"}>
+      <div id="panel-round" role="tabpanel" aria-labelledby="tab-round" hidden={view !== "tools" || active !== "round"}>
         <RoundPlanner onModelDilution={modelDilution} />
       </div>
 
-      <div id="panel-planner" role="tabpanel" aria-labelledby="tab-planner" hidden={active !== "planner"}>
+      <div id="panel-planner" role="tabpanel" aria-labelledby="tab-planner" hidden={view !== "tools" || active !== "planner"}>
         <Planner seed={seed} />
       </div>
 
-      <div id="panel-network" role="tabpanel" aria-labelledby="tab-network" hidden={active !== "network"}>
+      <div id="panel-split" role="tabpanel" aria-labelledby="tab-split" hidden={view !== "tools" || active !== "split"}>
+        <EquitySplit />
+      </div>
+
+      <div id="panel-network" role="tabpanel" aria-labelledby="tab-network" hidden={view !== "tools" || active !== "network"}>
         <NetworkStrategy />
       </div>
 
-      <InfoCards onOpenTool={openTool} />
+      <div id="panel-infos" role="tabpanel" aria-labelledby="tab-infos" hidden={view !== "infos"}>
+        <InfoCards onOpenTool={openTool} />
+      </div>
     </>
   );
 }

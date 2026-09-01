@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./PillNav.module.css";
 
-export type ToolId = "planner" | "network" | "ready" | "round" | "bootstrap";
+export type ToolId = "planner" | "network" | "ready" | "round" | "bootstrap" | "split";
 
 /* Ordered as the questions actually arrive: do you even need to raise, are
    you ready, how much, what does it cost you, and who do you ask. */
@@ -12,12 +12,16 @@ export const TOOLS: { id: ToolId; label: string }[] = [
   { id: "ready", label: "Ready to Raise" },
   { id: "round", label: "Round Planner" },
   { id: "planner", label: "Dilution Planner" },
+  { id: "split", label: "Co-Founder Split" },
   { id: "network", label: "Network Strategy" },
 ];
 
 type PillNavProps = {
   active: ToolId;
   onChange: (id: ToolId) => void;
+  /** Which section is showing — Infos is a peer of the tools, not a footer. */
+  view: "tools" | "infos";
+  onOpenInfos: () => void;
 };
 
 /**
@@ -27,7 +31,7 @@ type PillNavProps = {
  * three pills — the trigger and the dropdown chrome are CSS-only, so there
  * is no viewport check in JS to mismatch on hydration.
  */
-export default function PillNav({ active, onChange }: PillNavProps) {
+export default function PillNav({ active, onChange, view, onOpenInfos }: PillNavProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +52,7 @@ export default function PillNav({ active, onChange }: PillNavProps) {
     };
   }, [open]);
 
-  const activeLabel = TOOLS.find((t) => t.id === active)?.label ?? "Tools";
+  const activeLabel = view === "infos" ? "Infos" : (TOOLS.find((t) => t.id === active)?.label ?? "Tools");
 
   return (
     <div className={`${styles.wrap} no-print`} id="tools" ref={wrapRef}>
@@ -77,7 +81,7 @@ export default function PillNav({ active, onChange }: PillNavProps) {
             type="button"
             role="tab"
             id={`tab-${tool.id}`}
-            aria-selected={active === tool.id}
+            aria-selected={view === "tools" && active === tool.id}
             aria-controls={`panel-${tool.id}`}
             className={styles.pill}
             onClick={() => {
@@ -88,6 +92,23 @@ export default function PillNav({ active, onChange }: PillNavProps) {
             {tool.label}
           </button>
         ))}
+
+        {/* Infos sits in the same strip as the tools because it is a peer of
+            them, not an appendix underneath. */}
+        <button
+          type="button"
+          role="tab"
+          id="tab-infos"
+          aria-selected={view === "infos"}
+          aria-controls="panel-infos"
+          className={`${styles.pill} ${styles.pillInfos}`}
+          onClick={() => {
+            onOpenInfos();
+            setOpen(false);
+          }}
+        >
+          Infos
+        </button>
       </div>
     </div>
   );
