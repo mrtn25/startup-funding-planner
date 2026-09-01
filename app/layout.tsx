@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Startup Funding & Dilution Planner",
+  title: "backable — five free tools for founders",
   description:
-    "Five free tools for founders: a growth planner that shows whether you can fund growth out of revenue, an investor-readiness assessment, a round planner that sizes the raise and its use of funds, a dilution and cap-table planner, and a research-backed network strategy model.",
+    "backable — five free tools for founders: a bootstrap check on whether you need outside money at all, an investor-readiness assessment, a round planner that sizes the raise, a dilution and cap-table planner, and a research-backed network strategy model. Plus a plain-language term sheet glossary.",
 };
 
 export const viewport: Viewport = {

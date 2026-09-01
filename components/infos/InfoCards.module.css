@@ -1,0 +1,181 @@
+/* Glossary collage. Same tokens as the tools. */
+
+.root {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem;
+}
+
+.head {
+  max-width: 760px;
+  margin-bottom: 1.5rem;
+}
+.head h2 {
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 0 0 0.5rem;
+}
+.head p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text2);
+  margin: 0;
+}
+
+.filters {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+.filter {
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 13px;
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+}
+.filter:hover {
+  color: var(--text);
+}
+.filterOn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+/* Dense packing is what makes the varied sizes read as a composition
+   rather than as gaps the layout failed to fill. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-auto-flow: dense;
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s, transform 0.15s;
+  border-top: 3px solid var(--cat);
+}
+.card:hover {
+  border-color: var(--border2);
+  border-top-color: var(--cat);
+  transform: translateY(-1px);
+}
+.cardOpen {
+  border-color: var(--cat);
+}
+
+.sizeS {
+  grid-column: span 1;
+}
+.sizeM {
+  grid-column: span 1;
+}
+.sizeL {
+  grid-column: span 2;
+}
+.sizeWIDE {
+  grid-column: span 3;
+}
+@media (max-width: 700px) {
+  .sizeL,
+  .sizeWIDE {
+    grid-column: span 1;
+  }
+}
+
+.cardBtn {
+  font: inherit;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.875rem 1rem 1rem;
+}
+.cat {
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cat);
+  font-weight: 600;
+}
+.cardBtn h3 {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  margin: 5px 0 6px;
+}
+.short {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text2);
+  margin: 0;
+}
+
+.body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+  padding-top: 12px;
+}
+.body p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0;
+}
+.example {
+  margin-top: 10px !important;
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+  font-variant-numeric: tabular-nums;
+}
+.example span {
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 3px;
+}
+.toolLink {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 10px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--cat);
+  background: transparent;
+  color: var(--cat);
+  cursor: pointer;
+}
+.toolLink:hover {
+  background: var(--cat);
+  color: #fff;
+}
+
+@media (max-width: 620px) {
+  .root {
+    padding: 2rem 0.875rem;
+  }
+  .head h2 {
+    font-size: 22px;
+  }
+}

@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./PillNav.module.css";
 
-export type ToolId = "planner" | "network" | "ready" | "round" | "growth";
+export type ToolId = "planner" | "network" | "ready" | "round" | "bootstrap";
 
 /* Ordered as the questions actually arrive: do you even need to raise, are
    you ready, how much, what does it cost you, and who do you ask. */
 export const TOOLS: { id: ToolId; label: string }[] = [
-  { id: "growth", label: "Growth Planner" },
+  { id: "bootstrap", label: "Bootstrap" },
   { id: "ready", label: "Ready to Raise" },
   { id: "round", label: "Round Planner" },
   { id: "planner", label: "Dilution Planner" },

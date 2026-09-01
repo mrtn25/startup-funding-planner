@@ -2,14 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { RoundId } from "@/lib/planner";
-import GrowthPlanner from "./growth/GrowthPlanner";
+import BootstrapPlanner from "./bootstrap/BootstrapPlanner";
 import NetworkStrategy from "./network/NetworkStrategy";
 import PillNav, { TOOLS, type ToolId } from "./PillNav";
+import ScrollHero from "./ScrollHero";
+import SiteHeader from "./SiteHeader";
+import InfoCards from "./infos/InfoCards";
 import Planner from "./planner/Planner";
 import RoundPlanner from "./round/RoundPlanner";
 import ReadyToRaise from "./ready/ReadyToRaise";
 
-const DEFAULT_TOOL: ToolId = "growth";
+const DEFAULT_TOOL: ToolId = "bootstrap";
 
 /**
  * All five tools stay mounted and the inactive ones are `hidden`, so
@@ -65,12 +68,21 @@ export default function ToolSwitcher() {
     [openTool],
   );
 
+  const openInfos = useCallback(() => {
+    document.getElementById("infos")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   return (
     <>
+      {/* The wordmark has to sit above the hero, so the shell owns the whole
+          page composition rather than only the tab strip — otherwise a header
+          rendered after the hero is invisible until you scroll past it. */}
+      <SiteHeader active={active} onOpenTool={openTool} onOpenInfos={openInfos} />
+      <ScrollHero ctaHref="#tools" />
       <PillNav active={active} onChange={select} />
 
-      <div id="panel-growth" role="tabpanel" aria-labelledby="tab-growth" hidden={active !== "growth"}>
-        <GrowthPlanner onOpenTool={openTool} />
+      <div id="panel-bootstrap" role="tabpanel" aria-labelledby="tab-bootstrap" hidden={active !== "bootstrap"}>
+        <BootstrapPlanner onOpenTool={openTool} />
       </div>
 
       <div id="panel-ready" role="tabpanel" aria-labelledby="tab-ready" hidden={active !== "ready"}>
@@ -88,6 +100,8 @@ export default function ToolSwitcher() {
       <div id="panel-network" role="tabpanel" aria-labelledby="tab-network" hidden={active !== "network"}>
         <NetworkStrategy />
       </div>
+
+      <InfoCards onOpenTool={openTool} />
     </>
   );
 }

@@ -387,6 +387,10 @@ export type Stakeholder = {
   color?: string;
   /** Round name, for investor entries. */
   rnd?: string;
+  /** Cash this stakeholder actually put in, M€. Absent for founders and the
+      ESOP, who hold shares without having written a cheque — a multiple on
+      nothing is not a number. */
+  invested?: number;
 };
 
 export type Snapshot = {
@@ -479,7 +483,14 @@ export function calc(state: PlannerState): CalcResult {
       const convDilFrac = convEffect.pct / 100;
       const convShares = Math.round((totalShares * convDilFrac) / (1 - convDilFrac));
       totalShares += convShares;
-      convEntry = { name: "Convertible Loan", shares: convShares, type: "conv", color: CONVERTIBLE_COLOR, pct: 0 };
+      convEntry = {
+        name: "Convertible Loan",
+        shares: convShares,
+        type: "conv",
+        color: CONVERTIBLE_COLOR,
+        pct: 0,
+        invested: convEffect.amt,
+      };
     }
 
     const dilFrac = r.dilPct / 100;
@@ -494,6 +505,7 @@ export function calc(state: PlannerState): CalcResult {
       rnd: name,
       color: ROUND_DEF_BY_ID[r.id].color,
       pct: 0,
+      invested: si,
     });
     lastPostM = sp;
 
@@ -615,6 +627,8 @@ export type InvestorDetailRow = {
   pct: number;
   amtK: number;
   exitProceeds: number | null;
+  /** Exit proceeds over cash in. Null without an exit or without a ticket. */
+  multiple: number | null;
 };
 
 /**
@@ -645,13 +659,15 @@ export function investorDetailRows(
     const amtK = typeof x.amt === "number" ? x.amt : 0;
     const amtM = amtK / 1000;
     const p = roundTotal > 0 ? (amtM / roundTotal) * rp : 0;
+    const exitProceeds = exitM ? (exitM * p) / 100 : null;
     return {
       key: `${roundId}-${i}`,
       type: x.type,
       name: x.name,
       pct: p,
       amtK,
-      exitProceeds: exitM ? (exitM * p) / 100 : null,
+      exitProceeds,
+      multiple: exitProceeds !== null && amtM > 0 ? exitProceeds / amtM : null,
     };
   });
 }

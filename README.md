@@ -1,15 +1,16 @@
-# Startup Funding & Dilution Planner
+# backable
 
-Five free tools for founders, in one Next.js app —
-**[startup-funding-planner.vercel.app](https://startup-funding-planner.vercel.app)**
+Five free tools for founders and a plain-language term sheet glossary, in one
+Next.js app — **[startup-funding-planner.vercel.app](https://startup-funding-planner.vercel.app)**
 
-- **Growth Planner** — whether you need outside money at all. Models growth
-  motions by what they do to the *slope*: Land buys revenue with delivery
-  capacity and stops where your people stop, Expand compounds on a base you
-  already paid to acquire, and License scales with a partner's customer list
-  instead of your headcount. Reports revenue per person-month, and either says
-  the plan funds itself or names the amount and the month you must start
-  raising.
+- **Bootstrap** — whether you need outside money at all, in two parts. First
+  eight conditions from the bootstrapping literature — time to first revenue,
+  gross margin, capital needed before the first sale, payment terms, how fast
+  the market is being taken, whether founders can sell it, how long they last
+  unpaid, and what the company is meant to become. Three of them rule it out on
+  their own rather than costing points. Then the same question in cash: capacity
+  caps who can be served, hiring waits for money that already exists, and the
+  plan either funds itself or names the amount and the month to start raising.
 - **Ready to Raise** — an investor-readiness board. Tick what you already have; it
   scores five readiness dimensions from the fundraising literature, names your
   binding constraint, and ranks what to fix by leverage. Also ranks which investor
@@ -24,6 +25,10 @@ Five free tools for founders, in one Next.js app —
 - **Network Strategy** — a weighted three-layer model (founder attributes →
   mechanisms → strategies) built from the empirical fundraising literature, each
   strategy with a step-by-step playbook.
+
+Plus **Infos** — the vocabulary of a term sheet in plain words, each entry
+answering what it is, why it exists and what it does to you, with the worked
+numbers where prose would be vaguer than arithmetic.
 
 Each model states its weights openly and cites the papers behind them. The
 weights are set by hand from the literature, not fitted to data — the output is
@@ -49,14 +54,16 @@ Copy `.env.example` to `.env.local` for the optional keys.
 
 ```
 app/
-  page.tsx                  hero + tool switcher + footer
+  page.tsx                  shell + footer
   globals.css               design tokens, shared component styles, print rules
   api/milestones/route.ts   server-side milestone suggestions
 components/
-  growth/                   growth planner UI
+  SiteHeader.tsx            wordmark and the one menu
+  bootstrap/                bootstrap tool UI
+  infos/                    term sheet glossary cards
   ScrollHero.tsx            scroll-driven word hero
   PillNav.tsx               tool switcher (dropdown on mobile)
-  ToolSwitcher.tsx          keeps all five tools mounted, syncs ?tool=
+  ToolSwitcher.tsx          shell: header, hero, five mounted tools, glossary
   MotionButton.tsx          circle-that-grows-into-a-pill link
   SiteFooter.tsx            GitHub links + disclaimer
   ready/                    ready-to-raise UI
@@ -65,7 +72,9 @@ components/
   network/                  network strategy UI
 lib/
   months.ts                 month arithmetic, shared by the planners
-  growth-motions.ts         motions, leverage metrics, the capital verdict
+  bootstrap.ts              the eight conditions, weighted, with sources
+  bootstrap-cash.ts         capacity, hiring gates, the capital verdict
+  glossary.ts               term sheet vocabulary
   planner.ts                all planner maths — pure, no DOM
   network-strategy.ts       weights, citations, and the two-layer model
   ready-to-raise.ts         readiness dimensions, actions, archetypes
@@ -88,9 +97,11 @@ public tools. It has two views of the same company:
   is that motion's contribution and each crosses the target on a different
   month. Plain arithmetic throughout — `lib/inplicit/goal.ts`.
 - **Monatsplan** — bottom-up from the named pipeline, with delivery capacity
-  and the financing phase switch — `lib/inplicit/plan.ts`. It has **no access control**: it is excluded in `robots.txt`,
-absent from `sitemap.xml`, carries `noindex` and is not in the tool
-navigation — so search engines skip it, but anyone with the URL can read it.
+  and the financing phase switch — `lib/inplicit/plan.ts`.
+
+It has **no access control**: it is excluded in `robots.txt`, absent from
+`sitemap.xml`, carries `noindex` and is not in the tool navigation — so search
+engines skip it, but anyone with the URL can read it.
 
 `lib/inplicit/roster.ts` therefore holds **placeholder rows only** — it ships
 in the client bundle and lives in a public repo, so treat everything in it as

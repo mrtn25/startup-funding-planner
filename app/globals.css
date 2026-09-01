@@ -955,3 +955,12 @@ input[type="text"]:focus {
     height: auto !important;
   }
 }
+
+/* Fußnote unter dem Cap Table. */
+.cap-note {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text3);
+  padding: 10px 12px 2px;
+  max-width: 760px;
+}

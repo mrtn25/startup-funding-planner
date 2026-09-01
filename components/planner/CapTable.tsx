@@ -50,6 +50,7 @@ export default function CapTable({ data, state }: Props) {
             <th>Ownership</th>
             <th>Share</th>
             <th>Exit Proceeds</th>
+            <th>Multiple</th>
           </tr>
         </thead>
         <tbody>
@@ -85,6 +86,7 @@ export default function CapTable({ data, state }: Props) {
                   </td>
                   <td style={{ fontSize: 12, opacity: 0.7 }}>{s.pct.toFixed(1)}%</td>
                   <td style={{ fontSize: 12, fontWeight: 500 }}>{exitM ? fmtM((exitM * s.pct) / 100) : "—"}</td>
+                  <td style={{ fontSize: 12, fontWeight: 500 }}>{fmtMultiple(exitM, s.pct, s.invested)}</td>
                 </tr>
 
                 {details.map((d) => {
@@ -103,6 +105,9 @@ export default function CapTable({ data, state }: Props) {
                       <td style={{ fontSize: 11, fontWeight: 500, color: "var(--text)" }}>
                         {d.exitProceeds !== null ? fmtM(d.exitProceeds) : "—"}
                       </td>
+                      <td style={{ fontSize: 11, fontWeight: 500, color: "var(--text)" }}>
+                        {d.multiple !== null ? `${d.multiple.toFixed(1)}×` : "—"}
+                      </td>
                     </tr>
                   );
                 })}
@@ -116,9 +121,25 @@ export default function CapTable({ data, state }: Props) {
             </td>
             <td style={{ fontSize: 12, fontWeight: 500 }}>100%</td>
             <td style={{ fontSize: 12, fontWeight: 500 }}>{exitM ? fmtM(exitM) : "—"}</td>
+            <td style={{ fontSize: 12, fontWeight: 500 }}>
+              {exitM && data.totalInvested > 0 ? `${(exitM / data.totalInvested).toFixed(1)}×` : "—"}
+            </td>
           </tr>
         </tbody>
       </table>
+
+      <p className="cap-note">
+        Das Multiple ist der Exit-Erlös geteilt durch das eingezahlte Kapital — <strong>as-converted</strong>, also
+        ohne Liquidationspräferenz. Was eine Präferenz daran ändert, steht im Abschnitt darüber; bei einem Exit unter
+        der Bewertung der letzten Runde weichen die beiden deutlich voneinander ab. Gründer und ESOP haben kein Geld
+        eingezahlt, deshalb steht dort kein Multiple.
+      </p>
     </div>
   );
+}
+
+/** Exit-Erlös über eingezahltem Kapital. Ohne Einzahlung gibt es kein Vielfaches. */
+function fmtMultiple(exitM: number | null, pctOfCompany: number, invested?: number): string {
+  if (!exitM || !invested || invested <= 0) return "—";
+  return `${((exitM * pctOfCompany) / 100 / invested).toFixed(1)}×`;
 }
