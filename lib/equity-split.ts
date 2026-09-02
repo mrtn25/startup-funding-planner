@@ -31,6 +31,18 @@ export const SRC: Record<string, [string, string]> = {
     "Wasserman, N. (2012). <em>The Founder's Dilemmas.</em> Princeton University Press — roughly 10,000 founders and 3,600 startups.",
     "https://press.princeton.edu/books/hardcover/9780691149134/the-founders-dilemmas",
   ],
+  kaplanStromberg: [
+    "Kaplan, S. &amp; Strömberg, P. (2003). <em>Financial Contracting Theory Meets the Real World: An Empirical Analysis of Venture Capital Contracts.</em> Review of Economic Studies 70(2), 281–315 — including how founder vesting is actually written.",
+    "https://www.nber.org/papers/w7660",
+  ],
+  index: [
+    "Index Ventures — <em>Rewarding Talent.</em> European ESOP benchmarks from 27 portfolio companies and a survey of 53 startups covering over 11,000 employees.",
+    "https://www.indexventures.com/rewarding-talent/esop-size-at-seed",
+  ],
+  bag2025: [
+    "German Federal Labour Court (BAG), March 2025 — vested virtual options are earned compensation; bad-leaver clauses forfeiting them are invalid. Summary by Morgan Lewis.",
+    "https://www.morganlewis.com/pubs/2025/05/german-federal-labor-court-strengthens-employee-rights-for-virtual-stock-options-upon-employment-termination",
+  ],
   demmler: [
     "Demmler, F. <em>Founders' Pie Calculator.</em> Carnegie Mellon University — the weighted-factor method used here.",
     "https://www.andrew.cmu.edu/user/fd0n/35%20Founders'%20Pie%20Calculator.htm",
@@ -320,3 +332,80 @@ export const DEFAULT_SPLIT: SplitInputs = {
   vesting: DEFAULT_VESTING,
   departureMonth: 18,
 };
+
+
+/* ── How this is actually done ────────────────────────────────
+   The questions founders ask once the split itself is settled, and
+   the ones they tend not to ask until it is too late. Jurisdiction
+   matters here in a way it does not for the arithmetic above, so the
+   German practice is called out separately rather than folded into a
+   single "standard".
+   ────────────────────────────────────────────────────────────── */
+
+export type PracticeNote = {
+  id: string;
+  question: string;
+  answer: string;
+  /** The number or rule of thumb, where one exists. */
+  rule?: string;
+  sources: string[];
+};
+
+export const PRACTICE: PracticeNote[] = [
+  {
+    id: "when",
+    question: "Do founders get their shares straight away, or over time?",
+    answer:
+      "Straight away — and this is the part most often misunderstood. Founders hold their full stake from day one and are shareholders immediately. Vesting runs in reverse: the company keeps the right to take back the portion you have not yet earned if you leave. Employee options work the other way round, granted now and vesting into existence later. So the number in the cap table is your whole stake from the start; what changes over four years is how much of it you would keep on the way out.",
+    rule: "Founders: shares now, forfeiture risk falling over time. Employees: nothing now, options vesting in.",
+    sources: ["kaplanStromberg"],
+  },
+  {
+    id: "standard",
+    question: "What is the standard schedule?",
+    answer:
+      "Four years with a one-year cliff, then monthly. That is the convention in both the US and Europe and holds across roles and seniority. Nothing vests before the cliff, and the cliff then pays out twelve months at once — the discontinuity is deliberate, because the co-founder who turns out not to be one usually becomes apparent inside the first year. Credit for work done before the company existed is negotiable and common where it was real; it simply starts the clock earlier.",
+    rule: "4 years · 1-year cliff · monthly thereafter",
+    sources: ["index", "kaplanStromberg"],
+  },
+  {
+    id: "fifty",
+    question: "Is 50:50 normal? And is it a problem?",
+    answer:
+      "It is the most common outcome by a distance — around three quarters of teams split equally. It is not a problem in itself, and the research does not say it is. What the data shows is that teams who arrived there by default rather than by argument were far likelier to regret it and much less able to change it later. The practical risk of an exact 50:50 is deadlock: two shareholders, no tiebreaker, and any decision needing a majority can simply stop. Teams that keep 50:50 usually name a tiebreaker somewhere else — a casting vote for one role, a third board seat, or a written escalation process — rather than shave the split to 51:49 for its own sake.",
+    rule: "≈73 % of teams split equally. The split is fine; the missing tiebreaker is the risk.",
+    sources: ["wasserman", "dilemmas"],
+  },
+  {
+    id: "pool",
+    question: "Where do employee shares come from?",
+    answer:
+      "From a pool carved out before the round, which means it dilutes the founders and not the incoming investor — that ordering is worth negotiating, and is worth as much as several points of valuation. In Europe a pool of roughly 10 % at seed is typical, of which only 3–4 % tends to be handed out before the Series A and the rest is held back for the hires that follow. The pool is not a gift to employees so much as a budget you will spend recruiting.",
+    rule: "≈10 % pool at seed in Europe · 3–4 % actually granted before Series A",
+    sources: ["index"],
+  },
+  {
+    id: "vsop",
+    question: "VSOP or real options — what do German startups use?",
+    answer:
+      "Virtual shares, in nearly all cases. Real GmbH shares need notarisation for every transfer and real options create a tax event employees usually cannot pay for, so the standard instrument is a VSOP: a contractual right to a cash payout tied to company value at an exit, with the same four-year vesting and the same good-leaver and bad-leaver mechanics. Since a Federal Labour Court ruling in March 2025, bad-leaver clauses that forfeit options an employee has already vested are invalid — vested options count as earned compensation. Plans written before that ruling are worth re-reading.",
+    rule: "Germany: VSOP, cash-settled at exit. Vested options can no longer be clawed back.",
+    sources: ["bag2025"],
+  },
+  {
+    id: "hires",
+    question: "How much for the first engineers?",
+    answer:
+      "It falls fast with each hire, because risk falls fast. A first engineer joining before there is a product or a salary is closer to a late founder than to an employee, and single-digit percentages are defensible; by the tenth hire the same role is usually a fraction of one percent. The honest question is not what the market pays but what someone is giving up — a pay cut and an unhedged bet on one company are what the equity is compensating, and where neither applies, cash is the better instrument.",
+    rule: "First hires: whole percentage points. By the tenth: fractions of one.",
+    sources: ["index"],
+  },
+  {
+    id: "advisors",
+    question: "And advisors?",
+    answer:
+      "Far less than advisors ask for and far less than founders expect: tenths of a percent, vesting over about two years, and only against a defined commitment — a set number of hours, specific introductions, a named problem. Advisor equity that vests for being on a list is the cheapest thing to give away and the most expensive to still be carrying at Series B. A short written agreement with a scope and a cliff solves nearly all of it.",
+    rule: "≈0.1–1 %, vesting over ~2 years, against a written scope.",
+    sources: [],
+  },
+];

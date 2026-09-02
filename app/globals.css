@@ -964,3 +964,11 @@ input[type="text"]:focus {
   padding: 10px 12px 2px;
   max-width: 760px;
 }
+
+/* `[hidden]` is only a user-agent `display: none`, so any author `display`
+   on the same element silently beats it and the element stays on screen
+   while the code believes it is closed. Hardened once here rather than
+   remembered at every call site. */
+[hidden] {
+  display: none !important;
+}

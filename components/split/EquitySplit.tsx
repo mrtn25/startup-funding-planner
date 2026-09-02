@@ -7,6 +7,7 @@ import styles from "./EquitySplit.module.css";
 import {
   DEFAULT_SPLIT,
   FACTORS,
+  PRACTICE,
   PRESETS,
   SRC,
   computeSplit,
@@ -366,23 +367,35 @@ export default function EquitySplit() {
           {r.warnings.map((w) => (
             <div key={w.key} className={`${styles.warn} ${w.level === "warn" ? styles.warnHard : styles.warnSoft}`}>
               <p>{w.text}</p>
-              {w.sources.length > 0 && (
-                <div className={styles.warnSrc}>
-                  {w.sources.map((id) => (
-                    <a
-                      key={id}
-                      href={SRC[id][1]}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      dangerouslySetInnerHTML={{ __html: SRC[id][0] }}
-                    />
-                  ))}
-                </div>
-              )}
+              <Sources ids={w.sources} />
             </div>
           ))}
         </div>
       )}
+
+      {/* ── How this is done in practice ──
+          The arithmetic above settles the number. These are the questions
+          that come immediately after it, and the ones founders tend not to
+          ask until the answer has already cost them something. */}
+      <div className={styles.practice}>
+        <div className={styles.groupTitle}>How this is done in practice</div>
+        <div className={styles.practiceGrid}>
+          {PRACTICE.map((n) => (
+            <details key={n.id} className={styles.pItem}>
+              <summary>
+                {n.question}
+                {n.rule && <span className={styles.pRule}>{n.rule}</span>}
+              </summary>
+              <p>{n.answer}</p>
+              <Sources ids={n.sources} />
+            </details>
+          ))}
+        </div>
+        <p className={styles.practiceNote}>
+          Conventions, not law — and the German notes are specific to a GmbH. Anything you are about to sign is worth
+          an hour of a lawyer who does this weekly; this is for knowing what to ask them.
+        </p>
+      </div>
 
       <details className={styles.biblio}>
         <summary>References ({Object.keys(SRC).length})</summary>
@@ -401,6 +414,26 @@ export default function EquitySplit() {
         </p>
       </details>
     </section>
+  );
+}
+
+/** Renders whatever it can resolve. A source key that does not exist is a
+    typo, not a reason for the page to stop rendering. */
+function Sources({ ids }: { ids: string[] }) {
+  const found = ids.filter((id) => SRC[id]);
+  if (!found.length) return null;
+  return (
+    <div className={styles.warnSrc}>
+      {found.map((id) => (
+        <a
+          key={id}
+          href={SRC[id][1]}
+          target="_blank"
+          rel="noopener noreferrer"
+          dangerouslySetInnerHTML={{ __html: SRC[id][0] }}
+        />
+      ))}
+    </div>
   );
 }
 

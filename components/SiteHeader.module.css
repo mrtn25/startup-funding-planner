@@ -50,12 +50,16 @@
   transform: rotate(180deg);
 }
 
+/* `display` here has to be driven by the class, not by the `hidden`
+   attribute alone: [hidden] is only a user-agent `display: none`, so any
+   author `display` declaration beats it and the panel would stay on screen
+   while React believed it was closed. */
 .panel {
   position: absolute;
   top: calc(100% + 6px);
   right: 1.25rem;
   min-width: 240px;
-  display: grid;
+  display: none;
   grid-template-columns: 1fr;
   gap: 14px;
   padding: 14px;
@@ -64,6 +68,10 @@
   background: var(--surface);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
 }
+.panelOpen {
+  display: grid;
+}
+
 @media (prefers-color-scheme: dark) {
   .panel {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
