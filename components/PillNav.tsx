@@ -33,6 +33,11 @@ type PillNavProps = {
  */
 export default function PillNav({ active, onChange, view, onOpenInfos }: PillNavProps) {
   const [open, setOpen] = useState(false);
+  /* Separate from `open`, which drives the mobile dropdown. On a wide screen
+     the strip is shown by default and this folds it away; the two cannot be
+     one flag, because the same default would mean "list expanded" on a phone
+     and "strip visible" on a desktop. */
+  const [folded, setFolded] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Only bound while open, so there is no idle listener on the page.
@@ -55,13 +60,16 @@ export default function PillNav({ active, onChange, view, onOpenInfos }: PillNav
   const activeLabel = view === "infos" ? "Infos" : (TOOLS.find((t) => t.id === active)?.label ?? "Tools");
 
   return (
-    <div className={`${styles.wrap} no-print`} id="tools" ref={wrapRef}>
+    <div className={`${styles.wrap}${folded ? ` ${styles.wrapFolded}` : ""} no-print`} id="tools" ref={wrapRef}>
       <button
         type="button"
         className={styles.trigger}
         aria-expanded={open}
         aria-controls="tool-list"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => !o);
+          setFolded(false);
+        }}
       >
         <span className={styles.triggerLabel}>{activeLabel}</span>
         <span className={`${styles.chev}${open ? ` ${styles.chevOpen}` : ""}`} aria-hidden="true">
@@ -110,6 +118,20 @@ export default function PillNav({ active, onChange, view, onOpenInfos }: PillNav
           Infos
         </button>
       </div>
+
+      <button
+        type="button"
+        className={styles.fold}
+        aria-expanded={!folded}
+        aria-controls="tool-list"
+        onClick={() => setFolded((f) => !f)}
+        title={folded ? "Show the tools" : "Hide the tools"}
+      >
+        <span className={`${styles.foldChev}${folded ? ` ${styles.foldChevUp}` : ""}`} aria-hidden="true">
+          ▾
+        </span>
+        <span className="sr-only">{folded ? "Show the tools" : "Hide the tools"}</span>
+      </button>
     </div>
   );
 }

@@ -66,6 +66,64 @@
   padding: 1rem 1.25rem 1.125rem;
   margin-bottom: 1.75rem;
 }
+/* Cake on the left, bars on the right: the pie answers "how much of it is
+   mine", the bars answer "how far is that from equal" — the hairline cannot
+   be drawn on a pie without lying about the geometry. */
+.result {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: 1.75rem;
+  align-items: center;
+}
+@media (max-width: 760px) {
+  .result {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+}
+.cake {
+  min-width: 0;
+}
+.pieWrap {
+  position: relative;
+  width: 100%;
+  height: 200px;
+}
+.pieCentre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+  text-align: center;
+}
+.pieCentre strong {
+  font-size: 19px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.pieCentre span {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--es-fg3);
+  max-width: 90px;
+  line-height: 1.35;
+}
+.pieNote {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--es-fg3);
+  margin: 10px 0 0;
+}
+.bars {
+  min-width: 0;
+}
+
 .slice {
   margin-bottom: 12px;
 }

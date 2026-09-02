@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import styles from "./InfoCards.module.css";
-import { CATEGORIES, ENTRIES, type Category } from "@/lib/glossary";
+import { CATEGORIES, ENTRIES, SRC, type Category } from "@/lib/glossary";
 import type { ToolId } from "@/components/PillNav";
 
 type Props = { onOpenTool?: (id: ToolId) => void };
@@ -86,6 +86,21 @@ export default function InfoCards({ onOpenTool }: Props) {
                       {e.example}
                     </p>
                   )}
+                  {e.sources && e.sources.length > 0 && (
+                    <div className={styles.srcs}>
+                      {e.sources.map((id) => (
+                        <a
+                          key={id}
+                          href={SRC[id][1]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          dangerouslySetInnerHTML={{ __html: SRC[id][0] }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {e.convention && <p className={styles.convention}>{e.convention}</p>}
+
                   {e.tool && onOpenTool && (
                     <button
                       type="button"
@@ -101,6 +116,22 @@ export default function InfoCards({ onOpenTool }: Props) {
           );
         })}
       </div>
+
+      <details className={styles.biblio}>
+        <summary>All sources ({Object.keys(SRC).length})</summary>
+        <ol>
+          {Object.keys(SRC).map((id) => (
+            <li key={id}>
+              <a href={SRC[id][1]} target="_blank" rel="noopener noreferrer" dangerouslySetInnerHTML={{ __html: SRC[id][0] }} />
+            </li>
+          ))}
+        </ol>
+        <p className={styles.biblioNote}>
+          Peer-reviewed work and primary documents only. Where a term is a practitioner convention with no research
+          behind it — most of the SaaS metrics are — the entry says so rather than dressing a blog post up as
+          evidence. An invented citation would be worse than an honest &ldquo;this is convention&rdquo;.
+        </p>
+      </details>
     </section>
   );
 }

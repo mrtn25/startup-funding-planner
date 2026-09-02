@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArcElement, Chart as ChartJS, Tooltip, type ChartOptions } from "chart.js";
+import { Doughnut } from "react-chartjs-2";
 import styles from "./EquitySplit.module.css";
 import {
   DEFAULT_SPLIT,
@@ -13,7 +15,12 @@ import {
   type SplitInputs,
 } from "@/lib/equity-split";
 
+ChartJS.register(ArcElement, Tooltip);
+
 const BAR = ["#2200FF", "#a8cf12", "#00B5AD", "#7c3aed", "#d85a30", "#0091EA"];
+/* Forfeited slices are drawn hollow rather than in a colour of their own:
+   they are the absence of a claim, not a party to the split. */
+const FORFEIT = "rgba(138,136,128,0.22)";
 
 export default function EquitySplit() {
   const [s, setS] = useState<SplitInputs>(DEFAULT_SPLIT);
@@ -29,6 +36,56 @@ export default function EquitySplit() {
     setS((p) => ({ ...p, founders: p.founders.map((f) => (f.id === id ? { ...f, ...patch } : f)) }));
 
   const equalPct = s.founders.length ? 100 / s.founders.length : 0;
+  const totalVested = r.founders.reduce((a, f) => a + f.keptShare, 0);
+
+  /* Two concentric rings on one figure: what was agreed, and what is actually
+     earned so far. Chart.js draws dataset 0 as the outer ring, so the agreed
+     split goes first and the vested breakdown sits inside it. The inner ring
+     alternates kept and forfeited per founder, which keeps each pair radially
+     under its own outer slice. */
+  const pieData = {
+    labels: r.founders.map((f, i) => f.name || `Founder ${i + 1}`),
+    datasets: [
+      {
+        data: r.founders.map((f) => f.share * 100),
+        backgroundColor: r.founders.map((_, i) => BAR[i % BAR.length]),
+        borderWidth: 0,
+        spacing: 2,
+        weight: 1.4,
+      },
+      {
+        data: r.founders.flatMap((f) => [f.keptShare * 100, f.forfeitedShare * 100]),
+        backgroundColor: r.founders.flatMap((_, i) => [BAR[i % BAR.length], FORFEIT]),
+        borderWidth: 0,
+        spacing: 1,
+        weight: 1,
+      },
+    ],
+  };
+
+  const pieOptions: ChartOptions<"doughnut"> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: "42%",
+    animation: { animateRotate: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => {
+            const v = ctx.parsed;
+            if (ctx.datasetIndex === 0) return `${ctx.label}: ${v.toFixed(1)} % of the company`;
+            // The inner ring runs kept, forfeited, kept, forfeited …
+            const who = r.founders[Math.floor(ctx.dataIndex / 2)];
+            const name = who?.name || `Founder ${Math.floor(ctx.dataIndex / 2) + 1}`;
+            return ctx.dataIndex % 2 === 0
+              ? `${name} has earned ${v.toFixed(1)} %`
+              : `${name} would forfeit ${v.toFixed(1)} %`;
+          },
+        },
+      },
+    },
+  };
 
   return (
     <section className={styles.root} aria-label="Co-founder equity split">
@@ -44,6 +101,22 @@ export default function EquitySplit() {
 
       {/* ── The answer ── */}
       <div className={styles.result}>
+        <div className={styles.cake}>
+          <div className={styles.pieWrap}>
+            <Doughnut data={pieData} options={pieOptions} />
+            <div className={styles.pieCentre}>
+              <strong>{Math.round(totalVested * 100)} %</strong>
+              <span>vested by month {s.departureMonth}</span>
+            </div>
+          </div>
+          <p className={styles.pieNote}>
+            The outer ring is the agreed split. The inner ring is how much of it each founder would actually own if
+            they walked in month {s.departureMonth} — the hollow part has not been earned yet and returns to everyone
+            who stayed.
+          </p>
+        </div>
+
+        <div className={styles.bars}>
         {r.founders.map((f, i) => (
           <div key={f.id} className={styles.slice}>
             <div className={styles.sliceHead}>
@@ -70,6 +143,7 @@ export default function EquitySplit() {
           The hairline on each bar is where an equal split would sit. A split you can defend line by line survives a
           bad year; a quick handshake often does not.
         </p>
+        </div>
       </div>
 
       <div className={styles.layout}>
