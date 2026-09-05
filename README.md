@@ -18,6 +18,17 @@ startup numbers that are actually traceable to a source, in one Next.js app — 
   month, not on the base after new sales flattered it. It also shows the gap
   between ARR taken as *committed* recurring revenue and the number you get by
   annualising everything that came in, which is the gap investors ask about.
+
+  A second view models **land and expand in ACV**, for software that starts
+  with a paid project and grows into a platform licence. Pilots are won at a
+  rate that itself accelerates, a cohort of them steps up after a lag, and the
+  licence carries an ACV, a billing cycle and a term — so total contract value
+  and annual contract value stay apart, annual contracts churn at renewal
+  rather than continuously, and billing annually upfront produces a deferred
+  revenue balance you can see. Whether the first engagement is a one-off
+  project or a small subscription decides whether an upgrade is new ARR or
+  expansion, which moves net retention enormously for the same business; the
+  model computes it both ways and shows the two numbers side by side.
 - **Ready to Raise** — an investor-readiness board. Tick what you already have; it
   scores five readiness dimensions from the fundraising literature, names your
   binding constraint, and ranks what to fix by leverage. Also ranks which investor
@@ -103,6 +114,7 @@ lib/
   glossary.ts               term sheet vocabulary
   stats.ts                  the quoted figures, their sources, and what is left out
   recurring.ts              MRR normalisation, the bridge, GRR/NRR
+  land-expand.ts            pilots, ACV, renewals, deferred revenue
   equity-split.ts           founders pie, vesting, the warnings
   planner.ts                all planner maths — pure, no DOM
   network-strategy.ts       weights, citations, and the two-layer model

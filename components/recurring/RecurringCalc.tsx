@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { BarElement, CategoryScale, Chart as ChartJS, Filler, LineElement, LinearScale, PointElement, Tooltip, type ChartOptions } from "chart.js";
 import { Line } from "react-chartjs-2";
 import styles from "./RecurringCalc.module.css";
+import LandExpand from "./LandExpand";
 import {
   DEFAULT_RECURRING,
   SRC,
@@ -20,7 +21,14 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 const ACCENT = "#2200FF";
 const AXIS = "#8a8880";
 
+type Mode = "plans" | "landExpand";
+
 export default function RecurringCalc() {
+  /* Two shapes of the same question. The plan-and-bridge view assumes
+     everything already recurs; a lot of B2B software starts with a paid
+     project instead, and that case needs its own arithmetic rather than a
+     row in the plan table. */
+  const [mode, setMode] = useState<Mode>("plans");
   const [s, setS] = useState<RecurringInputs>(DEFAULT_RECURRING);
   const r = useMemo(() => computeRecurring(s), [s]);
 
@@ -80,6 +88,30 @@ export default function RecurringCalc() {
         </p>
       </header>
 
+      <div className={styles.toolModes} role="tablist" aria-label="Revenue shape">
+        {(
+          [
+            ["plans", "Plans & bridge"],
+            ["landExpand", "Land → expand (ACV)"],
+          ] as [Mode, string][]
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={mode === key}
+            className={`${styles.toolMode}${mode === key ? ` ${styles.toolModeOn}` : ""}`}
+            onClick={() => setMode(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "landExpand" && <LandExpand />}
+
+      {mode === "plans" && (
+      <>
       <div className={styles.kpis}>
         <div className={styles.kpi}>
           <div className={styles.kpiLabel}>MRR</div>
@@ -287,6 +319,8 @@ export default function RecurringCalc() {
           )}
         </div>
       </div>
+      </>
+      )}
     </section>
   );
 }
