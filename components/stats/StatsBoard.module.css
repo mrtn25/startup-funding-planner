@@ -1,0 +1,301 @@
+/* Stats board. Same tokens as the tools. */
+
+.root {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.head {
+  max-width: 760px;
+  margin-bottom: 1.5rem;
+}
+.head h2 {
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 0 0 0.5rem;
+}
+.head p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text2);
+  margin: 0;
+}
+
+.panel {
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 1.125rem 1.25rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.panelHead h3 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0;
+}
+.panelNote {
+  font-size: 11px;
+  color: var(--text3);
+}
+.panelFoot {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text2);
+  margin: 1rem 0 0;
+}
+
+/* ── Survival curve ── */
+
+.curve {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  height: 170px;
+  align-items: end;
+}
+.bar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 6px;
+}
+.barTrack {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  background: var(--surface2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.barFill {
+  width: 100%;
+  background: linear-gradient(to top, var(--accent), color-mix(in srgb, var(--accent) 55%, transparent));
+  border-radius: 6px 6px 0 0;
+}
+.barPct {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  mix-blend-mode: difference;
+}
+.barLabel {
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text3);
+}
+
+.caution {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 1rem 0 0;
+  background: var(--warn-bg);
+  border: 0.5px solid var(--warn-border);
+  color: var(--warn-text);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+/* ── VC share ── */
+
+.shareGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+.shareTitle {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+.shareRow {
+  display: grid;
+  grid-template-columns: 1fr 70px 42px;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 12.5px;
+}
+.shareLabel {
+  color: var(--text2);
+}
+.shareTrack {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--surface2);
+  overflow: hidden;
+}
+.shareTrack span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+.shareRow strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* ── Cards ── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-auto-flow: dense;
+  gap: 10px;
+  margin-top: 1rem;
+}
+.card {
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.card:hover {
+  border-color: var(--border2);
+}
+.sizeS,
+.sizeM {
+  grid-column: span 1;
+}
+.sizeL {
+  grid-column: span 2;
+}
+@media (max-width: 700px) {
+  .sizeL {
+    grid-column: span 1;
+  }
+}
+.cardBtn {
+  font: inherit;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 1rem;
+}
+.value {
+  display: block;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.label {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text2);
+  margin-top: 6px;
+}
+.detail {
+  padding: 0 1rem 1rem;
+  border-top: 0.5px solid var(--border);
+  padding-top: 11px;
+}
+.detail p {
+  font-size: 12.5px;
+  line-height: 1.65;
+  margin: 0;
+}
+.srcs {
+  margin-top: 9px;
+}
+.srcs a {
+  display: block;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text3);
+  text-decoration: none;
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+  margin-bottom: 4px;
+}
+.srcs a:hover {
+  color: var(--text2);
+}
+
+/* ── What is missing ── */
+
+.omitted {
+  margin-top: 1.5rem;
+  border: 0.5px dashed var(--border2);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+.omittedTitle {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 6px;
+}
+.omitted p {
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text2);
+  margin: 0;
+  max-width: 760px;
+}
+
+.biblio {
+  margin-top: 1.5rem;
+  border-top: 0.5px solid var(--border);
+  padding-top: 1rem;
+}
+.biblio summary {
+  font-size: 12px;
+  color: var(--text3);
+  cursor: pointer;
+}
+.biblio ol {
+  margin: 12px 0 0;
+  padding-left: 1.25rem;
+}
+.biblio li {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text3);
+  margin-bottom: 7px;
+}
+.biblio a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+
+@media (max-width: 620px) {
+  .root {
+    padding: 1.5rem 0.875rem 2.5rem;
+  }
+  .head h2 {
+    font-size: 22px;
+  }
+  .curve {
+    height: 140px;
+    gap: 6px;
+  }
+}

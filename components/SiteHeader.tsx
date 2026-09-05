@@ -7,8 +7,8 @@ import { TOOLS, type ToolId } from "./PillNav";
 type Props = {
   active: ToolId;
   onOpenTool: (id: ToolId) => void;
-  onOpenInfos: () => void;
-  view: "tools" | "infos";
+  onOpenView: (v: "infos" | "stats") => void;
+  view: "tools" | "infos" | "stats";
 };
 
 /**
@@ -19,7 +19,7 @@ type Props = {
  * outside click and on Escape, and the listeners only exist while it is
  * open so there is nothing bound to the document at rest.
  */
-export default function SiteHeader({ active, onOpenTool, onOpenInfos, view }: Props) {
+export default function SiteHeader({ active, onOpenTool, onOpenView, view }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +86,7 @@ export default function SiteHeader({ active, onOpenTool, onOpenInfos, view }: Pr
           <button
             type="button"
             className={`${styles.item}${view === "infos" ? ` ${styles.itemOn}` : ""}`}
-            onClick={() => go(onOpenInfos)}
+            onClick={() => go(() => onOpenView("infos"))}
           >
             Term sheet glossary
           </button>
@@ -99,6 +99,17 @@ export default function SiteHeader({ active, onOpenTool, onOpenInfos, view }: Pr
           >
             Source & method ↗
           </a>
+        </div>
+
+        <div className={styles.group}>
+          <div className={styles.groupTitle}>Stats</div>
+          <button
+            type="button"
+            className={`${styles.item}${view === "stats" ? ` ${styles.itemOn}` : ""}`}
+            onClick={() => go(() => onOpenView("stats"))}
+          >
+            What the data says
+          </button>
         </div>
       </div>
     </header>

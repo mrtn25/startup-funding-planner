@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./PillNav.module.css";
 
-export type ToolId = "planner" | "network" | "ready" | "round" | "bootstrap" | "split";
+export type ToolId = "planner" | "network" | "ready" | "round" | "bootstrap" | "split" | "recurring";
 
 /* Ordered as the questions actually arrive: do you even need to raise, are
    you ready, how much, what does it cost you, and who do you ask. */
 export const TOOLS: { id: ToolId; label: string }[] = [
   { id: "bootstrap", label: "Bootstrap" },
+  { id: "recurring", label: "ARR & MRR" },
   { id: "ready", label: "Ready to Raise" },
   { id: "round", label: "Round Planner" },
   { id: "planner", label: "Dilution Planner" },
@@ -19,9 +20,10 @@ export const TOOLS: { id: ToolId; label: string }[] = [
 type PillNavProps = {
   active: ToolId;
   onChange: (id: ToolId) => void;
-  /** Which section is showing — Infos is a peer of the tools, not a footer. */
-  view: "tools" | "infos";
-  onOpenInfos: () => void;
+  /** Which section is showing — Infos and Stats are peers of the tools,
+      not footers underneath them. */
+  view: "tools" | "infos" | "stats";
+  onOpenView: (v: "infos" | "stats") => void;
 };
 
 /**
@@ -31,7 +33,7 @@ type PillNavProps = {
  * three pills — the trigger and the dropdown chrome are CSS-only, so there
  * is no viewport check in JS to mismatch on hydration.
  */
-export default function PillNav({ active, onChange, view, onOpenInfos }: PillNavProps) {
+export default function PillNav({ active, onChange, view, onOpenView }: PillNavProps) {
   const [open, setOpen] = useState(false);
   /* Separate from `open`, which drives the mobile dropdown. On a wide screen
      the strip is shown by default and this folds it away; the two cannot be
@@ -57,7 +59,8 @@ export default function PillNav({ active, onChange, view, onOpenInfos }: PillNav
     };
   }, [open]);
 
-  const activeLabel = view === "infos" ? "Infos" : (TOOLS.find((t) => t.id === active)?.label ?? "Tools");
+  const activeLabel =
+    view === "infos" ? "Infos" : view === "stats" ? "Stats" : (TOOLS.find((t) => t.id === active)?.label ?? "Tools");
 
   return (
     <div className={`${styles.wrap}${folded ? ` ${styles.wrapFolded}` : ""} no-print`} id="tools" ref={wrapRef}>
@@ -101,22 +104,25 @@ export default function PillNav({ active, onChange, view, onOpenInfos }: PillNav
           </button>
         ))}
 
-        {/* Infos sits in the same strip as the tools because it is a peer of
-            them, not an appendix underneath. */}
-        <button
-          type="button"
-          role="tab"
-          id="tab-infos"
-          aria-selected={view === "infos"}
-          aria-controls="panel-infos"
-          className={`${styles.pill} ${styles.pillInfos}`}
-          onClick={() => {
-            onOpenInfos();
-            setOpen(false);
-          }}
-        >
-          Infos
-        </button>
+        {/* Infos and Stats sit in the same strip as the tools because they
+            are peers of them, not appendices underneath. */}
+        {(["infos", "stats"] as const).map((v, i) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            id={`tab-${v}`}
+            aria-selected={view === v}
+            aria-controls={`panel-${v}`}
+            className={`${styles.pill}${i === 0 ? ` ${styles.pillInfos}` : ""}`}
+            onClick={() => {
+              onOpenView(v);
+              setOpen(false);
+            }}
+          >
+            {v === "infos" ? "Infos" : "Stats"}
+          </button>
+        ))}
       </div>
 
       <button

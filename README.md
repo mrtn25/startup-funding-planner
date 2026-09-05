@@ -1,7 +1,7 @@
 # backable
 
-Six free tools for founders and a plain-language term sheet glossary, in one
-Next.js app — **[startup-funding-planner.vercel.app](https://startup-funding-planner.vercel.app)**
+Seven free tools for founders, a plain-language term sheet glossary and the
+startup numbers that are actually traceable to a source, in one Next.js app — **[startup-funding-planner.vercel.app](https://startup-funding-planner.vercel.app)**
 
 - **Bootstrap** — whether you need outside money at all, in two parts. First
   eight conditions from the bootstrapping literature — time to first revenue,
@@ -11,6 +11,13 @@ Next.js app — **[startup-funding-planner.vercel.app](https://startup-funding-p
   their own rather than costing points. Then the same question in cash: capacity
   caps who can be served, hiring waits for money that already exists, and the
   plan either funds itself or names the amount and the month to start raising.
+- **ARR & MRR** — what your recurring revenue really is. Normalises monthly,
+  quarterly and annual plans onto one monthly number, then builds the bridge —
+  starting MRR plus new plus expansion minus contraction minus churn — and
+  reports gross and net retention on the base that existed at the start of the
+  month, not on the base after new sales flattered it. It also shows the gap
+  between ARR taken as *committed* recurring revenue and the number you get by
+  annualising everything that came in, which is the gap investors ask about.
 - **Ready to Raise** — an investor-readiness board. Tick what you already have; it
   scores five readiness dimensions from the fundraising literature, names your
   binding constraint, and ranks what to fix by leverage. Also ranks which investor
@@ -32,9 +39,19 @@ Next.js app — **[startup-funding-planner.vercel.app](https://startup-funding-p
   mechanisms → strategies) built from the empirical fundraising literature, each
   strategy with a step-by-step playbook.
 
-Plus **Infos** — the vocabulary of a term sheet in plain words, each entry
-answering what it is, why it exists and what it does to you, with the worked
-numbers where prose would be vaguer than arithmetic.
+Plus two sections that are not tools:
+
+- **Infos** — the vocabulary of a term sheet in plain words, each entry
+  answering what it is, why it exists and what it does to you, with the worked
+  numbers where prose would be vaguer than arithmetic.
+- **Stats** — survival rates, how concentrated venture outcomes are, what a
+  prior success does and does not predict, and the gap between a unicorn
+  headline and what the common shares are worth. Every figure traces to a paper
+  or a government series and carries what it measures — including the survival
+  series, which counts every new employer establishment and is not a startup
+  failure rate however often it is quoted as one. There is deliberately no
+  unicorn map and no founder-archetype chart: those counts come from commercial
+  trackers whose inclusion rules nobody can check, and the section says so.
 
 Each model states its weights openly and cites the papers behind them. The
 weights are set by hand from the literature, not fitted to data — the output is
@@ -68,9 +85,11 @@ components/
   bootstrap/                bootstrap tool UI
   split/                    co-founder split UI
   infos/                    term sheet glossary cards
+  stats/                    the data board
+  recurring/                ARR & MRR calculator
   ScrollHero.tsx            scroll-driven word hero
   PillNav.tsx               tool switcher (dropdown on mobile)
-  ToolSwitcher.tsx          shell: header, hero, six mounted tools, glossary
+  ToolSwitcher.tsx          shell: header, hero, seven mounted tools, glossary, stats
   MotionButton.tsx          circle-that-grows-into-a-pill link
   SiteFooter.tsx            GitHub links + disclaimer
   ready/                    ready-to-raise UI
@@ -82,6 +101,8 @@ lib/
   bootstrap.ts              the eight conditions, weighted, with sources
   bootstrap-cash.ts         capacity, hiring gates, the capital verdict
   glossary.ts               term sheet vocabulary
+  stats.ts                  the quoted figures, their sources, and what is left out
+  recurring.ts              MRR normalisation, the bridge, GRR/NRR
   equity-split.ts           founders pie, vesting, the warnings
   planner.ts                all planner maths — pure, no DOM
   network-strategy.ts       weights, citations, and the two-layer model
