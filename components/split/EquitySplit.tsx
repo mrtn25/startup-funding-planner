@@ -315,48 +315,103 @@ export default function EquitySplit() {
           </Field>
 
           <div className={styles.groupTitle}>If someone leaves</div>
-          <Field label="They walk in month">
-            <input
-              className={styles.range}
-              type="range"
-              min={0}
-              max={Math.max(12, s.vesting.years * 12 + 12)}
-              step={1}
-              value={s.departureMonth}
-              onChange={(e) => set("departureMonth", +e.target.value)}
-              aria-label="Departure month"
-            />
-            <span className={styles.rangeVal}>{s.departureMonth}</span>
-          </Field>
+          <p className={styles.leaveIntro}>
+            Founders hold their shares from day one. Vesting is the right the company keeps to <strong>buy back the
+            part that has not been earned</strong> if someone walks. Pick who, and when.
+          </p>
 
-          <div className={styles.leaveList}>
-            {r.founders.map((f, i) => (
-              <div key={f.id} className={styles.leaveRow}>
-                <span className={styles.leaveName} style={{ color: BAR[i % BAR.length] }}>
-                  {f.name || `Founder ${i + 1}`}
-                </span>
-                <span className={styles.leaveNums}>
-                  keeps <strong>{(f.keptShare * 100).toFixed(1)} %</strong>
-                  {f.forfeitedShare > 0.0005 && (
-                    <>
-                      {" "}
-                      · forfeits {(f.forfeitedShare * 100).toFixed(1)} %
-                    </>
-                  )}
-                </span>
-                <span className={styles.leaveBar}>
-                  <span
-                    className={styles.leaveFill}
-                    style={{ width: `${f.vestedFraction * 100}%`, background: BAR[i % BAR.length] }}
-                  />
-                </span>
-              </div>
+          <div className={styles.whoBtns} role="group" aria-label="Who leaves">
+            <button
+              type="button"
+              aria-pressed={s.departingId === null}
+              className={`${styles.who}${s.departingId === null ? ` ${styles.whoOn}` : ""}`}
+              onClick={() => set("departingId", null)}
+            >
+              Nobody
+            </button>
+            {s.founders.map((f, i) => (
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={s.departingId === f.id}
+                className={`${styles.who}${s.departingId === f.id ? ` ${styles.whoOn}` : ""}`}
+                style={s.departingId === f.id ? { background: BAR[i % BAR.length], borderColor: BAR[i % BAR.length] } : undefined}
+                onClick={() => set("departingId", f.id)}
+              >
+                {f.name || `Founder ${i + 1}`}
+              </button>
             ))}
           </div>
-          <p className={styles.leaveNote}>
-            What is forfeited returns to the company and lifts everyone who stayed. This row is the reason vesting
-            exists — run the slider back to month six and look at it.
-          </p>
+
+          {s.departingId !== null && (
+            <>
+              <Field label="They walk after" hint="Months from today, on top of any time already served">
+                <input
+                  className={styles.range}
+                  type="range"
+                  min={0}
+                  max={Math.max(12, s.vesting.years * 12 + 12)}
+                  step={1}
+                  value={s.departureMonth}
+                  onChange={(e) => set("departureMonth", +e.target.value)}
+                  aria-label="Departure month"
+                />
+                <span className={styles.rangeVal}>{s.departureMonth} mo</span>
+              </Field>
+
+              {(() => {
+                const leaver = r.founders.find((f) => f.isDeparting);
+                if (!leaver) return null;
+                const stayers = r.founders.filter((f) => !f.isDeparting);
+                return (
+                  <div className={styles.outcome}>
+                    <div className={styles.outcomeHead}>
+                      {leaver.name ? `If ${leaver.name} leaves` : "If they leave"} in month {s.departureMonth}
+                      {leaver.vestedFraction === 0 ? " — before the cliff" : ""}
+                    </div>
+                    <div className={styles.outcomeRow}>
+                      <span>They keep</span>
+                      <strong>{(leaver.keptShare * 100).toFixed(1)} %</strong>
+                      <span className={styles.outcomeSub}>
+                        {Math.round(leaver.vestedFraction * 100)} % of their {(leaver.share * 100).toFixed(1)} % has
+                        vested
+                      </span>
+                    </div>
+                    <div className={styles.outcomeRow}>
+                      <span>Back to the company</span>
+                      <strong className={styles.back}>{(leaver.forfeitedShare * 100).toFixed(1)} %</strong>
+                      <span className={styles.outcomeSub}>bought back and cancelled</span>
+                    </div>
+
+                    {stayers.length > 0 && leaver.forfeitedShare > 0.0005 && (
+                      <div className={styles.stayers}>
+                        <div className={styles.stayersTitle}>Everyone who stayed goes up</div>
+                        {stayers.map((f, i) => (
+                          <div key={f.id} className={styles.stayerRow}>
+                            <span style={{ color: BAR[r.founders.indexOf(f) % BAR.length] }}>
+                              {f.name || `Founder ${i + 1}`}
+                            </span>
+                            <span className={styles.stayerNums}>
+                              {(f.share * 100).toFixed(1)} % → <strong>{(f.afterShare * 100).toFixed(1)} %</strong>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* The note has to follow the scenario on screen. A fixed
+                  sentence about the cliff read as a contradiction whenever
+                  the slider sat past it and something had plainly vested. */}
+              <p className={styles.leaveNote}>
+                {r.founders.find((f) => f.isDeparting)?.vestedFraction === 0
+                  ? "Nothing had vested yet, so the whole stake goes back to the company. That is what the cliff is for."
+                  : "Past the cliff it vests month by month, so the longer they stay the more they take with them. Drag this back inside the first year too — the pre-cliff case is the one worth agreeing before anyone signs."}
+              </p>
+            </>
+          )}
         </div>
       </div>
 

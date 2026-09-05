@@ -25,6 +25,7 @@ const twoEqual: SplitInputs = {
   ],
   weights: flat(5),
   vesting: { years: 4, cliffMonths: 12, creditMonths: 0 },
+  departingId: null,
   departureMonth: 48,
 };
 
@@ -115,34 +116,76 @@ test("ohne Cliff vestet es von Anfang an anteilig", () => {
   assert.equal(round2(vestedFraction({ years: 4, cliffMonths: 0, creditMonths: 0 }, 6)), 0.13);
 });
 
+test("ohne benannten Abgang verliert niemand etwas", () => {
+  const r = computeSplit(twoEqual);
+  for (const f of r.founders) {
+    assert.equal(f.isDeparting, false);
+    assert.equal(f.forfeitedShare, 0);
+    assert.equal(round2(f.afterShare), round2(f.share));
+  }
+});
+
 test("wer vor dem Cliff geht, behält nichts und gibt alles zurück", () => {
-  const r = computeSplit({ ...twoEqual, departureMonth: 6 });
-  const a = r.founders[0];
-  assert.equal(a.vestedFraction, 0);
-  assert.equal(a.keptShare, 0);
-  assert.equal(round2(a.forfeitedShare), 0.5);
+  const a = twoEqual.founders[0].id;
+  const r = computeSplit({ ...twoEqual, departingId: a, departureMonth: 6 });
+  const leaver = r.founders.find((f) => f.id === a)!;
+  assert.equal(leaver.isDeparting, true);
+  assert.equal(leaver.keptShare, 0);
+  assert.equal(round2(leaver.forfeitedShare), 0.5);
+  assert.equal(leaver.afterShare, 0);
 });
 
-test("wer durchhält, behält alles", () => {
-  const r = computeSplit({ ...twoEqual, departureMonth: 48 });
-  assert.equal(r.founders[0].vestedFraction, 1);
-  assert.equal(round2(r.founders[0].keptShare), 0.5);
-  assert.equal(r.founders[0].forfeitedShare, 0);
+test("was verfällt, hebt die Anteile derer, die geblieben sind", () => {
+  const a = twoEqual.founders[0].id;
+  const r = computeSplit({ ...twoEqual, departingId: a, departureMonth: 6 });
+  const stayer = r.founders.find((f) => f.id !== a)!;
+  // Der andere hatte 50 %, hält nach dem Rückkauf die ganze Firma.
+  assert.equal(round2(stayer.share), 0.5);
+  assert.equal(round2(stayer.afterShare), 1);
+  // Und verliert dabei selbst nichts.
+  assert.equal(stayer.forfeitedShare, 0);
 });
 
-test("Behaltenes und Verfallenes ergeben zusammen den Anteil", () => {
-  const r = computeSplit({ ...DEFAULT_SPLIT, departureMonth: 20 });
-  for (const f of r.founders) assert.equal(round2(f.keptShare + f.forfeitedShare), round2(f.share));
+test("nur der Abgehende verfällt, nicht alle gleichzeitig", () => {
+  const a = twoEqual.founders[0].id;
+  const r = computeSplit({ ...twoEqual, departingId: a, departureMonth: 24 });
+  assert.equal(r.founders.filter((f) => f.forfeitedShare > 0).length, 1);
 });
 
-test("bereits geleistete Monate zählen bei der Abgangsrechnung mit", () => {
-  const early = computeSplit({
-    ...twoEqual,
-    founders: [newFounder("A", { scores: flat(5), monthsServed: 0 }), newFounder("B", { scores: flat(5), monthsServed: 24 })],
-    departureMonth: 6,
-  });
-  assert.equal(early.founders[0].vestedFraction, 0); // noch vor dem Cliff
-  assert.ok(early.founders[1].vestedFraction > 0.5); // zwei Jahre plus sechs Monate
+test("wer durchhält, behält alles und verändert nichts", () => {
+  const a = twoEqual.founders[0].id;
+  const r = computeSplit({ ...twoEqual, departingId: a, departureMonth: 48 });
+  const leaver = r.founders.find((f) => f.id === a)!;
+  assert.equal(leaver.vestedFraction, 1);
+  assert.equal(round2(leaver.keptShare), 0.5);
+  assert.equal(leaver.forfeitedShare, 0);
+  for (const f of r.founders) assert.equal(round2(f.afterShare), round2(f.share));
+});
+
+test("nach dem Abgang summieren sich die Anteile wieder auf eins", () => {
+  for (const m of [0, 6, 13, 24, 47, 60]) {
+    const r = computeSplit({ ...DEFAULT_SPLIT, departingId: DEFAULT_SPLIT.founders[1].id, departureMonth: m });
+    const sum = r.founders.reduce((a, f) => a + f.afterShare, 0);
+    assert.equal(round2(sum), 1, `Monat ${m}`);
+  }
+});
+
+test("später gehen heißt mehr behalten und weniger zurückgeben", () => {
+  const a = DEFAULT_SPLIT.founders[0].id;
+  const early = computeSplit({ ...DEFAULT_SPLIT, departingId: a, departureMonth: 13 }).founders.find((f) => f.id === a)!;
+  const late = computeSplit({ ...DEFAULT_SPLIT, departingId: a, departureMonth: 36 }).founders.find((f) => f.id === a)!;
+  assert.ok(late.keptShare > early.keptShare);
+  assert.ok(late.forfeitedShare < early.forfeitedShare);
+});
+
+test("bereits geleistete Monate zählen beim Abgang mit", () => {
+  const veteran = newFounder("B", { scores: flat(5), monthsServed: 24 });
+  const rookie = newFounder("A", { scores: flat(5), monthsServed: 0 });
+  const inputs = { ...twoEqual, founders: [rookie, veteran] };
+  const r1 = computeSplit({ ...inputs, departingId: rookie.id, departureMonth: 6 });
+  const r2 = computeSplit({ ...inputs, departingId: veteran.id, departureMonth: 6 });
+  assert.equal(r1.founders[0].vestedFraction, 0); // noch vor dem Cliff
+  assert.ok(r2.founders[1].vestedFraction > 0.5); // zwei Jahre plus sechs Monate
 });
 
 /* ── Die Warnungen ── */

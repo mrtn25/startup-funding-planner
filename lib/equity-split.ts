@@ -102,7 +102,12 @@ export type SplitInputs = {
   /** 0..10 per factor: how much this factor matters to this venture. */
   weights: Record<FactorKey, number>;
   vesting: VestingTerms;
-  /** Month at which the what-if departure is evaluated. */
+  /** Whose departure the scenario is about. null means nobody leaves.
+      One at a time, deliberately: "everyone walks simultaneously" is not a
+      scenario anyone needs, and it hides the thing that matters — what the
+      forfeited shares do to the people who stayed. */
+  departingId: string | null;
+  /** Months after the split is agreed at which they walk. */
   departureMonth: number;
 };
 
@@ -115,12 +120,16 @@ export type FounderResult = {
   share: number;
   /** Percentage points above or below an equal split. */
   vsEqual: number;
-  /** Share actually vested at the departure month, 0..1 of their own stake. */
+  /** Share of their own stake vested at the scenario month, 0..1. */
   vestedFraction: number;
-  /** Of the whole company: what they keep if they walk at that month. */
+  /** True for the one founder the scenario is about. */
+  isDeparting: boolean;
+  /** Of the whole company: what the departing founder walks away with. */
   keptShare: number;
-  /** What they forfeit, which returns to everyone else. */
+  /** Of the whole company: what they hand back. Zero for everyone else. */
   forfeitedShare: number;
+  /** What this founder holds once the forfeited shares are cancelled. */
+  afterShare: number;
 };
 
 export type Warning = {
@@ -158,7 +167,7 @@ export function vestedFraction(terms: VestingTerms, monthsServed: number): numbe
 /* ── The split ───────────────────────────────────────────────── */
 
 export function computeSplit(input: SplitInputs): SplitResult {
-  const { founders, weights, vesting, departureMonth } = input;
+  const { founders, weights, vesting, departureMonth, departingId } = input;
 
   const points = founders.map((f) =>
     FACTORS.reduce((a, factor) => a + (weights[factor.key] ?? 0) * (f.scores[factor.key] ?? 0), 0),
@@ -171,8 +180,22 @@ export function computeSplit(input: SplitInputs): SplitResult {
      a spurious ranking out of noise. */
   const shares = founders.map((_, i) => (total > 0 ? points[i] / total : equal));
 
+  /* Only the departing founder forfeits anything. The unvested part is
+     bought back and cancelled, so what is left re-scales to 100 % — which is
+     why everyone who stayed ends up with a larger percentage without having
+     bought a single share. */
+  const departingIdx = founders.findIndex((f) => f.id === departingId);
+  const departingVested =
+    departingIdx >= 0
+      ? vestedFraction(vesting, founders[departingIdx].monthsServed + departureMonth)
+      : 1;
+  const forfeited = departingIdx >= 0 ? shares[departingIdx] * (1 - departingVested) : 0;
+  const remaining = 1 - forfeited;
+
   const results: FounderResult[] = founders.map((f, i) => {
+    const isDeparting = i === departingIdx;
     const vested = vestedFraction(vesting, f.monthsServed + departureMonth);
+    const kept = isDeparting ? shares[i] * departingVested : shares[i];
     return {
       id: f.id,
       name: f.name,
@@ -180,8 +203,10 @@ export function computeSplit(input: SplitInputs): SplitResult {
       share: shares[i],
       vsEqual: (shares[i] - equal) * 100,
       vestedFraction: vested,
-      keptShare: shares[i] * vested,
-      forfeitedShare: shares[i] * (1 - vested),
+      isDeparting,
+      keptShare: isDeparting ? kept : 0,
+      forfeitedShare: isDeparting ? shares[i] - kept : 0,
+      afterShare: remaining > 0 ? kept / remaining : 0,
     };
   });
 
@@ -330,7 +355,8 @@ export const DEFAULT_SPLIT: SplitInputs = {
   ],
   weights: PRESETS[0].weights,
   vesting: DEFAULT_VESTING,
-  departureMonth: 18,
+  departingId: null,
+  departureMonth: 8,
 };
 
 
