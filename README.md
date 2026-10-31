@@ -50,6 +50,18 @@ startup numbers that are actually traceable to a source, in one Next.js app — 
   mechanisms → strategies) built from the empirical fundraising literature, each
   strategy with a step-by-step playbook.
 
+Plus a module that is not a calculator at all:
+
+- **Can you get to an exit?** (`/simulator`) — a decision game, modelled on
+  GermanZero's *Klimakanzler:in* and its one good idea: two meters that pull
+  against each other, one of which falls while you are deciding. Here the
+  meters are cash, the confidence of investors, the affection of customers and
+  the equity you still hold — and investor confidence decays a point a month
+  whatever you do. Nine decisions from the kitchen table to the seed round,
+  each one with a note on what it does in reality and a link to the tool that
+  works it out properly. Five endings, four of them survivable, because most
+  companies neither die nor exit — they continue.
+
 Plus two sections that are not tools:
 
 - **Infos** — the vocabulary of a term sheet in plain words, each entry
@@ -93,6 +105,7 @@ app/
   api/milestones/route.ts   server-side milestone suggestions
 components/
   SiteHeader.tsx            wordmark and the one menu
+  simulator/                the decision game on /simulator
   bootstrap/                bootstrap tool UI
   split/                    co-founder split UI
   infos/                    term sheet glossary cards
@@ -114,6 +127,8 @@ lib/
   glossary.ts               term sheet vocabulary
   stats.ts                  the quoted figures, their sources, and what is left out
   recurring.ts              MRR normalisation, the bridge, GRR/NRR
+  simulator.ts              game engine: meters, a choice, an ending
+  simulator-scenes.ts       the two chapters, as data
   land-expand.ts            pilots, ACV, renewals, deferred revenue
   equity-split.ts           founders pie, vesting, the warnings
   planner.ts                all planner maths — pure, no DOM
@@ -165,3 +180,19 @@ feature degrades quietly. The key is only ever read server-side.
 
 Deployed on Vercel. `vercel.json` pins `framework: "nextjs"` so the build runs
 `next build` regardless of the project's dashboard preset.
+
+## The simulator's artwork
+
+The twelve scenes in `public/game/` were generated with Figma's image tool
+(`gpt-image-2.5-flare`, 1536×1024, downscaled to 1200 px wide) from one shared
+style prompt:
+
+> Flat comic-style editorial illustration, bold black outlines, flat colour
+> fills, no gradients, no text, no logos, no watermarks. Limited palette:
+> cobalt blue, warm off-white, mustard yellow, lime green, muted brick red.
+> Simple flat background, slightly stylised faces, confident clean linework.
+
+…followed by the scene itself. They are placeholders in the sense that any
+replacement dropped in under the same filename is picked up without a code
+change, and a missing file degrades to a coloured frame rather than a broken
+layout — see `Scene` in `components/simulator/Simulator.tsx`.

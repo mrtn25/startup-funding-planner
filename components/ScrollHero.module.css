@@ -227,3 +227,18 @@
     padding: 13px 26px;
   }
 }
+
+/* The second way in, set quietly under the main one: a game is an
+   invitation, not an instruction. */
+.ctaAlt {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 13.5px;
+  color: var(--text2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.ctaAlt:hover {
+  color: var(--text);
+}

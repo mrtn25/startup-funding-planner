@@ -82,6 +82,13 @@ export default function SiteHeader({ active, onOpenTool, onOpenView, view }: Pro
         </div>
 
         <div className={styles.group}>
+          <div className={styles.groupTitle}>Play</div>
+          <a className={styles.item} href="/simulator" onClick={() => setOpen(false)}>
+            Can you get to an exit?
+          </a>
+        </div>
+
+        <div className={styles.group}>
           <div className={styles.groupTitle}>Infos</div>
           <button
             type="button"

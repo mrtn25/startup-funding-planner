@@ -116,6 +116,11 @@ export default function ScrollHero({ ctaHref }: ScrollHeroProps) {
               <line x1="3" y1="8" x2="13" y2="8" />
             </svg>
           </a>
+          {/* The game is the way in for anyone who does not yet know which
+              tool they need — which is most people arriving here. */}
+          <a className={styles.ctaAlt} href="/simulator">
+            Or play it first: can you get to an exit?
+          </a>
         </div>
       </div>
     </div>

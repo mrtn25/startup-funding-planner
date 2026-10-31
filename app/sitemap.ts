@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 
-/** The public site is a single page with four tools behind `?tool=`.
-    /inplicit is deliberately absent — it is not public. */
+/** The public site is one page with the tools behind `?tool=`, plus the
+    simulator on its own route. /inplicit is deliberately absent — it is
+    not public. */
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
@@ -9,6 +10,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 1,
+    },
+    {
+      url: "https://startup-funding-planner.vercel.app/simulator",
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
     },
   ];
 }

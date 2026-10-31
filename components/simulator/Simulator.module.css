@@ -1,0 +1,413 @@
+/* The founder simulator. Portrait-first like its model: the whole
+   thing is a column you can play with one thumb, and the meters stay
+   above the decision rather than beside it. */
+
+.root {
+  --sm-bg: #ffffff;
+  --sm-bg2: #f7f7f5;
+  --sm-fg: #141413;
+  --sm-fg2: #5f5e5a;
+  --sm-fg3: #8a8880;
+  --sm-line: rgba(20, 20, 19, 0.12);
+  --sm-line2: rgba(20, 20, 19, 0.22);
+  --sm-accent: hsl(248 100% 50%);
+  --sm-ok: #1d9e75;
+  --sm-warn: #d2810f;
+  --sm-bad: #d85a30;
+
+  color: var(--sm-fg);
+  font-family: inherit;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  .root {
+    --sm-bg: #1a1a19;
+    --sm-bg2: #232322;
+    --sm-fg: #f2f1ec;
+    --sm-fg2: #b6b4ab;
+    --sm-fg3: #8a8880;
+    --sm-line: rgba(255, 255, 255, 0.13);
+    --sm-line2: rgba(255, 255, 255, 0.24);
+    --sm-accent: hsl(248 90% 78%);
+    --sm-ok: #35c48a;
+    --sm-warn: #e0a44a;
+  }
+}
+.root * {
+  box-sizing: border-box;
+}
+
+/* ── The HUD ── */
+
+.hud {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--sm-bg);
+  padding: 10px 0 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--sm-line);
+}
+.chapters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.chapterBar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--sm-line);
+  position: relative;
+}
+.chapterOn {
+  background: var(--sm-accent);
+}
+.chapterBar em {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sm-fg3);
+  white-space: nowrap;
+}
+.chapterOn em {
+  color: var(--sm-fg2);
+}
+.month {
+  flex: none;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sm-fg3);
+  font-variant-numeric: tabular-nums;
+}
+
+.meters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.meter {
+  min-width: 0;
+}
+.meterTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.meterTop span {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sm-fg3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meterTop strong {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.meterTrack {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--sm-bg2);
+  overflow: hidden;
+}
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+.fill_ok {
+  background: var(--sm-ok);
+}
+.fill_warn {
+  background: var(--sm-warn);
+}
+.fill_bad {
+  background: var(--sm-bad);
+}
+.ok {
+  color: var(--sm-ok);
+}
+.warn {
+  color: var(--sm-warn);
+}
+.bad {
+  color: var(--sm-bad);
+}
+
+/* ── Cards ── */
+
+.card,
+.titleCard {
+  border: 1px solid var(--sm-line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--sm-bg);
+}
+.scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  background: linear-gradient(135deg, var(--sm-accent) 0%, #7c3aed 100%);
+}
+.sceneImg {
+  object-fit: cover;
+}
+.body,
+.titleBody {
+  padding: 18px 18px 20px;
+}
+.titleBody h1 {
+  font-size: 27px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+.body h2 {
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 0 0 10px;
+}
+.titleBody p {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--sm-fg2);
+  margin: 0 0 16px;
+}
+.place {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sm-fg3);
+  margin-bottom: 6px;
+}
+.text {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--sm-fg2);
+  margin: 0 0 16px;
+}
+/* The speaker sits inside the paragraph as a lead-in rather than above
+   it, so a line of dialogue does not need a card of its own. */
+.speaker {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sm-accent);
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+.smallprint {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--sm-fg3);
+  margin: 14px 0 0;
+}
+
+/* ── Choices ── */
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 15px;
+  border: 1px solid var(--sm-line2);
+  border-radius: 12px;
+  background: var(--sm-bg);
+  color: var(--sm-fg);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.08s;
+}
+.choice:hover {
+  border-color: var(--sm-accent);
+}
+.choice:active {
+  transform: translateY(1px);
+}
+.choice strong {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+.choice span {
+  font-size: 12px;
+  color: var(--sm-fg3);
+  line-height: 1.45;
+}
+
+/* ── The result beat ── */
+
+.chose {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sm-fg3);
+  margin-bottom: 4px;
+}
+.choseWhat {
+  margin-bottom: 12px !important;
+}
+.deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.delta {
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: var(--sm-bg2);
+  color: var(--sm-fg2);
+  white-space: nowrap;
+}
+.delta strong {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.up strong {
+  color: var(--sm-ok);
+}
+.down strong {
+  color: var(--sm-bad);
+}
+.realityTag {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sm-accent);
+  margin-bottom: 6px;
+}
+/* Block, not inline-block: the button follows it in the flow and on a
+   phone the two sat on top of each other. */
+.toolLink {
+  display: block;
+  width: fit-content;
+  font-size: 12.5px;
+  color: var(--sm-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  margin-bottom: 18px;
+}
+
+/* ── Endings ── */
+
+.endingTag {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  .endingTag {
+    color: #141413;
+  }
+}
+.win {
+  background: var(--sm-ok);
+}
+.mixed {
+  background: var(--sm-warn);
+}
+.loss {
+  background: var(--sm-bad);
+}
+.payout {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--sm-fg);
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--sm-bg2);
+  margin: 0 0 18px;
+}
+.endActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── Buttons ── */
+
+.primary {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sm-accent);
+  color: #fff;
+  cursor: pointer;
+}
+@media (prefers-color-scheme: dark) {
+  .primary {
+    color: #141413;
+  }
+}
+.primary:hover {
+  filter: brightness(1.1);
+}
+.secondary {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 22px;
+  border: 1px solid var(--sm-line2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sm-fg);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.secondary:hover {
+  border-color: var(--sm-accent);
+}
+
+@media (max-width: 560px) {
+  .root {
+    padding: 0.5rem 0.75rem 2.5rem;
+  }
+  .titleBody h1 {
+    font-size: 23px;
+  }
+  .meters {
+    gap: 6px;
+  }
+  .meterTop span {
+    font-size: 9px;
+  }
+}
