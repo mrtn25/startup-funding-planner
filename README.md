@@ -52,15 +52,19 @@ startup numbers that are actually traceable to a source, in one Next.js app — 
 
 Plus a module that is not a calculator at all:
 
-- **Can you get to an exit?** (`/simulator`) — a decision game, modelled on
-  GermanZero's *Klimakanzler:in* and its one good idea: two meters that pull
-  against each other, one of which falls while you are deciding. Here the
-  meters are cash, the confidence of investors, the affection of customers and
-  the equity you still hold — and investor confidence decays a point a month
-  whatever you do. Nine decisions from the kitchen table to the seed round,
-  each one with a note on what it does in reality and a link to the tool that
-  works it out properly. Five endings, four of them survivable, because most
-  companies neither die nor exit — they continue.
+- **Can you get to an exit?** (`/simulator`) — a decision game about one
+  concrete company: Palettio, software that fills the empty return trips of
+  mid-sized freight forwarders, run by Lena Brandt and Jonas Ritter out of a
+  kitchen in Hamburg. Modelled on GermanZero's *Klimakanzler:in* and the three
+  things that game actually gets right: the clock never stops, so reading costs
+  you months; the meters twitch rather than slide, so they feel alive; and
+  consequences arrive in two beats — what happened, then what it cost, with the
+  number on a badge, usually against a different meter than the one you aimed
+  at. Four meters (runway, investors, customers, the equity you still hold),
+  twelve events that fire while you deliberate, two chapters on their own
+  clocks and five endings. The customers meter is the paying base, so it
+  arrives as money every month — without that the game was a slope with one
+  direction.
 
 Plus two sections that are not tools:
 

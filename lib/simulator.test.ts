@@ -1,187 +1,275 @@
-/* Tests für den Founder-Simulator.  node --test lib/simulator.test.ts */
+/* Tests für Palettio.  node --test lib/simulator.test.ts */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  START,
+  advance,
   applyChoice,
-  effectLines,
-  forcedEnding,
+  applyEffects,
+  badges,
+  brokeNow,
+  drawEvent,
+  initialState,
   meterViews,
   runway,
+  tick,
   type Choice,
+  type GameEvent,
   type GameState,
 } from "./simulator.ts";
-import { CHAPTERS, ENDINGS, ENDING_BY_ID, SCENES, SCENE_BY_ID, pickEnding } from "./simulator-scenes.ts";
+import { CHAPTERS, ENDING_BY_ID, ENDINGS, EVENTS, INTRO, SCENES, SCENE_BY_ID, pickEnding } from "./simulator-scenes.ts";
 
-const S = (patch: Partial<GameState> = {}): GameState => ({ ...START, sceneId: "c1-split", ...patch });
+const S = (patch: Partial<GameState> = {}): GameState => ({ ...initialState(CHAPTERS[0]), ...patch });
 const C = (patch: Partial<Choice> = {}): Choice => ({
   id: "x",
   label: "x",
   effects: {},
-  reality: "x",
+  beats: ["a", "b"],
   next: "c1-job",
   ...patch,
 });
 
-/* ── Die Mechanik ── */
+/* ── Die Uhr ── */
 
-test("ein Zug kostet Monate, und Monate kosten Geld", () => {
-  const r = applyChoice(S({ cash: 20_000, burn: 2_000 }), C({ months: 3 }));
-  assert.equal(r.month, 3);
-  assert.equal(r.cash, 14_000);
+test("ein Monat bringt Umsatz, kostet Burn, Zeit und etwas Vertrauen", () => {
+  const a = S({ cash: 20_000, burn: 1_250, left: 14, investors: 40, customers: 12 });
+  const b = tick(a);
+  // 12 Punkte Kundenstamm = 1.320 € im Monat, gegen 1.250 € Burn.
+  assert.equal(b.cash, 20_000 + 1_320 - 1_250);
+  assert.equal(b.left, 13);
+  assert.equal(b.month, 1);
+  assert.ok(b.investors <= 41 && b.investors >= 38, `Vertrauen sprang auf ${b.investors}`);
 });
 
-test("Investorenvertrauen sinkt von allein, einen Punkt je Monat", () => {
-  const r = applyChoice(S({ investors: 50 }), C({ months: 4 }));
-  assert.equal(r.investors, 46);
+test("das Vertrauen zappelt, statt gleichmäßig zu fallen", () => {
+  let s = S({ investors: 60 });
+  const folge: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    s = tick(s);
+    folge.push(s.investors);
+  }
+  const schritte = folge.slice(1).map((v, i) => v - folge[i]);
+  assert.ok(new Set(schritte).size > 1, "immer derselbe Schritt — das ist eine Rampe, kein Spiel");
+  assert.ok(s.investors < 60, "über zwölf Monate muss es netto fallen");
 });
 
-test("Effekte landen nach dem Zeitverbrauch", () => {
-  const r = applyChoice(S({ cash: 10_000, burn: 1_000, investors: 30 }), C({ months: 2, effects: { cash: 50_000, investors: 10 } }));
-  assert.equal(r.cash, 10_000 - 2_000 + 50_000);
-  assert.equal(r.investors, 30 - 2 + 10);
+test("derselbe Seed spielt dieselbe Partie", () => {
+  const a = advance(S({ seed: 42 }), 10);
+  const b = advance(S({ seed: 42 }), 10);
+  assert.deepEqual(a, b);
 });
 
-test("Anteile gehen nur runter, nie hoch", () => {
-  const runter = applyChoice(S({ equity: 100 }), C({ effects: { equity: -40 } }));
-  assert.equal(runter.equity, 60);
-  const hoch = applyChoice(S({ equity: 60 }), C({ effects: { equity: 25 } }));
-  assert.equal(hoch.equity, 60);
+test("die Kapiteluhr bleibt bei null stehen", () => {
+  const s = advance(S({ left: 3 }), 8);
+  assert.equal(s.left, 0);
+  assert.equal(s.month, 8);
 });
 
-test("Prozentmeter bleiben zwischen null und hundert", () => {
-  const hoch = applyChoice(S({ customers: 95 }), C({ effects: { customers: 40 } }));
-  assert.equal(hoch.customers, 100);
-  const runter = applyChoice(S({ investors: 3 }), C({ months: 1, effects: { investors: -20 } }));
-  assert.equal(runter.investors, 0);
+test("leere Kasse ist leer, nicht negativ erzählt", () => {
+  assert.equal(brokeNow(S({ cash: 1 })), false);
+  assert.equal(brokeNow(S({ cash: 0 })), true);
+  assert.equal(brokeNow(S({ cash: -200 })), true);
 });
 
-test("ein Hire hebt den Burn dauerhaft", () => {
-  const r = applyChoice(S({ burn: 1_200 }), C({ effects: { burn: 7_500 } }));
-  assert.equal(r.burn, 8_700);
-  const danach = applyChoice(r, C({ months: 2 }));
-  assert.equal(danach.cash, r.cash - 17_400);
+/* ── Entscheidungen ── */
+
+test("eine Entscheidung kostet Monate und wirkt danach", () => {
+  const s = applyChoice(S({ cash: 30_000, burn: 1_000, customers: 0 }), C({ months: 3, effects: { cash: 12_000, customers: 10 } }));
+  assert.equal(s.cash, 30_000 - 3_000 + 12_000);
+  assert.equal(s.month, 3);
+  assert.equal(s.sceneId, "c1-job");
 });
 
-test("Runway ist Kasse durch Burn, abgerundet", () => {
-  assert.equal(runway(S({ cash: 25_000, burn: 10_000 })), 2);
-  assert.equal(runway(S({ cash: 0, burn: 1_000 })), 0);
-  assert.equal(runway(S({ burn: 0 })), null);
+test("Anteile gehen nur runter", () => {
+  assert.equal(applyEffects(S({ equity: 100 }), { equity: -40 }).equity, 60);
+  assert.equal(applyEffects(S({ equity: 60 }), { equity: 25 }).equity, 60);
 });
 
-test("nur leere Kasse beendet die Partie von selbst", () => {
-  assert.equal(forcedEnding(S({ cash: 1 })), null);
-  assert.equal(forcedEnding(S({ cash: 0 })), "insolvent");
-  assert.equal(forcedEnding(S({ investors: 0, customers: 0, cash: 50_000 })), null);
+test("ein Hire hebt den Burn für jeden weiteren Monat", () => {
+  const nach = applyChoice(S({ burn: 1_250, customers: 0 }), C({ months: 1, effects: { burn: 7_500 } }));
+  assert.equal(nach.burn, 8_750);
+  assert.equal(tick(nach).cash - nach.cash, -8_750);
 });
 
-/* ── Die Anzeige ── */
-
-test("die Kasse wird als Runway angezeigt, nicht als Kontostand", () => {
-  const v = meterViews(S({ cash: 24_000, burn: 8_000 }));
-  const cash = v.find((x) => x.key === "cash")!;
-  assert.equal(cash.value, "3 mo");
-  assert.equal(cash.tone, "warn");
-  assert.equal(meterViews(S({ cash: 8_000, burn: 8_000 }))[0].tone, "bad");
-  assert.equal(meterViews(S({ cash: 80_000, burn: 8_000 }))[0].tone, "ok");
+test("ein zahlender Kundenstamm trägt den Monat", () => {
+  const knapp = S({ cash: 10_000, burn: 4_000, customers: 30 });
+  assert.equal(tick(knapp).cash, 10_000 + 3_300 - 4_000);
+  const traegt = S({ cash: 10_000, burn: 4_000, customers: 50 });
+  assert.ok(tick(traegt).cash > 10_000, "50 Punkte Kundenstamm müssen 4 k€ Burn decken");
+  assert.equal(meterViews(traegt)[0].value, "pays");
 });
 
-test("die Deltas auf der Ergebniskarte lesen sich wie Geld und Punkte", () => {
-  const lines = effectLines(C({ effects: { cash: 100_000, equity: -40, burn: 7_500 } }));
+test("ein sehr langer Runway wird gedeckelt statt präzise gelogen", () => {
+  // 12.400 € bei 330 € Netto-Burn sind rechnerisch 37 Monate — und zwei,
+  // sobald jemand eingestellt wird.
+  const s = S({ cash: 12_400, burn: 1_650, customers: 12 });
+  assert.equal(runway(s), 37);
+  assert.equal(meterViews(s)[0].value, "24+ mo");
+});
+
+test("Prozentwerte bleiben in ihren Grenzen", () => {
+  assert.equal(applyEffects(S({ customers: 96 }), { customers: 20 }).customers, 100);
+  assert.equal(applyEffects(S({ investors: 4 }), { investors: -30 }).investors, 0);
+});
+
+/* ── Ereignisse ── */
+
+test("jedes Ereignis feuert höchstens einmal", () => {
+  const evs: GameEvent[] = [
+    { id: "a", beats: [{ text: "a" }] },
+    { id: "b", beats: [{ text: "b" }] },
+  ];
+  const erst = drawEvent(S(), evs);
+  assert.ok(erst);
+  const zweit = drawEvent(S({ fired: [erst!.id] }), evs);
+  assert.ok(zweit && zweit.id !== erst!.id);
+  assert.equal(drawEvent(S({ fired: ["a", "b"] }), evs), null);
+});
+
+test("Ereignisse respektieren Kapitel und Bedingung", () => {
+  const evs: GameEvent[] = [
+    { id: "spaet", chapter: 2, beats: [{ text: "x" }] },
+    { id: "nurMitKunden", when: (s) => s.customers >= 40, beats: [{ text: "y" }] },
+  ];
+  assert.equal(drawEvent(S({ chapter: 1, customers: 10 }), evs), null);
+  assert.equal(drawEvent(S({ chapter: 2, customers: 10 }), evs)?.id, "spaet");
+  assert.equal(drawEvent(S({ chapter: 1, customers: 55 }), evs)?.id, "nurMitKunden");
+});
+
+test("ein Ereignis wirkt erst, wenn sein Beat gezeigt wird", () => {
+  const ev = EVENTS.find((e) => e.id === "rotterdam")!;
+  const vorher = S({ investors: 50 });
+  const nachBeat1 = applyEffects(vorher, ev.beats[0].effects);
+  assert.equal(nachBeat1.investors, 50);
+  const nachBeat2 = applyEffects(nachBeat1, ev.beats[1].effects);
+  assert.equal(nachBeat2.investors, 43);
+});
+
+/* ── Anzeige ── */
+
+test("die Kasse steht als Runway in Monaten da", () => {
+  assert.equal(runway(S({ cash: 25_000, burn: 10_000, customers: 0 })), 2);
+  const v = meterViews(S({ cash: 25_000, burn: 10_000, customers: 0 }));
+  assert.equal(v[0].value, "2 mo");
+  assert.equal(v[0].tone, "bad");
+  assert.equal(meterViews(S({ cash: 100_000, burn: 10_000, customers: 0 }))[0].tone, "ok");
+});
+
+test("Badges lesen sich wie das, was passiert ist", () => {
   assert.deepEqual(
-    lines.map((l) => `${l.label} ${l.delta}`),
-    ["Cash +100 k€", "Your equity −40", "Burn +7.5 k€ / mo"],
+    badges({ cash: 100_000, equity: -40, investors: -10, burn: 7_500 }).map((b) => b.label),
+    ["+100k €", "−10% investors", "−40% of the company", "+7.5k €/mo burn"],
   );
-  // Mehr Burn ist keine gute Nachricht.
-  assert.equal(lines[2].up, false);
+  assert.equal(badges({ burn: 7_500 })[0].up, false);
+  assert.equal(badges(undefined).length, 0);
 });
 
 /* ── Der Inhalt ── */
 
-test("jede Wahl führt zu einer Szene, die es gibt", () => {
-  for (const scene of SCENES) {
-    for (const choice of scene.choices) {
-      const ok = choice.next === "@finale" || !!SCENE_BY_ID[choice.next];
-      assert.ok(ok, `${scene.id} → ${choice.id} zeigt auf ${choice.next}`);
-    }
-  }
+test("das Intro sagt, wer man ist und worum es geht", () => {
+  assert.match(INTRO.who, /Lena/);
+  assert.ok(INTRO.lines.join(" ").includes("Palettio"));
+  assert.match(INTRO.lines.join(" "), /12,400|1,250/);
+  assert.ok(INTRO.rules.length >= 3);
 });
 
-test("jede Szene hat Bild, Text und mindestens zwei Optionen", () => {
-  for (const s of SCENES) {
-    assert.ok(s.image.length > 2, `${s.id} ohne Bild`);
-    assert.ok(s.text.length > 80, `${s.id} zu dünn`);
-    assert.ok(s.choices.length >= 2, `${s.id} ohne echte Wahl`);
-  }
-});
-
-test("jede Option erklärt, was in Wirklichkeit passiert", () => {
+test("jede Wahl führt irgendwohin und erzählt zwei Beats", () => {
   for (const s of SCENES) {
     for (const c of s.choices) {
-      assert.ok(c.reality.length > 100, `${s.id}/${c.id} ohne Realitätscheck`);
-      assert.ok(!/^(Richtig|Falsch|Gut gemacht)/.test(c.reality), `${s.id}/${c.id} bewertet statt zu erklären`);
+      assert.ok(c.next === "@finale" || SCENE_BY_ID[c.next], `${s.id}/${c.id} → ${c.next}`);
+      assert.equal(c.beats.length, 2, `${s.id}/${c.id} hat keine zwei Beats`);
+      assert.ok(c.beats[0].length > 40 && c.beats[1].length > 40, `${s.id}/${c.id} zu dünn`);
     }
   }
 });
 
-test("keine Option ist umsonst — jede kostet Zeit oder bewegt etwas", () => {
+test("keine Szene bewertet die Wahl", () => {
+  const bewertend = /(right choice|wrong choice|you should have|mistake|well done|good job)/i;
   for (const s of SCENES) {
     for (const c of s.choices) {
-      const bewegt = Object.values(c.effects).some((v) => v !== 0);
-      assert.ok(bewegt || (c.months ?? 1) > 0, `${s.id}/${c.id} ist folgenlos`);
+      for (const b of c.beats) assert.ok(!bewertend.test(b), `${s.id}/${c.id} benotet: ${b}`);
     }
   }
 });
 
-test("beide Kapitel fangen bei einer echten Szene an", () => {
+test("Szenentexte bleiben kurz — die Uhr läuft beim Lesen", () => {
+  for (const s of SCENES) {
+    assert.ok(s.text.length <= 190, `${s.id} ist zu lang (${s.text.length})`);
+    assert.ok(s.choices.length >= 3, `${s.id} hat zu wenig Optionen`);
+  }
+});
+
+test("die Szenen handeln von dieser einen Firma", () => {
+  const alles = SCENES.map((s) => `${s.title} ${s.text}`).join(" ");
+  for (const name of ["Jonas", "Krämer", "Oltmanns", "Palettio"]) {
+    assert.ok(alles.includes(name), `${name} kommt nirgends vor`);
+  }
+});
+
+test("jedes Ereignis trägt eine Zahl, sonst ist es keine Nachricht", () => {
+  for (const e of EVENTS) {
+    assert.ok(e.beats.length >= 1 && e.beats.length <= 2, `${e.id} hat ${e.beats.length} Beats`);
+    const wirkt = e.beats.some((b) => b.effects && Object.keys(b.effects).length > 0);
+    assert.ok(wirkt, `${e.id} passiert folgenlos`);
+  }
+  assert.ok(EVENTS.length >= 10, "zu wenige Ereignisse für zwei Kapitel");
+});
+
+test("die Uhr eines Kapitels reicht für seine eigenen Szenen", () => {
   for (const ch of CHAPTERS) {
     assert.ok(SCENE_BY_ID[ch.firstScene], `Kapitel ${ch.number} startet im Nichts`);
-    assert.equal(SCENE_BY_ID[ch.firstScene].chapter, ch.number);
+    // Der langsamste Weg durchs Kapitel, plus ein Monat Bedenkzeit je Szene.
+    const szenen = SCENES.filter((s) => s.chapter === ch.number);
+    const langsamster = szenen.reduce((a, s) => a + Math.max(...s.choices.map((c) => c.months ?? 1)) + 1, 0);
+    assert.ok(
+      ch.months >= langsamster,
+      `Kapitel ${ch.number}: Uhr ${ch.months} Monate, langsamster Weg ${langsamster}`,
+    );
   }
 });
 
-test("jedes Ende, das das Modell vergibt, existiert auch", () => {
-  const faelle: GameState[] = [
+test("jedes vergebene Ende existiert", () => {
+  const faelle = [
     S({ cash: 0 }),
-    S({ cash: 120_000, investors: 70, customers: 60 }),
+    S({ cash: 150_000, investors: 70, customers: 60 }),
     S({ cash: 90_000, investors: 20, customers: 70 }),
     S({ cash: 30_000, investors: 40, customers: 20 }),
-    S({ cash: 5_000, investors: 10, customers: 10 }),
+    S({ cash: 4_000, investors: 10, customers: 10 }),
   ];
-  const getroffen = new Set(faelle.map((f) => pickEnding(f)));
-  for (const id of getroffen) assert.ok(ENDING_BY_ID[id], `unbekanntes Ende: ${id}`);
-  // Die Fälle sind so gewählt, dass sie verschiedene Enden treffen.
-  assert.ok(getroffen.size >= 4);
+  const ids = new Set(faelle.map(pickEnding));
+  for (const id of ids) assert.ok(ENDING_BY_ID[id], `unbekannt: ${id}`);
+  assert.ok(ids.size >= 4);
   assert.equal(ENDINGS.length, 5);
 });
 
-test("eine leere Kasse schlägt jedes andere Ende", () => {
-  assert.equal(pickEnding(S({ cash: 0, investors: 90, customers: 90 })), "insolvent");
-});
+/* ── Eine ganze Partie mit laufender Uhr ── */
 
-/* ── Eine ganze Partie ── */
-
-test("wer immer die erste Option nimmt, kommt heil bis zum Ende durch", () => {
-  let s = S({ sceneId: CHAPTERS[0].firstScene });
+test("eine Partie läuft bis zum Ende durch, Uhr und Entscheidungen zusammen", () => {
+  let s = S({ seed: 7 });
   let schritte = 0;
-  while (s.sceneId !== "@finale" && schritte < 20) {
+  while (s.sceneId !== "@finale" && !brokeNow(s) && schritte < 40) {
     const scene = SCENE_BY_ID[s.sceneId];
     assert.ok(scene, `Sackgasse bei ${s.sceneId}`);
+    // Zwischen zwei Entscheidungen vergeht Zeit, wie beim echten Spielen.
+    s = advance(s, 2);
+    if (brokeNow(s)) break;
     s = applyChoice(s, scene.choices[0]);
+    const kapitel = SCENE_BY_ID[scene.choices[0].next]?.chapter;
+    if (kapitel && kapitel > s.chapter) {
+      s = { ...s, chapter: kapitel, left: CHAPTERS[kapitel - 1].months };
+    }
     schritte++;
   }
-  assert.equal(s.sceneId, "@finale");
-  assert.ok(schritte >= 7, "die Partie ist zu kurz");
+  assert.ok(schritte >= 5, "die Partie ist zu kurz");
+  const ende = pickEnding(s);
+  assert.ok(ENDING_BY_ID[ende]);
   assert.ok(isFinite(s.cash) && isFinite(s.equity));
-  assert.ok(ENDING_BY_ID[pickEnding(s)]);
 });
 
-test("wer alles verschenkt, hält am Ende deutlich weniger", () => {
-  const gierig = SCENE_BY_ID["c2-angel"].choices.find((c) => c.id === "accept")!;
-  const wandel = SCENE_BY_ID["c2-angel"].choices.find((c) => c.id === "convertible")!;
-  const a = applyChoice(S(), gierig);
-  const b = applyChoice(S(), wandel);
-  assert.ok(a.equity < b.equity);
-  assert.equal(a.equity, 60);
+test("wer das Angebot annimmt, hält danach 60 Prozent", () => {
+  const angel = SCENE_BY_ID["c2-angel"];
+  const nehmen = angel.choices.find((c) => c.id === "accept")!;
+  const wandeln = angel.choices.find((c) => c.id === "convertible")!;
+  assert.equal(applyChoice(S(), nehmen).equity, 60);
+  assert.ok(applyChoice(S(), wandeln).equity > 60);
 });

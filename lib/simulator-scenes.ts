@@ -1,24 +1,42 @@
 /* ══════════════════════════════════════════════════════════════
-   Two chapters of the founder simulator, as content.
+   Palettio — the company, the people, and everything that happens.
 
-   Every choice here is one somebody actually faces, and none of them
-   is the obviously right one — a scene with a correct answer teaches
-   nothing except that the author had an opinion. What each choice
-   carries instead is a line about what it does in reality, and where
-   the site can compute the thing properly, a pointer to the tool that
-   does it. The game is the hook; the calculator is the help.
+   One concrete business, not "a startup": a logistics engineer in
+   Hamburg who spent three years watching one truck in four drive
+   back empty, and built the thing that fills them. Concrete because
+   the alternative — "you have an idea with a friend" — gives a player
+   nothing to reason with. You cannot judge whether 890 € a month is
+   the right price for nothing in particular.
 
-   The numbers are deliberately coarse. This is a model of a decision,
-   not a forecast, and the moment it pretends to four significant
-   figures it is lying.
+   Scene texts are two sentences. The clock is running while they are
+   read, which is the whole point, so anything longer is a tax.
+
+   Consequences come in Klimakanzler's two beats: what happened, then
+   what it cost, and the second beat usually lands on a different
+   meter than the one the decision aimed at.
    ══════════════════════════════════════════════════════════════ */
 
-import type { Chapter, Ending, GameState, Scene } from "./simulator.ts";
+import type { Chapter, Ending, GameEvent, GameState, Scene } from "./simulator.ts";
 import { fmtEuro } from "./simulator.ts";
 
+export const INTRO = {
+  image: "kitchen-night",
+  who: "Lena Brandt, 29, logistics engineer",
+  lines: [
+    "For three years you dispatched trucks in Hamburg and watched one in four drive home empty. Palettio is what you built at night: it fills those return trips.",
+    "Jonas Ritter, 34, dispatched them with you. He does the talking, you do the software. Neither of you has quit anything yet.",
+    "In the bank: 12,400 €. Out every month: 1,650 €. One forwarder — Spedition Krämer, 18 trucks — has now said “interesting” twice.",
+  ],
+  rules: [
+    "The clock runs while you decide. Months pass, cash leaves, investors forget you.",
+    "Four meters, and most choices move more than one of them.",
+    "Two chapters, five endings. You can pause, and nothing here is advice.",
+  ],
+};
+
 export const CHAPTERS: Chapter[] = [
-  { number: 1, title: "The idea", subtitle: "Two people, one evening, no company yet", firstScene: "c1-split" },
-  { number: 2, title: "The first money", subtitle: "Somebody finally wants to give you some", firstScene: "c2-angel" },
+  { number: 1, title: "Getting it off the kitchen table", months: 18, firstScene: "c1-split" },
+  { number: 2, title: "The first money", months: 24, firstScene: "c2-angel" },
 ];
 
 export const SCENES: Scene[] = [
@@ -27,41 +45,45 @@ export const SCENES: Scene[] = [
     id: "c1-split",
     chapter: 1,
     place: "Your kitchen, 23:40",
-    title: "You and Jonas have something",
-    text: "Four evenings in and the prototype does the one thing you promised it would. Jonas says the sentence that makes it real: “Let's do this properly.” Then the question neither of you wants to open — who owns what.",
+    title: "Jonas asks for half",
+    text: "“Fifty-fifty, and we start Monday.” He has written no code and brought both customers you have spoken to.",
     speaker: "Jonas",
     image: "kitchen-night",
     choices: [
       {
         id: "handshake",
-        label: "50/50 on a handshake",
-        detail: "Fastest, and you both feel good tonight",
-        effects: { investors: -5 },
+        label: "Fifty-fifty, handshake",
+        detail: "Decided in four seconds",
+        effects: { investors: -4 },
         months: 1,
-        reality:
-          "Roughly three quarters of teams split equally, and the research finding is not that equal is wrong. It is that arriving there by default rather than by argument made teams markedly likelier to be unhappy later — and markedly less able to change it once the work had turned out to be uneven.",
-        tool: { id: "split", label: "Split it by contribution instead" },
+        beats: [
+          "You shake on it and open a second beer. It is the easiest conversation about equity either of you will ever have.",
+          "No vesting, nothing on paper. Oltmanns will ask about this in eleven months and you will not enjoy the answer.",
+        ],
         next: "c1-job",
       },
       {
-        id: "weighted",
-        label: "Argue it out, with vesting",
-        detail: "An evening of discomfort and a document",
-        effects: { investors: 12, customers: -2 },
+        id: "vesting",
+        label: "Fifty-fifty, with vesting",
+        detail: "Four years, one-year cliff",
+        effects: { investors: 10 },
         months: 2,
-        reality:
-          "Vesting is the first thing an investor checks and the only protection either of you has if one leaves in month seven. Four years with a one-year cliff is the convention; without it, a co-founder who quits early keeps everything they were given on day one.",
-        tool: { id: "split", label: "Run the weighted split" },
+        beats: [
+          "Two evenings and a notary appointment later, you both own half of something with rules attached.",
+          "It cost two months and a slightly cold Sunday. Every investor who sees it will stop reading that page early, which is exactly what you want.",
+        ],
         next: "c1-job",
       },
       {
-        id: "solo",
-        label: "Keep it yours for now",
-        detail: "Jonas helps out, unpaid, no shares",
-        effects: { equity: 0, investors: -10, customers: -5 },
+        id: "sixtyforty",
+        label: "Sixty-forty, you ahead",
+        detail: "You built it. Say so.",
+        effects: { investors: 2, customers: -3 },
         months: 2,
-        reality:
-          "You keep every share and lose the second pair of hands. Solo founders do raise and do exit — the honest cost is not the ownership arithmetic, it is that the first hard month is one you spend alone, and that investors read a single founder as a single point of failure.",
+        beats: [
+          "Jonas goes quiet, then agrees. “Fair enough. You wrote it.”",
+          "He is slower on the phone for a month. Nothing you could point at, and both of you notice.",
+        ],
         next: "c1-job",
       },
     ],
@@ -69,125 +91,138 @@ export const SCENES: Scene[] = [
   {
     id: "c1-job",
     chapter: 1,
-    place: "The office you still work in",
-    title: "The job question",
-    text: "Your contract has a three-month notice period and your salary is the only reason the rent is paid. The prototype is not a product, and a product is not revenue.",
+    place: "Dispatch office, Thursday",
+    title: "Your notice period is three months",
+    text: "Your salary is the only reason the rent is paid. Krämer wants a demo in six weeks.",
     image: "day-job",
     choices: [
       {
-        id: "quit-both",
-        label: "Both of you quit",
-        detail: "Full speed, and the clock starts",
-        effects: { investors: 15, customers: 10, burn: 2_800 },
+        id: "quit",
+        label: "Hand in your notice",
+        detail: "Jonas too. Both of you, all in.",
+        effects: { investors: 14, customers: 8, burn: 2_700 },
         months: 3,
-        reality:
-          "Commitment is legible — it is most of what a pre-seed investor is buying. It also multiplies your burn before you have a single customer, and the runway you just created is the only thing standing between you and taking the first term sheet you are offered.",
-        next: "c1-customer",
+        beats: [
+          "Your boss is decent about it and asks to be an early customer. Jonas quits the same week.",
+          "Your burn is now 3,950 € a month and nobody is paying you anything. The runway you just built is the only thing between you and a bad term sheet.",
+        ],
+        next: "c1-kraemer",
       },
       {
         id: "moonlight",
-        label: "Evenings and weekends",
-        detail: "Slower, and nobody has to be brave",
-        effects: { customers: 5, investors: -8 },
+        label: "Nights and weekends",
+        detail: "Nobody has to be brave yet",
+        effects: { customers: 4, investors: -7 },
         months: 5,
-        reality:
-          "Bhidé's hundred bootstrapped companies mostly started exactly here. It costs months you cannot get back in a market that is being taken, and it is the right answer whenever the thing you are unsure about is whether anyone wants this.",
-        tool: { id: "bootstrap", label: "Check whether you need outside money at all" },
-        next: "c1-customer",
+        beats: [
+          "Five months of 22:00 to 01:00. The demo is late, the product is better than it would have been.",
+          "Krämer's interest cools to politeness, and five months is five months. The thing you bought is certainty you did not need.",
+        ],
+        next: "c1-kraemer",
       },
       {
-        id: "one-quits",
-        label: "One quits, one keeps earning",
-        detail: "Jonas goes full time, you fund him",
-        effects: { cash: 9_000, investors: 5, customers: 5, burn: 1_400 },
+        id: "jonas-only",
+        label: "Jonas quits, you keep earning",
+        detail: "You fund him out of your salary",
+        effects: { cash: 7_800, investors: 4, customers: 4, burn: 1_300 },
         months: 3,
-        reality:
-          "The most common real arrangement, and the one that quietly breaks splits: two people with the same shares are now making very different sacrifices. If the equity was agreed before this, it is worth reopening now rather than in a year.",
-        tool: { id: "split", label: "Re-check the split" },
-        next: "c1-customer",
+        beats: [
+          "Jonas is full time on 1,300 € a month, which is less than he spends. You transfer 2,600 € to the company account.",
+          "It works, and the two of you now own the same share of very different sacrifices. That conversation is coming.",
+        ],
+        next: "c1-kraemer",
       },
     ],
   },
   {
-    id: "c1-customer",
+    id: "c1-kraemer",
     chapter: 1,
-    place: "A video call that ran over",
-    title: "The first customer wants something else",
-    text: "A mid-sized logistics company would pay. Not for what you built — for what you built plus an export their old system can read. Their head of ops is enthusiastic and specific, and you could have it done in six weeks.",
-    speaker: "Head of Ops",
+    place: "Krämer's yard, Harburg",
+    title: "They want it to talk to their 2008 TMS",
+    text: "Spedition Krämer will sign — if Palettio exports to the dispatch system they have run since 2008. Six weeks of work nobody else needs.",
+    speaker: "Krämer, dispatcher",
     image: "first-customer",
     choices: [
       {
-        id: "build-it",
-        label: "Build exactly what they asked for",
-        detail: "€14,000 against delivery",
-        effects: { cash: 14_000, customers: 15, investors: -5 },
+        id: "build",
+        label: "Build the export",
+        detail: "12,000 € on signature",
+        effects: { cash: 12_000, customers: 16, investors: -3 },
         months: 3,
-        reality:
-          "Real money from a real customer is the cheapest funding there is, and an export nobody else wants is a consultancy with extra steps. The question to settle now, not later, is whether the next customer gets the same thing or their own version of it.",
-        tool: { id: "recurring", label: "See what counts as recurring revenue" },
-        next: "c1-money",
+        beats: [
+          "Six weeks, one invoice, eighteen trucks live. Your first real customer is a reference and a payer.",
+          "You also own an export for a system from 2008 now, forever. The next forwarder will want their own.",
+        ],
+        next: "c1-price",
       },
       {
-        id: "say-no",
-        label: "Say no, build the product",
-        detail: "Keep the roadmap yours",
-        effects: { customers: -5, investors: 5 },
+        id: "refuse",
+        label: "Say no, keep one product",
+        detail: "They can use the web view",
+        effects: { customers: -6, investors: 4 },
         months: 2,
-        reality:
-          "Defensible, and expensive while you have nothing. A no to a paying customer is only strategy if you have a second customer who wants the standard thing — otherwise it is a preference.",
-        next: "c1-money",
+        beats: [
+          "Krämer does not sign. Their dispatcher keeps using the free trial and keeps saying nice things.",
+          "You have a clean product and no revenue. That is a strategy only if a second forwarder shows up soon.",
+        ],
+        next: "c1-price",
       },
       {
-        id: "pilot",
-        label: "Free pilot for a reference",
-        detail: "No money, a logo and a quote",
-        effects: { customers: 12, investors: 8 },
-        months: 3,
-        reality:
-          "A pilot nobody pays for is a pilot nobody has to defend internally, and most of them end politely. If you do this, put the conversion price and the date in writing on day one — the pilot's value is the commitment it carries, not the logo.",
-        next: "c1-money",
+        id: "half",
+        label: "Build a CSV they can import",
+        detail: "Two weeks, half the money",
+        effects: { cash: 5_000, customers: 9 },
+        months: 2,
+        beats: [
+          "A CSV export and a ten-minute phone call with their IT. It is ugly and it works.",
+          "Krämer signs for 890 € a month and tells two other forwarders at the Christmas thing.",
+        ],
+        next: "c1-price",
       },
     ],
   },
   {
-    id: "c1-money",
+    id: "c1-price",
     chapter: 1,
-    place: "Your banking app, Sunday",
-    title: "The number that decides the next six months",
-    text: "You look at the balance and do the division everybody does: what is in there, divided by what goes out. It is the first honest conversation you have had with the business.",
+    place: "A spreadsheet, Sunday",
+    title: "What does Palettio cost?",
+    text: "Krämer pays 890 € a month because you said that number out loud once. Four more forwarders are asking.",
     image: "money-low",
     choices: [
       {
-        id: "cut",
-        label: "Cut the burn to the bone",
-        detail: "No tools, no salaries, no office",
-        effects: { burn: -900, customers: -5, investors: -3 },
-        months: 1,
-        reality:
-          "Buys months, which is the only currency that matters when you have none. It also slows everything that creates the evidence you need, so it is a bridge to something, not a strategy by itself.",
+        id: "flat",
+        label: "890 € a month, everyone",
+        detail: "Simple, and easy to say",
+        effects: { cash: 9_000, customers: 8 },
+        months: 3,
+        beats: [
+          "Three of the four sign within a month. Nobody argues about the price.",
+          "The one with 60 trucks also pays 890 €. You are leaving most of your revenue on their yard.",
+        ],
         next: "c2-angel",
       },
       {
-        id: "sell",
-        label: "Sell harder before asking anyone for money",
-        detail: "Thirty conversations in six weeks",
-        effects: { customers: 10, cash: 6_000, investors: 6 },
-        months: 2,
-        reality:
-          "Revenue raised at a valuation of nothing is the only funding that costs you no ownership at all. It is also the single best thing you can bring to the conversation you are about to have.",
-        tool: { id: "round", label: "Size the round this would buy you" },
+        id: "pertruck",
+        label: "49 € per truck per month",
+        detail: "Grows with them",
+        effects: { cash: 14_000, customers: 2, investors: 6 },
+        months: 4,
+        beats: [
+          "Two sign, one negotiates for a month, one disappears. The 60-truck firm pays 2,940 €.",
+          "Revenue per customer triples and the sales cycle doubles. Investors like the first number much more than you like the second.",
+        ],
         next: "c2-angel",
       },
       {
-        id: "ask-around",
-        label: "Start asking people for money",
-        detail: "Friends, family, the one angel you know",
-        effects: { investors: 10, customers: -3 },
-        months: 2,
-        reality:
-          "Fundraising is a job, and while you are doing it nobody is building or selling. Starting before you need it is right; starting instead of selling is how a company ends up optimised for investors it has not met.",
-        tool: { id: "ready", label: "Check whether you are ready to raise" },
+        id: "success",
+        label: "A cut of every filled return trip",
+        detail: "They only pay when it works",
+        effects: { cash: 4_000, customers: 14, investors: -4 },
+        months: 4,
+        beats: [
+          "Nobody says no to this. All four are live within six weeks.",
+          "Your revenue now depends on their dispatchers actually using it, and it arrives three months late. Cash-wise you have bought a problem.",
+        ],
         next: "c2-angel",
       },
     ],
@@ -197,54 +232,58 @@ export const SCENES: Scene[] = [
   {
     id: "c2-angel",
     chapter: 2,
-    place: "A café in Hamburg, Tuesday",
-    title: "“I'll put in 100,000 for 40 %”",
-    text: "He has done this before — twelve companies, two of them you have heard of. He likes you, says so twice, and slides the number across the table like a favour. He wants an answer this week.",
-    speaker: "The angel",
+    place: "Café Nord, Tuesday 09:00",
+    title: "“100,000 for 40 percent”",
+    text: "Henning Oltmanns sold a freight exchange in 2014 and has backed eleven companies since. He wants an answer by Friday.",
+    speaker: "Oltmanns",
     image: "angel-cafe",
     choices: [
       {
         id: "accept",
-        label: "Take it",
-        detail: "€100,000 now, 40 % of the company gone",
-        effects: { cash: 100_000, equity: -40, investors: -12, customers: 3 },
+        label: "Take the 100,000",
+        detail: "40 % of Palettio, gone by Friday",
+        effects: { cash: 100_000, equity: -40, investors: -10 },
         months: 1,
-        reality:
-          "The money is real and so is the problem it creates. At 40 % in the first round, the founders are heading for a minority before a Series A is even discussed, and the next investor has to price a company whose team is already diluted — which is why a cap table like this is the most common reason a good company cannot raise again.",
-        tool: { id: "planner", label: "Model what 40 % now costs at Series A" },
+        beats: [
+          "The money is in the account on Friday. For the first time, the number in the bank is not frightening.",
+          "Forty percent in the first round. Every investor after him now has to price a company whose founders are halfway out of it — and most of them will pass rather than explain that to a committee.",
+        ],
         next: "c2-hire",
       },
       {
         id: "counter",
         label: "Counter: 100,000 for 15 %",
-        detail: "Name a valuation and defend it",
-        effects: { cash: 100_000, equity: -22, investors: 6 },
+        detail: "Name a valuation, defend it",
+        effects: { cash: 100_000, equity: -22, investors: 5 },
         months: 2,
-        reality:
-          "He comes back at 22 % and a board seat, which is roughly where this lands when a founder shows up with a number instead of a feeling. The month you spent countering cost you a month of runway — and the deal you signed is worth about eighteen points of the company more than the one on the table.",
-        tool: { id: "planner", label: "Compare 40 % against 22 %" },
+        beats: [
+          "He laughs, goes quiet for ten days, and comes back at 22 % with a board seat.",
+          "Two months gone and eighteen points of the company saved. He also respects you slightly more, which will matter at the next round.",
+        ],
         next: "c2-hire",
       },
       {
         id: "convertible",
-        label: "Propose a convertible loan",
-        detail: "€100,000 now, the price set at the next round",
-        effects: { cash: 100_000, equity: -12, investors: 4 },
+        label: "Offer him a convertible loan",
+        detail: "Money now, price at the next round",
+        effects: { cash: 100_000, equity: -11, investors: 3 },
         months: 2,
-        reality:
-          "A Wandeldarlehen postpones the price rather than avoiding it: he converts at the next round, usually at a discount and under a cap, and the dilution shows up then. It is not non-dilutive — it is equity with the invoice sent later — but it does stop you selling 40 % of a company nobody has valued yet.",
-        tool: { id: "planner", label: "Watch a convertible convert" },
+        beats: [
+          "100,000 € as a Wandeldarlehen: 20 % discount, 4 M€ cap, converts when somebody prices the company.",
+          "Nobody had to agree what Palettio is worth today. He converts at the seed round and takes his share then — postponed, not avoided.",
+        ],
         next: "c2-hire",
       },
       {
         id: "walk",
         label: "Say no",
         detail: "Keep all of it, keep the problem",
-        effects: { investors: -8, customers: 5 },
+        effects: { investors: -6, customers: 6 },
         months: 2,
-        reality:
-          "Nothing about this is automatically wrong. Whether it was brave or expensive is decided entirely by what the next ninety days of revenue look like — a no to money you did not need is strategy, a no to money you did need is a story you tell afterwards.",
-        tool: { id: "bootstrap", label: "Check whether you can do without" },
+        beats: [
+          "He takes it well and asks to be kept posted. You go back to selling because there is nothing else to do.",
+          "Two forwarders sign in the next eight weeks. Whether that was brave or expensive is decided by the next quarter, not by this scene.",
+        ],
         next: "c2-hire",
       },
     ],
@@ -252,94 +291,104 @@ export const SCENES: Scene[] = [
   {
     id: "c2-hire",
     chapter: 2,
-    place: "A room with three desks and four people",
-    title: "The bottleneck has a name now",
-    text: "You are turning work away. Jonas is doing sales in the evenings because the days are full of delivery, and the thing you keep saying in standups is “once we have someone for that”.",
+    place: "Two desks and a kettle, Ottensen",
+    title: "You are turning forwarders away",
+    text: "Jonas is doing demos until 21:00 and onboarding at weekends. Eleven forwarders are waiting for a call back.",
     image: "first-hire",
     choices: [
       {
-        id: "hire-sales",
+        id: "sales",
         label: "Hire a salesperson",
-        detail: "€7,500 a month, fully loaded",
-        effects: { burn: 7_500, customers: 8, investors: 6 },
+        detail: "7,500 € a month, fully loaded",
+        effects: { burn: 7_500, customers: 10, investors: 5 },
         months: 2,
-        reality:
-          "They cost from day one and contribute from month three at the earliest. The test is not whether you can pay them next month — it is whether you still have nine months of runway after they start, counted from their first day and not from today.",
-        tool: { id: "bootstrap", label: "Check the hire against your cash" },
-        next: "c2-crunch",
+        beats: [
+          "Marie comes from a freight exchange and knows half the dispatchers in Niedersachsen by first name.",
+          "She costs 7,500 € from day one and closes nothing for three months. That gap is the whole risk of the hire.",
+        ],
+        next: "c2-churn",
       },
       {
-        id: "hire-eng",
+        id: "engineer",
         label: "Hire an engineer",
-        detail: "€8,000 a month, and the product stops wobbling",
-        effects: { burn: 8_000, customers: 14, investors: 2 },
+        detail: "8,000 € a month, and it stops wobbling",
+        effects: { burn: 8_000, customers: 15 },
         months: 2,
-        reality:
-          "The slowest ramp of any hire and often the right one anyway: an engineer fixes the reason customers leave, which is worth more than the reason they arrive. Expect six months before the effect is visible in anything an investor would count.",
-        next: "c2-crunch",
+        beats: [
+          "The matching runs nightly instead of when you remember, and the Rostock bug class disappears.",
+          "Six months before any of it shows up in a number an investor counts. Your customers notice in three weeks.",
+        ],
+        next: "c2-churn",
       },
       {
-        id: "freelance",
-        label: "Take a freelancer for three months",
-        detail: "Expensive per day, cancellable",
-        effects: { burn: 4_000, customers: 5 },
+        id: "working-student",
+        label: "Two working students",
+        detail: "1,900 € a month together",
+        effects: { burn: 1_900, customers: 5 },
         months: 2,
-        reality:
-          "The honest answer when you are not sure the bottleneck is permanent. It costs more per hour and buys the one thing a hire cannot: the option to stop. What it does not buy is anyone who will still be there when the knowledge matters.",
-        next: "c2-crunch",
+        beats: [
+          "They do onboarding calls and the data cleaning nobody wants. It buys Jonas four hours a day.",
+          "Cheap, cancellable, and neither of them will still be here when the knowledge matters.",
+        ],
+        next: "c2-churn",
       },
       {
-        id: "no-hire",
+        id: "nobody",
         label: "Nobody. Work the weekend.",
-        detail: "Keep the burn flat, keep turning work away",
-        effects: { customers: -8, investors: -4 },
+        detail: "Keep the burn where it is",
+        effects: { customers: -9, investors: -3 },
         months: 3,
-        reality:
-          "Sustainable for a quarter and corrosive after that. The cost does not show up in the cash line — it shows up in the customers you did not serve and in whichever of you stops being able to do this.",
-        next: "c2-crunch",
+        beats: [
+          "You ship, you sell, you onboard, and the waiting list gets longer.",
+          "Four of the eleven stop waiting. The cost never appears in the cash line, which is why this one is so easy to keep choosing.",
+        ],
+        next: "c2-churn",
       },
     ],
   },
   {
-    id: "c2-crunch",
+    id: "c2-churn",
     chapter: 2,
     place: "Thursday, 08:15",
-    title: "Your biggest customer is leaving",
-    text: "Forty percent of your revenue, in an email of four sentences. Their new head of ops has a vendor he worked with before. He is not unhappy with you — he is just not attached to you either.",
+    title: "Krämer is leaving",
+    text: "Four sentences from their new dispatcher. He worked with a competitor at his last job and 38 % of your revenue walks with him.",
     speaker: "The email",
     image: "crunch",
     choices: [
       {
         id: "fight",
-        label: "Get on a train and fight for it",
-        detail: "Two days, one difficult meeting",
-        effects: { customers: 10, investors: 3 },
+        label: "Drive to Harburg today",
+        detail: "One uncomfortable meeting",
+        effects: { customers: 9, investors: 2 },
         months: 1,
-        reality:
-          "Churn that gets reversed in person is usually churn that was about attention rather than product. Worth doing once; if it works twice, the real finding is that your customers do not have a reason to stay that survives a change of personnel.",
-        tool: { id: "recurring", label: "See what this does to retention" },
+        beats: [
+          "Ninety minutes in a portacabin. He stays, on the condition that you build him a weekly report.",
+          "Churn you can reverse in person was never about the product. It was about nobody having called him.",
+        ],
         next: "c2-round",
       },
       {
         id: "replace",
-        label: "Let it go, win two smaller ones",
-        detail: "Concentration was the real risk",
-        effects: { customers: -4, investors: 5, cash: 8_000 },
+        label: "Let them go, win two smaller ones",
+        detail: "One customer at 38 % was the real risk",
+        effects: { customers: -3, investors: 6, cash: 9_000 },
         months: 3,
-        reality:
-          "One customer at forty percent of revenue is not a customer, it is a cliff with an invoice. Replacing them with two smaller accounts reads as a worse month and a much better company, and it is the version an investor will prefer in diligence.",
-        tool: { id: "recurring", label: "Model the revenue bridge" },
+        beats: [
+          "Two forwarders from Krämer's own network sign within the quarter, at 890 € each.",
+          "A worse month and a much better company: no single customer can now take more than a fifth of your revenue with them.",
+        ],
         next: "c2-round",
       },
       {
         id: "discount",
-        label: "Offer them 40 % off to stay",
-        detail: "Keep the logo, keep less of the money",
-        effects: { customers: 4, cash: -3_000, investors: -6 },
+        label: "Offer 40 % off to stay",
+        detail: "Keep the logo, keep less money",
+        effects: { customers: 3, cash: -3_500, investors: -7 },
         months: 1,
-        reality:
-          "A discount to prevent churn resets what that customer will ever pay and tells your sales team what a contract is really worth. It also lands in the one metric investors look at hardest: net revenue retention, which this quietly moves below a hundred percent.",
-        tool: { id: "recurring", label: "Watch net retention move" },
+        beats: [
+          "He stays for 534 € a month and mentions it to the two forwarders he drinks with.",
+          "You have just told the market what Palettio really costs, and your retention number now reads below a hundred percent.",
+        ],
         next: "c2-round",
       },
     ],
@@ -347,42 +396,45 @@ export const SCENES: Scene[] = [
   {
     id: "c2-round",
     chapter: 2,
-    place: "The decision at the end of the year",
-    title: "Raise, or keep going on your own money?",
-    text: "You have a product, customers who pay, and a bank balance you can read in one glance. Two investors have asked to see numbers. Jonas wants to know what you are going to tell them.",
+    place: "The whiteboard, end of the year",
+    title: "Raise, or keep it yours?",
+    text: "Two funds have asked to see numbers. Jonas wants to know what you are going to tell them.",
     image: "the-round",
     choices: [
       {
-        id: "go-raise",
+        id: "raise",
         label: "Go and raise the seed",
-        detail: "Three months of full-time fundraising",
-        effects: { investors: 8, customers: -6 },
+        detail: "A quarter of your life, spent on a deck",
+        effects: { investors: 7, customers: -7 },
         months: 3,
-        reality:
-          "A seed round is a quarter of your life spent not building, and it is the right trade whenever the market is being taken faster than revenue can fund you. What decides the outcome is almost never the deck — it is whether the last two quarters point in the same direction.",
-        tool: { id: "ready", label: "Score your readiness first" },
+        beats: [
+          "Three months of trains, forty calls, one real conversation.",
+          "Nobody sold anything while you did it, and that shows up in exactly the numbers the funds are reading.",
+        ],
         next: "@finale",
       },
       {
-        id: "stay-indie",
+        id: "indie",
         label: "Keep it yours",
-        detail: "Grow on what customers pay you",
-        effects: { customers: 8, investors: -15, cash: 12_000 },
+        detail: "Grow on what forwarders pay",
+        effects: { customers: 9, investors: -14, cash: 14_000 },
         months: 3,
-        reality:
-          "A company that funds itself answers to nobody and grows at the speed its customers allow. That is a real strategy with a real ceiling, and the only wrong version of it is the one chosen because raising felt frightening.",
-        tool: { id: "bootstrap", label: "Pressure-test the independent path" },
+        beats: [
+          "You tell both funds no, and tell Oltmanns before he reads it somewhere.",
+          "Nine forwarders, no board, and a growth rate your customers decide. The ceiling is real and so is the quiet.",
+        ],
         next: "@finale",
       },
       {
         id: "bridge",
-        label: "Take a bridge from the angel",
-        detail: "Enough to reach better numbers",
-        effects: { cash: 60_000, equity: -8, investors: -4 },
+        label: "Take a bridge from Oltmanns",
+        detail: "Six months to better numbers",
+        effects: { cash: 60_000, equity: -7, investors: -3 },
         months: 2,
-        reality:
-          "A bridge is a bet that six more months produce numbers worth a better price. When it works it is the cheapest round you will ever do. When it does not, you arrive at the same conversation with less ownership and less time — which is why bridges are named after the thing you are crossing, not the thing you are standing on.",
-        tool: { id: "planner", label: "Model the bridge and the round after it" },
+        beats: [
+          "60,000 €, converting at the next round, agreed over one phone call.",
+          "A bet that six more months produce a better price. When it works it is the cheapest money you will ever take.",
+        ],
         next: "@finale",
       },
     ],
@@ -391,71 +443,153 @@ export const SCENES: Scene[] = [
 
 export const SCENE_BY_ID = Object.fromEntries(SCENES.map((s) => [s.id, s])) as Record<string, Scene>;
 
-/* ── Endings ─────────────────────────────────────────────────
-   Scored on the state you arrive with, not on a single choice.
-   Four of the five are survivable, because most companies neither
-   die nor exit — they continue, which is the outcome a game about
-   founding should be willing to show.
+/* ── What happens while you are deciding ─────────────────────
+   Unprompted, one at a time, and mostly not about the thing you
+   are currently thinking about. That is what makes the clock feel
+   like a world rather than a progress bar.
    ────────────────────────────────────────────────────────────── */
+
+export const EVENTS: GameEvent[] = [
+  {
+    id: "holiday",
+    beats: [
+      { text: "Krämer's dispatcher is on holiday. Three weeks, no handover." },
+      { text: "Nobody else in the yard knows what Palettio is for. The trial quietly stops being used.", effects: { customers: -5 } },
+    ],
+  },
+  {
+    id: "rotterdam",
+    beats: [
+      { text: "A Rotterdam company doing almost exactly this raises 4 M€." },
+      { text: "Oltmanns sends you the article at 23:12 with a single question mark.", effects: { investors: -7 } },
+    ],
+  },
+  {
+    id: "dvz",
+    beats: [
+      { text: "The DVZ runs two hundred words about empty return trips and mentions you by name." },
+      { text: "Four forwarders ask for a demo before Friday.", effects: { customers: 7, investors: 2 } },
+    ],
+  },
+  {
+    id: "rostock",
+    beats: [
+      { text: "A rounding error in the matching sends a truck to Rostock instead of Rotterdam." },
+      { text: "Jonas spends two hours apologising. They stay, and they tell people.", effects: { customers: -4, investors: -2 } },
+    ],
+  },
+  {
+    id: "professor",
+    beats: [
+      { text: "Your old professor forwards your deck to a founder he supervised in 2016." },
+      { text: "She replies the same evening and offers to introduce you to her seed investor.", effects: { investors: 8 } },
+    ],
+  },
+  {
+    id: "finanzamt",
+    beats: [
+      { text: "The Finanzamt reassesses last year's advance payments." },
+      { text: "2,400 € leaves the account in a week you had planned differently.", effects: { cash: -2_400 } },
+    ],
+  },
+  {
+    id: "strike",
+    beats: [
+      { text: "Warning strike at the container terminal. Nothing moves for four days." },
+      { text: "Your customers have larger problems than your onboarding call this week.", effects: { customers: -3 } },
+    ],
+  },
+  {
+    id: "recruiter",
+    chapter: 2,
+    beats: [
+      { text: "A recruiter offers Jonas 95,000 € at a Series-B company in Berlin." },
+      { text: "He says no, and mentions it twice. You raise his draw, which was overdue anyway.", effects: { burn: 700 } },
+    ],
+  },
+  {
+    id: "renewal",
+    when: (s: GameState) => s.customers >= 40,
+    beats: [
+      { text: "Two forwarders renew for twelve months instead of month to month." },
+      { text: "21,360 € of contracted revenue, and the first time anyone has committed to you in advance.", effects: { cash: 10_680, investors: 4 } },
+    ],
+  },
+  {
+    id: "winter",
+    beats: [
+      { text: "Mild winter, freight volumes down across the north." },
+      { text: "Fewer trips to fill means less for Palettio to do, and your usage numbers show it.", effects: { customers: -3 } },
+    ],
+  },
+  {
+    id: "aws",
+    beats: [
+      { text: "The nightly matching run is suddenly nine times more expensive." },
+      { text: "Someone left a loop in. It costs 1,900 € before anybody notices.", effects: { cash: -1_900 } },
+    ],
+  },
+  {
+    id: "referral",
+    when: (s: GameState) => s.customers >= 30,
+    beats: [
+      { text: "A dispatcher you have never met calls. His brother-in-law runs a forwarder in Bremen." },
+      { text: "He signs without a demo, because somebody he trusts already did the demo for him.", effects: { customers: 5, cash: 2_670 } },
+    ],
+  },
+];
+
+/* ── Endings ─────────────────────────────────────────────── */
 
 export const ENDINGS: Ending[] = [
   {
     id: "insolvent",
-    title: "The money ran out",
+    title: "Palettio runs out of money",
     tone: "loss",
     image: "ending-empty",
-    text: "There is no dramatic scene. There is a month where the salaries do not clear, a conversation with an accountant about what you are legally required to do next, and a list of people to call before they hear it elsewhere. Nothing you chose was stupid; the runway was just shorter than the distance.",
-    payout: (s) => `${s.month} months, ${Math.round(s.equity)} % of nothing.`,
+    text: "There is no dramatic scene. A month where the salaries do not clear, a conversation with a Steuerberater about what you are legally obliged to do next, and a list of forwarders to call before they hear it from somebody else.",
+    payout: (s) => `${s.month} months. ${Math.round(s.equity)} % of nothing.`,
   },
   {
     id: "seed",
-    title: "The round comes together",
+    title: "The seed round comes together",
     tone: "win",
     image: "ending-round",
-    text: "Two term sheets, one of them serious. The numbers pointed the same way for two quarters and that turned out to be the whole argument. You sign, the money lands, and the company you run in January is a different company from the one you ran in November.",
-    payout: (s) =>
-      `${Math.round(s.equity)} % of it is still yours going into the round — and a seed round will take roughly twenty of those points.`,
+    text: "Two term sheets, one of them serious: 1.8 M€ on a pre-money nobody argues about, led by a fund that already owns a freight exchange. The company you run in January is not the one you ran in November.",
+    payout: (s) => `${Math.round(s.equity)} % is still yours going in — and a seed round takes about twenty of those points.`,
   },
   {
     id: "down",
     title: "You raise, but not like that",
     tone: "mixed",
     image: "ending-round",
-    text: "The round happens at a price nobody puts in a press release, from the one investor who stayed interested. It is money, it is a year, and it is a cap table with a story you will be explaining in every conversation from here.",
+    text: "The round happens at a price nobody puts in a press release, from the one investor who stayed interested. It is money, it is eighteen months, and it is a cap table you will be explaining in every conversation from here.",
     payout: (s) => `${Math.round(s.equity)} % left, and the next round prices off this one.`,
   },
   {
     id: "indie",
-    title: "It is yours, and it pays",
+    title: "Nine forwarders, no board",
     tone: "win",
     image: "ending-indie",
-    text: "No round, no board, no quarterly performance of optimism. Customers pay for something they would miss, the team is small enough to fit in one room, and the growth rate is whatever that produces. Nobody writes about this outcome and most founders would take it.",
-    payout: (s) => `${Math.round(s.equity)} % of a company that owes nobody anything.`,
+    text: "No round, no quarterly performance of optimism. Enough forwarders pay enough every month that the three of you are paid properly and the servers are boring. Nobody writes about this outcome and most founders would take it.",
+    payout: (s) => `${Math.round(s.equity)} % of a company that owes nobody anything, and ${fmtEuro(s.cash)} in the bank.`,
   },
   {
     id: "stalled",
     title: "Still here, barely",
     tone: "mixed",
     image: "ending-empty",
-    text: "The product works, a few customers pay, and neither the investors nor the market has made a decision about you. That is not failure — it is the most common place to be after two years, and the hardest one to write a plan from.",
-    payout: (s) => `${s.month} months in, ${fmtEuro(s.cash)} in the bank.`,
+    text: "Palettio works, a handful of forwarders pay for it, and neither the market nor any investor has made a decision about you. That is not failure. It is the most common place to be after two years and the hardest one to write a plan from.",
+    payout: (s) => `${s.month} months in, ${fmtEuro(s.cash)} in the bank and ${Math.round(s.customers)} % of the base still using it.`,
   },
 ];
 
 export const ENDING_BY_ID = Object.fromEntries(ENDINGS.map((e) => [e.id, e])) as Record<string, Ending>;
 
-/**
- * Which ending the run earned.
- *
- * Investors decide whether there is a round at all, customers decide
- * whether it is a round anyone wants, and the independent ending is
- * only available to a company that actually sells — otherwise "we chose
- * not to raise" is just the stalled ending with better lighting.
- */
 export function pickEnding(s: GameState): string {
   if (s.cash <= 0) return "insolvent";
-  if (s.investors >= 55 && s.customers >= 45) return "seed";
+  if (s.investors >= 50 && s.customers >= 45) return "seed";
   if (s.customers >= 55 && s.cash >= 40_000) return "indie";
-  if (s.investors >= 30) return "down";
+  if (s.investors >= 28) return "down";
   return "stalled";
 }
