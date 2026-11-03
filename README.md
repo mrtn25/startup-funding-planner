@@ -52,19 +52,22 @@ startup numbers that are actually traceable to a source, in one Next.js app — 
 
 Plus a module that is not a calculator at all:
 
-- **Can you get to an exit?** (`/simulator`) — a decision game about one
-  concrete company: Palettio, software that fills the empty return trips of
-  mid-sized freight forwarders, run by Lena Brandt and Jonas Ritter out of a
-  kitchen in Hamburg. Modelled on GermanZero's *Klimakanzler:in* and the three
-  things that game actually gets right: the clock never stops, so reading costs
-  you months; the meters twitch rather than slide, so they feel alive; and
-  consequences arrive in two beats — what happened, then what it cost, with the
-  number on a badge, usually against a different meter than the one you aimed
-  at. Four meters (runway, investors, customers, the equity you still hold),
-  twelve events that fire while you deliberate, two chapters on their own
-  clocks and five endings. The customers meter is the paying base, so it
-  arrives as money every month — without that the game was a slope with one
-  direction.
+- **Can you get to an exit?** (`/simulator`) — a decision game that follows one
+  company through the five stages it actually has: you notice a problem you
+  cannot stop seeing, you build the smallest thing that tests it, you find out
+  whether anybody cares, you send the first invoice, and then other people's
+  money arrives with conditions attached. Palettio fills the empty return trips
+  of mid-sized freight forwarders; you are Lena Brandt, who dispatched trucks
+  in Hamburg for three years and counted how many came home empty.
+
+  Modelled on GermanZero's *Klimakanzler:in* and the three things that game
+  gets right: the clock runs while you decide, so dithering costs months; the
+  meters twitch rather than slide; and consequences arrive in two beats — what
+  happened, then what it cost, with the number on a badge, usually against a
+  meter the decision was not aiming at. Fourteen events fire while you
+  deliberate, and the people recur: Ole Wendt dispatches for Krämer in chapter
+  three and what you did to him then is what he does to you in chapter five.
+  Five endings, four of them survivable.
 
 Plus two sections that are not tools:
 
@@ -97,6 +100,7 @@ npm run dev
 | `npm run build` | Production build |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Model unit tests, via Node's own runner |
+| `node --experimental-strip-types scripts/simulator-balance.ts` | Plays the simulator under five strategies × four seeds and prints the endings |
 
 Copy `.env.example` to `.env.local` for the optional keys.
 

@@ -10,6 +10,7 @@ import {
   badges,
   brokeNow,
   drawEvent,
+  eventDue,
   initialState,
   meterViews,
   tick,
@@ -19,29 +20,50 @@ import {
 } from "@/lib/simulator";
 import { CHAPTERS, ENDING_BY_ID, EVENTS, INTRO, SCENE_BY_ID, pickEnding } from "@/lib/simulator-scenes";
 
-/** One month of game time. Slow enough to read a scene, fast enough
-    that reading three of them costs you a quarter. */
-const MS_PER_MONTH = 4000;
+/** One month of game time. Fourteen seconds: reading a scene properly
+    costs about a month, which is the pressure. Simulating the whole
+    story at three months of deliberation per scene ended insolvent in
+    four runs out of five — that is not tension, that is a tax on
+    reading. */
+const MS_PER_MONTH = 14000;
 
 type Card = {
   kind: "consequence" | "event" | "chapter";
   title?: string;
+  kicker?: string;
+  image?: string;
   beats: { text: string; effects?: Effects }[];
   /** Badges shown on the last beat, for a choice's mechanical result. */
   summary?: Effects;
 };
+
+/** The card that opens a chapter — the spine of the thing, made visible. */
+function chapterCard(n: number): Card {
+  const ch = CHAPTERS.find((c) => c.number === n) ?? CHAPTERS[0];
+  return {
+    kind: "chapter",
+    kicker: `Chapter ${ch.number} of ${CHAPTERS.length}`,
+    title: ch.title,
+    image: ch.image,
+    beats: [{ text: ch.blurb }],
+  };
+}
 
 type Phase = "intro" | "play" | "ending";
 
 export default function Simulator() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [state, setState] = useState<GameState>(() => initialState(CHAPTERS[0]));
-  const [card, setCard] = useState<Card | null>(null);
+  const [cards, setCards] = useState<Card[]>([]);
   const [beat, setBeat] = useState(0);
+  const card = cards[0] ?? null;
   const [paused, setPaused] = useState(false);
-  /* The clock keeps running inside cards, as it does in the game this
-     is modelled on: reading is not free, and that is the mechanic. */
-  const running = phase === "play" && !paused && !state.endingId;
+  /* The clock runs while you are deciding and stops while the story is
+     talking. Klimakanzler lets it run through everything, which works
+     for a game whose cards are one line of policy — here the cards are
+     the story, and charging rent on it taught players to skim the best
+     part. Deliberation costs months; being told what happened does not. */
+  const running = phase === "play" && !paused && !card && !state.endingId;
   const tickRef = useRef(0);
 
   const scene = SCENE_BY_ID[state.sceneId];
@@ -74,11 +96,11 @@ export default function Simulator() {
   /* Events are drawn on the beat rather than at random moments, so the
      rhythm is predictable even though the content is not. */
   useEffect(() => {
-    if (!running || card || state.month === 0 || state.month % 3 !== 0) return;
+    if (!running || card || !eventDue(state)) return;
     const ev = drawEvent(state, EVENTS);
     if (!ev) return;
-    setState((s) => ({ ...s, fired: [...s.fired, ev.id] }));
-    setCard({ kind: "event", beats: ev.beats });
+    setState((s) => ({ ...s, fired: [...s.fired, ev.id], lastEvent: s.month }));
+    setCards([{ kind: "event", beats: ev.beats }]);
     setBeat(0);
   }, [state, running, card]);
 
@@ -90,7 +112,11 @@ export default function Simulator() {
         ? { ...moved, chapter: crossed, left: (CHAPTERS.find((c) => c.number === crossed) ?? chapter).months }
         : moved;
     setState(brokeNow(withChapter) ? { ...withChapter, endingId: "insolvent" } : withChapter);
-    setCard({ kind: "consequence", beats: choice.beats.map((text) => ({ text })), summary: choice.effects });
+    const queue: Card[] = [
+      { kind: "consequence", beats: choice.beats.map((text) => ({ text })), summary: choice.effects },
+    ];
+    if (crossed && crossed > state.chapter) queue.push(chapterCard(crossed));
+    setCards(queue);
     setBeat(0);
   };
 
@@ -102,7 +128,7 @@ export default function Simulator() {
       setBeat(beat + 1);
       return;
     }
-    setCard(null);
+    setCards((cs) => cs.slice(1));
     setBeat(0);
     setState((s) => {
       if (brokeNow(s)) return { ...s, endingId: "insolvent" };
@@ -117,7 +143,7 @@ export default function Simulator() {
 
   const restart = () => {
     setState(initialState(CHAPTERS[0], Math.floor(Math.random() * 100000)));
-    setCard(null);
+    setCards([]);
     setBeat(0);
     setPaused(false);
     setPhase("intro");
@@ -142,7 +168,15 @@ export default function Simulator() {
                 <li key={r.slice(0, 20)}>{r}</li>
               ))}
             </ul>
-            <button type="button" className={styles.primary} onClick={() => setPhase("play")}>
+            <button
+              type="button"
+              className={styles.primary}
+              onClick={() => {
+                setCards([chapterCard(1)]);
+                setBeat(0);
+                setPhase("play");
+              }}
+            >
               Start the clock
             </button>
           </div>
@@ -181,8 +215,12 @@ export default function Simulator() {
 
       {card ? (
         <button type="button" className={`${styles.card} ${styles.cardTap}`} onClick={nextBeat}>
+          {card.image && <Scene image={card.image} alt={card.title ?? ""} />}
           <div className={styles.body}>
-            <div className={styles.kicker}>{card.kind === "event" ? "Meanwhile" : "What happened"}</div>
+            <div className={styles.kicker}>
+              {card.kicker ?? (card.kind === "event" ? "Meanwhile" : "What happened")}
+            </div>
+            {card.title && <h2 className={styles.cardTitle}>{card.title}</h2>}
             <p className={styles.beat}>{card.beats[beat]?.text}</p>
             {beat === card.beats.length - 1 && (
               <div className={styles.badges}>
@@ -193,7 +231,9 @@ export default function Simulator() {
                 ))}
               </div>
             )}
-            <span className={styles.tapHint}>{beat + 1 < card.beats.length ? "Tap to continue" : "Tap to carry on"}</span>
+            <span className={styles.tapHint}>
+              {card.kind === "chapter" ? "Tap to begin" : beat + 1 < card.beats.length ? "Tap to continue" : "Tap to carry on"}
+            </span>
           </div>
         </button>
       ) : (

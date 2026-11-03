@@ -45,6 +45,9 @@ export type GameEvent = {
   id: string;
   /** Only fires in this chapter, or any chapter when absent. */
   chapter?: number;
+  /** Higher goes first among everything eligible. The grant has to beat
+      the noise, or it arrives after the company it was meant to save. */
+  priority?: number;
   /** Only fires once this is true of the state. */
   when?: (s: GameState) => boolean;
   beats: Beat[];
@@ -79,6 +82,9 @@ export type Scene = {
 export type Chapter = {
   number: number;
   title: string;
+  /** One line on the chapter card — what this stage is for. */
+  blurb: string;
+  image: string;
   /** Months on the clock for this chapter. */
   months: number;
   firstScene: string;
@@ -107,6 +113,8 @@ export type GameState = {
   sceneId: string;
   /** Events already fired, so none repeats. */
   fired: string[];
+  /** The month the last one fired, so they do not arrive in a clump. */
+  lastEvent: number;
   endingId: string | null;
   /** Seeded, so a run can be replayed exactly. */
   seed: number;
@@ -128,12 +136,13 @@ export function initialState(chapter: Chapter, seed = 1): GameState {
     investors: 18,
     customers: 12,
     equity: 100,
-    burn: 1_650,
+    burn: 1_900,
     month: 0,
     left: chapter.months,
     chapter: chapter.number,
     sceneId: chapter.firstScene,
     fired: [],
+    lastEvent: 0,
     endingId: null,
     seed,
   };
@@ -161,16 +170,31 @@ export function applyEffects(state: GameState, e: Effects | undefined): GameStat
  * to arrive as money every month. Without this the game was a slope
  * with one direction: cash only ever left, one-off contract payments
  * never compounded, and every honest run ended insolvent. Roughly
- * 110 € per point, so a dozen forwarders at 890 € reads as a meter in
- * the thirties.
+ * 125 € per point — set against the scale the meter actually moves
+ * on, not against a feeling: a run that goes well lands in the fifties,
+ * so break-even has to sit in the low forties.
  */
 export function revenue(state: GameState): number {
-  return Math.round(state.customers * 110);
+  return Math.round(state.customers * 125);
 }
 
-/** Burn minus what comes in. Negative means the month pays for itself. */
+/**
+ * What serving them costs — support calls, the nightly matching run,
+ * the dispatcher who needs the same thing explained twice.
+ *
+ * Without this the game went permanently green somewhere in chapter
+ * three: every customer was pure margin, so a growing base turned cash
+ * into a solved problem and took the tension out of the whole second
+ * half. At 110 € net per point, break-even is a number of forwarders
+ * rather than a formality.
+ */
+export function costOfServing(state: GameState): number {
+  return Math.round(state.customers * 15);
+}
+
+/** Fixed costs plus service, minus what comes in. */
 export function netBurn(state: GameState): number {
-  return state.burn - revenue(state);
+  return state.burn + costOfServing(state) - revenue(state);
 }
 
 /**
@@ -185,20 +209,24 @@ export function netBurn(state: GameState): number {
 export function tick(state: GameState): GameState {
   const [r, seed] = rng(state.seed);
   const twitch = r < 0.42 ? 1 : r < 0.5 ? 0 : -1;
-  /* The drift is every other month rather than every month: at a point
-     a month an investor you met in the first chapter is at zero before
-     the second one starts, which punishes the clock instead of the
-     player. */
-  const drift = state.month % 2 === 0 ? -1 : 0;
-  /* Customers drift down too, a tenth as fast: attention decays, but
-     a product people pay for does not evaporate in a quarter. */
-  const churn = r > 0.88 ? -1 : 0;
+  /* Confidence only decays once there is somebody to lose it. Before
+     the first invoice nobody has met you, so the meter is just how
+     this looks on paper and it should move only when you do something
+     — playing it showed the alternative: the meter bled out during
+     the prototype years and the angel arrived in chapter five to a
+     player who had already lost, without ever having met an investor. */
+  const drift = state.chapter >= 4 && state.month % 3 === 0 ? -1 : 0;
+  /* Churn scales with the base. A dozen forwarders are all people you
+     know; ninety are a support load, and some of them leave for
+     reasons nobody logged. Without this the customers meter simply
+     climbed to the nineties and stayed there. */
+  const churn = r > 0.95 - state.customers / 400 ? -1 : 0;
   return {
     ...state,
     seed,
     month: state.month + 1,
     left: Math.max(0, state.left - 1),
-    cash: state.cash + revenue(state) - state.burn,
+    cash: state.cash - netBurn(state),
     investors: clamp(state.investors + twitch + drift),
     customers: clamp(state.customers + churn),
   };
@@ -216,20 +244,44 @@ export function applyChoice(state: GameState, choice: Choice): GameState {
   return { ...applyEffects(moved, choice.effects), sceneId: choice.next };
 }
 
+/**
+ * Is an event due?
+ *
+ * Checked against the gap since the last one rather than against the
+ * month number. The first version asked whether the month was divisible
+ * by three, which is true for as long as the month does not change —
+ * and the clock is stopped while a card is open, so closing one event
+ * immediately drew the next. Seven of them arrived in a row at a
+ * chapter boundary and took 8,000 € with them.
+ */
+export function eventDue(state: GameState): boolean {
+  return state.month >= 3 && state.month - state.lastEvent >= 3;
+}
+
 /** The next event that may fire, or null. Each fires at most once. */
 export function drawEvent(state: GameState, events: GameEvent[]): GameEvent | null {
   const open = events.filter(
     (e) => !state.fired.includes(e.id) && (e.chapter === undefined || e.chapter === state.chapter) && (!e.when || e.when(state)),
   );
   if (!open.length) return null;
+  const top = Math.max(...open.map((e) => e.priority ?? 0));
+  const tier = open.filter((e) => (e.priority ?? 0) === top);
   const [r] = rng(state.seed ^ 0x9e3779b9);
-  return open[Math.floor(r * open.length) % open.length];
+  return tier[Math.floor(r * tier.length) % tier.length];
 }
 
-/** Months of cash left at the current net burn. 99 = it pays for itself. */
+/**
+ * Months of cash left at the current net burn, or Infinity when the
+ * month pays for itself.
+ *
+ * Infinity rather than a large number: the first version returned 99
+ * as a sentinel and then compared `>= 99` to decide whether to print
+ * "pays" — so 120,000 € at a small but real burn, a genuinely finite
+ * 183 months, claimed the company was profitable.
+ */
 export function runway(state: GameState): number {
   const net = netBurn(state);
-  if (net <= 0) return 99;
+  if (net <= 0) return Infinity;
   return Math.max(0, Math.floor(state.cash / net));
 }
 
@@ -255,8 +307,8 @@ export function meterViews(state: GameState): MeterView[] {
         /* Capped, because "37 mo" off a 330 €/month margin is a true
            number that reads as safety — and it becomes two months the
            day anyone is hired. */
-        value: r >= 99 ? "pays" : r > 24 ? "24+ mo" : `${r} mo`,
-        fill: clamp((r / 12) * 100),
+        value: !isFinite(r) ? "pays" : r > 24 ? "24+ mo" : `${r} mo`,
+        fill: isFinite(r) ? clamp((r / 12) * 100) : 100,
         tone: r <= 2 ? "bad" : r <= 5 ? "warn" : "ok",
       };
     }
