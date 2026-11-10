@@ -19,16 +19,18 @@ import {
   forcedEnding,
   initialState,
   meterViews,
+  erfolge,
   netBurn,
   rivalMove,
   runTactic,
   runway,
   runwayFill,
+  saldo,
   tick,
   type GameState,
   type Tactic,
 } from "./simulator.ts";
-import { ENDING_BY_ID, ENDINGS, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
+import { ENDING_BY_ID, ENDINGS, ERFOLGE, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
 
 const S = (patch: Partial<GameState> = {}): GameState => ({ ...initialState(1), ...patch });
 const T = (patch: Partial<Tactic> = {}): Tactic => ({
@@ -80,10 +82,57 @@ test("die Wirkung kommt beim Abschluss, die Kosten beim Start", () => {
 /* ── Die Uhr ── */
 
 test("der Runway ist Kasse durch das, was netto rausgeht", () => {
-  // 1.900 € fix plus 3 Kunden à 180 € Betreuung, minus 1.000 € MRR.
+  // 1.900 € fix plus 3 Kunden à 120 € Betreuung, minus 1.000 € MRR.
   const s = S({ cash: 10_080, burn: 1_900, customers: 3, mrr: 1_000 });
-  assert.equal(netBurn(s), 1_440);
-  assert.equal(runway(s), 7);
+  assert.equal(netBurn(s), 1_260);
+  assert.equal(runway(s), 8);
+});
+
+test("der Saldo sagt, in welche Richtung die Uhr läuft", () => {
+  // Ohne Kunden läuft der Monat gegen euch, mit genug Kunden für euch.
+  assert.ok(saldo(S({ burn: 2_400, mrr: 0, customers: 0 })) < 0);
+  assert.equal(saldo(S({ burn: 2_400, mrr: 0, customers: 0 })), -2_400);
+  assert.ok(saldo(S({ burn: 2_400, mrr: 3_600, customers: 4 })) > 0);
+  // Und er ist immer das Gegenstück zum Netto-Abfluss.
+  const s = S({ burn: 1_900, mrr: 1_000, customers: 3 });
+  assert.equal(saldo(s), -netBurn(s));
+});
+
+test("jeder zahlende Kunde bringt mehr, als seine Betreuung kostet", () => {
+  // Sonst wäre der erste Kunde eine schlechte Nachricht — und genau
+  // das war der Fehler: der Runway fiel weiter, obwohl Geld reinkam.
+  const ohne = S({ burn: 2_400, mrr: 0, customers: 0 });
+  const mit = S({ burn: 2_400, mrr: 890, customers: 1 });
+  assert.ok(saldo(mit) > saldo(ohne));
+  assert.ok(runway({ ...mit, cash: 20_000 }) > runway({ ...ohne, cash: 20_000 }));
+});
+
+test("Erfolge feiern den Übergang und danach nie wieder", () => {
+  const arm = S({ mrr: 0, customers: 0, burn: 2_400 });
+  const erster = S({ mrr: 890, customers: 1, burn: 2_400 });
+  const treffer = erfolge(arm, erster, ERFOLGE);
+  assert.equal(treffer.length, 1);
+  assert.equal(treffer[0].id, "erste-rechnung");
+  // Schon gefeiert: kommt nicht noch einmal.
+  assert.equal(erfolge(arm, { ...erster, gefeiert: ["erste-rechnung"] }, ERFOLGE).length, 0);
+  // Und kein Zustand, sondern ein Übergang: zweimal Umsatz ist kein Moment.
+  assert.equal(erfolge(erster, S({ mrr: 1_780, customers: 2 }), ERFOLGE).length, 0);
+});
+
+test("der Monat, der sich selbst trägt, ist ein eigener Moment", () => {
+  const rot = S({ burn: 2_400, mrr: 1_800, customers: 2 });
+  const schwarz = S({ burn: 2_400, mrr: 3_600, customers: 4, gefeiert: ["erste-rechnung"] });
+  assert.ok(saldo(rot) < 0 && saldo(schwarz) >= 0);
+  const treffer = erfolge(rot, schwarz, ERFOLGE);
+  assert.equal(treffer.length, 1);
+  assert.equal(treffer[0].id, "traegt-sich");
+});
+
+test("jede Maßnahme sagt vorher, wie lange sie dauert", () => {
+  for (const t of Object.values(TACTICS)) {
+    assert.ok(t.months >= 1, `${t.id} dauert keine Zeit`);
+    assert.ok(t.cost === undefined || t.cost > 0, `${t.id} hat Kosten von null`);
+  }
 });
 
 test("wer mehr einnimmt als ausgibt, hat keinen Countdown mehr", () => {

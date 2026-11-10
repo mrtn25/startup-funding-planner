@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import styles from "./Simulator.module.css";
 import {
@@ -12,6 +12,7 @@ import {
   capacity,
   deckFor,
   drawEvent,
+  erfolge,
   eventDue,
   finishTactic,
   fmtEuro,
@@ -21,14 +22,17 @@ import {
   rivalMove,
   runway,
   runwayFill,
+  saldo,
   startTactic,
   tickBoard,
   type Effects,
   type GameState,
+  type Running,
   type Tactic,
 } from "@/lib/simulator";
 import {
   ENDING_BY_ID,
+  ERFOLGE,
   EVENTS,
   INTRO,
   MILESTONES,
@@ -43,8 +47,13 @@ import {
     liest — das ist der Druck. Elf Sekunden, weil die Liste kurz ist. */
 const MS_PER_MONTH = 11_000;
 
+/* Der Zeiger dreht genau eine Runde pro Spielmonat. Die Uhr muss sich
+   bewegen, während man liest — eine Zahl, die alle elf Sekunden
+   umspringt, sieht nicht aus wie Zeitdruck. */
+const TAKT = { "--monat": `${MS_PER_MONTH}ms` } as React.CSSProperties;
+
 type Card = {
-  kind: "ergebnis" | "ereignis" | "phase" | "rivale";
+  kind: "ergebnis" | "ereignis" | "phase" | "rivale" | "erfolg";
   kicker: string;
   title?: string;
   image?: string;
@@ -55,6 +64,22 @@ type Card = {
 type Phase = "titel" | "onboarding" | "spiel" | "ende";
 
 const GROUPS = ["Produkt", "Vertrieb", "Team", "Geld"];
+
+/* Jede Gruppe hat ihr eigenes Bild, sonst sieht die Detailkarte aus
+   wie die Phasenkarte davor und man hält sie für dieselbe Karte. */
+const GRUPPENBILD: Record<string, string> = {
+  Produkt: "kitchen-night",
+  Vertrieb: "first-customer",
+  Team: "first-hire",
+  Geld: "angel-cafe",
+};
+
+/** Was auf der Zeile steht: wie lange es dauert und was es kostet. */
+function metaVon(t: Tactic, laeuft?: Running): string {
+  if (laeuft) return `noch ${laeuft.left} ${laeuft.left === 1 ? "Monat" : "Monate"}`;
+  const dauer = `${t.months} ${t.months === 1 ? "Monat" : "Monate"}`;
+  return t.cost ? `${dauer} · ${fmtEuro(t.cost)}` : `${dauer} · kostet kein Geld`;
+}
 
 export default function Simulator() {
   const [phase, setPhase] = useState<Phase>("titel");
@@ -160,6 +185,19 @@ export default function Simulator() {
     setBeat(0);
   }, [state, running]);
 
+  /* Erfolge: Übergänge, nicht Zustände. Deshalb der Vergleich mit dem
+     vorigen Zustand statt einer Bedingung im Tick — die erste bezahlte
+     Rechnung kann aus einer Maßnahme kommen, aus einem Ereignis oder
+     aus einer Phase, und sie soll in allen drei Fällen gefeiert werden. */
+  const vorher = useRef(state);
+  useEffect(() => {
+    const treffer = erfolge(vorher.current, state, ERFOLGE);
+    vorher.current = state;
+    if (!treffer.length) return;
+    setState((s) => ({ ...s, gefeiert: [...s.gefeiert, ...treffer.map((e) => e.id)] }));
+    setCards((cs) => [...cs, ...treffer.map((e) => ({ kind: "erfolg" as const, kicker: "Geschafft", title: e.title, beats: [...e.beats] }))]);
+  }, [state]);
+
   const starten = (t: Tactic) => {
     setDetail(null);
     setState((s) => startTactic(s, t));
@@ -215,7 +253,7 @@ export default function Simulator() {
     const satz = ONBOARDING[step];
     const letzter = step === ONBOARDING.length - 1;
     return (
-      <div className={styles.app}>
+      <div className={styles.app} style={TAKT}>
         <div className={styles.blurred} aria-hidden="true">
           <Board
             state={state}
@@ -224,6 +262,7 @@ export default function Simulator() {
             index={index}
             deck={deck}
             paused
+            tickt={false}
             onPause={() => {}}
             onPick={() => {}}
           />
@@ -282,7 +321,7 @@ export default function Simulator() {
 
   /* ── Brett ── */
   return (
-    <div className={styles.app}>
+    <div className={styles.app} style={TAKT}>
       <Board
         state={state}
         months={months}
@@ -290,6 +329,7 @@ export default function Simulator() {
         index={index}
         deck={deck}
         paused={paused}
+        tickt={running}
         onPause={() => setPaused((p) => !p)}
         onPick={(t) => setDetail(t)}
       />
@@ -297,15 +337,21 @@ export default function Simulator() {
       {detail && (
         <div className={styles.overlay}>
           <div className={styles.detail}>
-            <Bild src={milestone.image} alt="" className={styles.detailBild} />
+            <Bild src={GRUPPENBILD[detail.group] ?? milestone.image} alt="" className={styles.detailBild} />
             <div className={styles.detailBody}>
               <h3>{detail.label}</h3>
               <p>{detail.flavour}</p>
-              <Wirkung t={detail} />
               <div className={styles.detailMeta}>
-                <span>{detail.months} Mon.</span>
-                {detail.cost ? <span className={styles.kosten}>{fmtEuro(detail.cost)}</span> : null}
+                <span className={styles.dauer}>
+                  Dauer: {detail.months} {detail.months === 1 ? "Monat" : "Monate"}
+                </span>
+                {detail.cost ? (
+                  <span className={styles.kosten}>Kosten: {fmtEuro(detail.cost)}</span>
+                ) : (
+                  <span className={styles.gratis}>Kostet kein Geld</span>
+                )}
               </div>
+              <Wirkung t={detail} />
               <div className={styles.detailActions}>
                 <button type="button" className={styles.ghost} onClick={() => setDetail(null)}>
                   Zurück
@@ -326,10 +372,14 @@ export default function Simulator() {
 
       {card && (
         <div className={styles.overlay}>
-          <button type="button" className={styles.karte} onClick={weiter}>
+          <div className={styles.karte} onClick={weiter} role="presentation">
             {card.image && <Bild src={card.image} alt="" className={styles.karteBild} />}
             <div className={styles.karteBody}>
-              <div className={`${styles.kicker} ${card.kind === "ereignis" ? styles.kickerEvent : ""} ${card.kind === "rivale" ? styles.kickerRival : ""}`}>
+              <div
+                className={`${styles.kicker} ${card.kind === "ereignis" ? styles.kickerEvent : ""} ${
+                  card.kind === "rivale" ? styles.kickerRival : ""
+                } ${card.kind === "erfolg" ? styles.kickerGut : ""}`}
+              >
                 {card.kicker}
               </div>
               {card.title && <h3>{card.title}</h3>}
@@ -343,9 +393,18 @@ export default function Simulator() {
                   ))}
                 </div>
               )}
-              <span className={styles.tapHint}>{beat + 1 < card.beats.length ? "Weiter" : "Weiterspielen"}</span>
+              <button
+                type="button"
+                className={styles.weiterBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  weiter();
+                }}
+              >
+                {beat + 1 < card.beats.length ? "Weiter" : "Weiterspielen"}
+              </button>
             </div>
-          </button>
+          </div>
         </div>
       )}
     </div>
@@ -361,6 +420,7 @@ function Board({
   index,
   deck,
   paused,
+  tickt,
   onPause,
   onPick,
 }: {
@@ -370,6 +430,7 @@ function Board({
   index: number;
   deck: Tactic[];
   paused: boolean;
+  tickt: boolean;
   onPause: () => void;
   onPick: (t: Tactic) => void;
 }) {
@@ -389,7 +450,7 @@ function Board({
 
       <div className={styles.boardMain}>
         <aside className={styles.rail}>
-          <Tank months={months} fill={runwayFill(state)} cash={state.cash} knapp={knapp} />
+          <Uhr months={months} fill={runwayFill(state)} cash={state.cash} monat={state.month} saldoWert={saldo(state)} knapp={knapp} tickt={tickt} />
 
           <div className={styles.stats}>
             {meterViews(state).map((v) => (
@@ -400,15 +461,16 @@ function Board({
           <button type="button" className={styles.pause} onClick={onPause} aria-label={paused ? "Weiter" : "Pause"}>
             {paused ? "▶" : "❚❚"}
           </button>
-          <span className={styles.railFoot}>
-            Monat {state.month} · {fmtEuro(state.cash)}
-          </span>
         </aside>
 
         <div className={styles.list}>
           <div className={styles.listHead}>
             <strong>{milestone.gateLabel}</strong>
-            <span>{frei > 0 ? `${frei} von ${capacity(state)} frei` : "alle beschäftigt"}</span>
+            <span>
+              {frei > 0
+                ? `${frei} von ${capacity(state)} ${capacity(state) === 1 ? "Kopf" : "Köpfen"} frei`
+                : "Beide beschäftigt — erst muss etwas fertig werden"}
+            </span>
           </div>
 
           {gruppen.map((g) => (
@@ -417,16 +479,22 @@ function Board({
               {g.karten.map((t) => {
                 const laeuft = state.running.find((r) => r.id === t.id);
                 const fertig = state.used.includes(t.id) && !laeuft;
+                const gesperrt = !laeuft && !fertig && !canStart(state, t);
                 return (
                   <button
                     key={t.id}
                     type="button"
-                    className={`${styles.item} ${fertig ? styles.itemDone : ""}`}
+                    className={`${styles.item} ${fertig ? styles.itemDone : ""} ${gesperrt ? styles.itemLocked : ""}`}
                     onClick={() => !fertig && onPick(t)}
                     disabled={fertig}
                   >
                     <Ring laeuft={laeuft} fertig={fertig} />
-                    <span className={styles.itemLabel}>{t.label}</span>
+                    <span className={styles.itemText}>
+                      <span className={styles.itemLabel}>{t.label}</span>
+                      <span className={styles.itemMeta}>
+                        {gesperrt ? (blockedReason(state, t) ?? metaVon(t)) : metaVon(t, laeuft)}
+                      </span>
+                    </span>
                     {laeuft && <span className={styles.itemLeft}>läuft</span>}
                   </button>
                 );
@@ -442,38 +510,76 @@ function Board({
 /**
  * Die große Uhr.
  *
- * Ein Tank, der leerläuft — die Zahl allein tickt zwar, sieht aber
- * nicht aus wie Druck. Die Markierung bei drei Monaten ist die Stelle,
- * ab der man nichts Langes mehr anfangen sollte.
+ * Drei Dinge auf einmal, weil sie zusammengehören: der Ring zeigt, wie
+ * viel Luft noch da ist, der Zeiger dreht sich in Echtzeit, damit man
+ * sieht, dass gerade Zeit vergeht, und darunter steht als eine Zahl,
+ * ob der Monat gegen euch läuft oder für euch. Das Letzte fehlte: ein
+ * Runway von neun Monaten sagt nicht, ob er steigt oder fällt, und der
+ * erste zahlende Kunde war dadurch unsichtbar.
  */
-function Tank({ months, fill, cash, knapp }: { months: number; fill: number; cash: number; knapp: boolean }) {
-  const hoehe = Math.max(0, Math.min(1, fill));
+function Uhr({
+  months,
+  fill,
+  cash,
+  monat,
+  saldoWert,
+  knapp,
+  tickt,
+}: {
+  months: number;
+  fill: number;
+  cash: number;
+  monat: number;
+  saldoWert: number;
+  knapp: boolean;
+  tickt: boolean;
+}) {
+  const UMFANG = 2 * Math.PI * 42;
+  const anteil = Math.max(0, Math.min(1, fill));
+  const waechst = saldoWert >= 0;
+  const striche = Array.from({ length: 12 }, (_, i) => {
+    const w = (i * Math.PI) / 6;
+    return { x1: 50 + 35 * Math.sin(w), y1: 50 - 35 * Math.cos(w), x2: 50 + 39 * Math.sin(w), y2: 50 - 39 * Math.cos(w) };
+  });
   return (
-    <div className={styles.tank}>
-      <svg viewBox="0 0 52 150" className={styles.tankSvg} aria-hidden="true">
-        <rect x="6" y="6" width="40" height="138" rx="20" className={styles.tankHuelle} />
-        <clipPath id="tankClip">
-          <rect x="9" y="9" width="34" height="132" rx="17" />
-        </clipPath>
-        <g clipPath="url(#tankClip)">
-          <rect
-            x="9"
-            width="34"
-            y={9 + 132 * (1 - hoehe)}
-            height={132 * hoehe}
-            className={`${styles.tankFuellung} ${knapp ? styles.tankKnapp : ""}`}
+    <div className={styles.uhr}>
+      <div className={`${styles.zifferblatt} ${tickt ? "" : styles.uhrStop}`}>
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="42" className={styles.uhrBahn} />
+          <circle
+            cx="50"
+            cy="50"
+            r="42"
+            className={`${styles.uhrArc} ${waechst ? styles.uhrGut : knapp ? styles.uhrKnapp : ""}`}
+            strokeDasharray={UMFANG}
+            strokeDashoffset={UMFANG * (1 - anteil)}
           />
-        </g>
-        <line x1="6" x2="46" y1={9 + 132 * (1 - 0.25)} y2={9 + 132 * (1 - 0.25)} className={styles.tankMarke} />
-      </svg>
-      <div className={styles.tankText}>
-        <span className={`${styles.clock} ${knapp ? styles.clockLow : ""}`}>{isFinite(months) ? months : "12+"}</span>
-        <span className={styles.clockUnit}>
-          Monate
-          <br />
-          Geld
+          {striche.map((st, i) => (
+            <line key={i} {...st} className={styles.strich} />
+          ))}
+          <g className={styles.zeiger}>
+            <line x1="50" y1="50" x2="50" y2="17" />
+            <circle cx="50" cy="50" r="3.2" />
+          </g>
+        </svg>
+        <span className={styles.uhrText}>
+          <span className={`${styles.clock} ${knapp && !waechst ? styles.clockLow : ""}`}>{isFinite(months) ? months : "∞"}</span>
+          <span className={styles.clockUnit}>
+            Monate
+            <br />
+            Geld
+          </span>
         </span>
-        <span className={styles.tankCash}>{fmtEuro(cash)}</span>
+      </div>
+      <div className={`${styles.saldo} ${waechst ? styles.saldoAuf : styles.saldoAb}`}>
+        <strong>
+          {waechst ? "+" : "−"}
+          {fmtEuro(Math.abs(saldoWert))}
+        </strong>
+        <span>{waechst ? "mehr rein als raus" : "jeden Monat weniger"}</span>
+      </div>
+      <div className={styles.konto}>
+        {fmtEuro(cash)} · Monat {monat}
       </div>
     </div>
   );

@@ -8,15 +8,15 @@
    Texte sind kurz. Wer spielt, will nicht lesen.
    ══════════════════════════════════════════════════════════════ */
 
-import type { Ending, GameEvent, GameState, Milestone, RivalStep, Tactic } from "./simulator.ts";
-import { fmtEuro } from "./simulator.ts";
+import type { Ending, Erfolg, GameEvent, GameState, Milestone, RivalStep, Tactic } from "./simulator.ts";
+import { fmtEuro, saldo } from "./simulator.ts";
 
 export const ONBOARDING: { text: string; highlight?: string }[] = [
   { text: "Moin. Ich bin Tarek. Ich habe selbst zwei Firmen gegründet, eine davon ging gut. Ich schau euch über die Schulter." },
   { text: "Ihr beide habt Lkw eingeteilt — Disponenten nennt man das. Euch ist aufgefallen: jede vierte Fahrt geht leer zurück, weil niemand Zeit hat, eine Rückladung zu suchen." },
   { text: "Genau das soll eure Software machen. Gekündigt habt ihr beide schon. Gebaut ist noch nichts, Kunden habt ihr keine." },
   { text: "Links seht ihr euer Erspartes: 32.000 €. Davon gehen Miete und Essen ab, später Server und Gehälter. Das ist eure Uhr.", highlight: "eure Uhr" },
-  { text: "Rechts wählt ihr, woran ihr arbeitet. Zwei Sachen gleichzeitig, eine pro Kopf. Jede dauert Monate." },
+  { text: "Rechts wählt ihr, woran ihr arbeitet. Zwei Sachen gleichzeitig, eine pro Kopf. Unter jeder steht, wie viele Monate sie dauert und was sie kostet." },
   { text: "Und in San Francisco baut Haulway dasselbe, bezahlt von Y Combinator. Die warten nicht auf euch.", highlight: "Haulway" },
 ];
 
@@ -40,7 +40,7 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       id: "tabelle",
       label: "Tabelle mit Makro",
       group: "Produkt",
-      flavour: "Zwei Wochenenden. Freitags lasst ihr es von Hand laufen.",
+      flavour: "Zwei Wochen. Freitags lasst ihr es einmal von Hand durchlaufen.",
       impact: { produkt: 2 },
       months: 1,
       effects: { product: 16 },
@@ -50,7 +50,7 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       id: "handarbeit",
       label: "Von Hand machen, Software nennen",
       group: "Produkt",
-      flavour: "Sie schicken Leerfahrten, ihr schickt Treffer zurück. Nachts, zu Fuß.",
+      flavour: "Sie schicken Leerfahrten, ihr schickt Treffer zurück. Von Hand, am selben Tag.",
       impact: { produkt: 4, team: 2 },
       months: 2,
       effects: { product: 26, team: -6, burn: 150 },
@@ -60,11 +60,11 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       id: "richtig-bauen",
       label: "Richtig bauen",
       group: "Produkt",
-      flavour: "Login, Karte, Matching-Engine. Monate von Nächten.",
+      flavour: "Login, Karte, Matching-Engine. Fünf Monate, in denen ihr sonst nichts macht.",
       impact: { produkt: 5, team: 2, investoren: 2 },
       months: 5,
       effects: { product: 34, investors: 6, team: -5 },
-      beats: ["Fünf Monate von 22 bis 1 Uhr. Die Demo sieht gut aus.", "Fünf Monate, in denen kein Disponent es angefasst hat."],
+      beats: ["Fünf Monate am Stück. Die Demo sieht gut aus.", "Fünf Monate, in denen kein Disponent es angefasst hat."],
     }),
     T({
       id: "routing",
@@ -454,6 +454,30 @@ export const MILESTONES: Milestone[] = [
 ];
 
 export const MILESTONE_BY_ID = Object.fromEntries(MILESTONES.map((m) => [m.id, m])) as Record<string, Milestone>;
+
+/* ── Erfolge ─────────────────────────────────────────────────── */
+
+/** Die zwei Momente, in denen die Uhr aufhört, gegen euch zu laufen. */
+export const ERFOLGE: Erfolg[] = [
+  {
+    id: "erste-rechnung",
+    title: "Die erste Rechnung ist bezahlt",
+    beats: [
+      "Keine Testphase, keine Absichtserklärung. Eine Spedition überweist Geld für etwas, das ihr gebaut habt.",
+      "Ab jetzt kommt jeden Monat etwas rein. Schaut auf die Uhr: sie läuft langsamer als vorhin.",
+    ],
+    when: (v, n) => v.mrr === 0 && n.mrr > 0,
+  },
+  {
+    id: "traegt-sich",
+    title: "Dieser Monat hat sich selbst bezahlt",
+    beats: [
+      "Zum ersten Mal kommt mehr rein, als rausgeht.",
+      "Die Uhr läuft nicht mehr runter, sondern rauf. Ab hier könnt ihr auch Nein sagen — zu Investoren, zu Kunden, zu Bedingungen.",
+    ],
+    when: (v, n) => saldo(v) < 0 && saldo(n) >= 0,
+  },
+];
 
 /* ── Ereignisse ──────────────────────────────────────────────── */
 

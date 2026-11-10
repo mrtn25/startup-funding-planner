@@ -168,44 +168,95 @@
   gap: 10px;
   min-width: 0;
 }
-/* ── Die große Uhr: ein Tank, der leerläuft ── */
+/* ── Die große Uhr ──
+   Ein Zifferblatt: Ring = wie viel Luft noch da ist, Zeiger = eine
+   Umdrehung pro Spielmonat, damit sichtbar Zeit vergeht. */
 
-.tank {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.uhr {
   width: 100%;
-  padding: 2px 0 6px;
-}
-.tankSvg {
-  width: 44px;
-  height: 128px;
-  flex: none;
-}
-.tankHuelle {
-  fill: #fff;
-  stroke: var(--ink);
-  stroke-width: 3;
-}
-.tankFuellung {
-  fill: var(--ink);
-  transition: y 0.6s linear, height 0.6s linear;
-}
-.tankKnapp {
-  fill: var(--bad);
-}
-.tankMarke {
-  stroke: rgba(20, 20, 19, 0.35);
-  stroke-width: 2;
-  stroke-dasharray: 3 3;
-}
-.tankText {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 2px;
+}
+.zifferblatt {
+  position: relative;
+  width: 100%;
+  max-width: 128px;
+  aspect-ratio: 1;
+}
+.zifferblatt svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.uhrBahn {
+  fill: #fff;
+  stroke: rgba(20, 20, 19, 0.1);
+  stroke-width: 7;
+}
+.uhrArc {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 7;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-box: view-box;
+  transform-origin: 50px 50px;
+  transition: stroke-dashoffset 0.7s linear, stroke 0.3s ease;
+}
+.uhrKnapp {
+  stroke: var(--bad);
+}
+.uhrGut {
+  stroke: var(--ok);
+}
+.strich {
+  stroke: rgba(20, 20, 19, 0.3);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.zeiger {
+  transform-box: view-box;
+  transform-origin: 50px 50px;
+  animation: dreh var(--monat, 11s) linear infinite;
+}
+.zeiger line {
+  stroke: var(--akzent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.zeiger circle {
+  fill: var(--akzent);
+}
+.uhrStop .zeiger {
+  animation-play-state: paused;
+}
+@keyframes dreh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zeiger {
+    animation: none;
+  }
+}
+.uhrText {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 .clock {
-  font-size: 40px;
+  font-size: 34px;
   font-weight: 700;
   line-height: 0.95;
   letter-spacing: -0.04em;
@@ -215,19 +266,52 @@
   color: var(--bad);
 }
 .clockUnit {
-  font-size: 9.5px;
-  letter-spacing: 0.07em;
+  font-size: 8px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  opacity: 0.6;
-  line-height: 1.25;
+  opacity: 0.55;
+  line-height: 1.2;
+  text-align: center;
   margin-top: 3px;
 }
-.tankCash {
-  font-size: 11px;
+
+/* Die Zahl, die vorher fehlte: läuft der Monat für oder gegen euch. */
+.saldo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  border-radius: 10px;
+  padding: 5px 6px;
+  text-align: center;
+}
+.saldo strong {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.saldo span {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+.saldoAb {
+  background: rgba(216, 90, 48, 0.1);
+  color: var(--bad);
+}
+.saldoAuf {
+  background: rgba(29, 158, 117, 0.12);
+  color: var(--ok);
+}
+.konto {
+  font-size: 10px;
   font-weight: 600;
   opacity: 0.55;
-  margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -284,15 +368,6 @@
   margin-top: auto;
   flex: none;
 }
-.railFoot {
-  font-size: 9px;
-  font-weight: 600;
-  opacity: 0.6;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  padding-bottom: 2px;
-}
-
 .punkteReihe {
   display: inline-flex;
   gap: 3px;
@@ -373,10 +448,31 @@
   opacity: 0.45;
   cursor: default;
 }
-.itemLabel {
+/* Gesperrt heißt sichtbar gesperrt — der Grund steht auf der Zeile und
+   nicht erst in der Detailkarte, die man dafür öffnen müsste. */
+.itemLocked {
+  opacity: 0.5;
+}
+.itemText {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.itemLabel {
   font-size: 14.5px;
   line-height: 1.3;
+}
+.itemMeta {
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+.itemLocked .itemMeta {
+  color: var(--bad);
+  opacity: 0.85;
 }
 .itemLeft {
   font-size: 9.5px;
@@ -475,11 +571,21 @@
 .karte {
   cursor: pointer;
 }
-.detailBild,
 .karteBild {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
+  background: #e9e6df;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+}
+/* Die Detailkarte bekommt nur einen Streifen: sonst sieht sie aus wie
+   die Phasenkarte davor, und „Starten“ steht unter dem Bildschirmrand. */
+.detailBild {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 32 / 9;
+  max-height: 120px;
   background: #e9e6df;
   border-radius: 20px 20px 0 0;
   overflow: hidden;
@@ -552,6 +658,14 @@
   background: #fdeede !important;
   color: #b4600e;
 }
+.dauer {
+  background: #e9e6ff !important;
+  color: #2200ff;
+}
+.gratis {
+  background: rgba(29, 158, 117, 0.12) !important;
+  color: #167a5a;
+}
 .detailActions {
   display: flex;
   gap: 8px;
@@ -591,13 +705,28 @@
 .down {
   color: var(--bad);
 }
-.tapHint {
+/* Vorher ein grauer Hinweis, den man übersehen hat. Jetzt der blaue
+   Knopf, nach dem man in einem Pop-up sucht. */
+.weiterBtn {
   display: block;
-  font-size: 10.5px;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  opacity: 0.45;
+  letter-spacing: 0.02em;
+  padding: 13px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--akzent);
+  color: #fff;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.weiterBtn:hover {
+  background: #1a00cc;
+}
+.kickerGut {
+  color: var(--ok);
 }
 
 /* ── Knöpfe ── */
@@ -705,12 +834,17 @@
   .board {
     padding: 14px 16px 0;
   }
-  .tankSvg {
-    width: 54px;
-    height: 150px;
+  .zifferblatt {
+    max-width: 170px;
   }
   .clock {
-    font-size: 48px;
+    font-size: 44px;
+  }
+  .clockUnit {
+    font-size: 9px;
+  }
+  .saldo strong {
+    font-size: 16px;
   }
 }
 @media (max-width: 380px) {
@@ -718,11 +852,10 @@
     grid-template-columns: 104px minmax(0, 1fr);
   }
   .clock {
-    font-size: 32px;
+    font-size: 28px;
   }
-  .tankSvg {
-    width: 34px;
-    height: 104px;
+  .zifferblatt {
+    max-width: 100px;
   }
   .itemLabel {
     font-size: 13.5px;

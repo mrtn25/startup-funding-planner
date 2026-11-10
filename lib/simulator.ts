@@ -167,6 +167,8 @@ export type GameState = {
   lastEvent: number;
   /** Liquidationspräferenz aus der Runde, die man genommen hat. */
   pref: "1x" | "2x" | null;
+  /** Schon gefeierte Erfolge — jeder Moment kommt genau einmal. */
+  gefeiert: string[];
   seed: number;
 };
 
@@ -182,8 +184,21 @@ const clamp = (v: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));
  * was Speditionen zahlen, abzüglich dessen, was ihre Betreuung kostet.
  */
 export function netBurn(s: GameState): number {
-  const betreuung = Math.round(s.customers * 180);
+  const betreuung = Math.round(s.customers * 120);
   return s.burn + betreuung - s.mrr;
+}
+
+/**
+ * Was am Monatsende übrig bleibt — positiv heißt: es kommt mehr rein,
+ * als rausgeht.
+ *
+ * Dieselbe Zahl wie netBurn, nur andersherum, und das ist der Punkt:
+ * „Runway 9 Monate“ sagt nicht, ob er gerade steigt oder fällt. Ein
+ * Spiel, in dem der erste zahlende Kunde sich nicht anfühlt, hat den
+ * wichtigsten Moment verschenkt.
+ */
+export function saldo(s: GameState): number {
+  return -netBurn(s);
 }
 
 /**
@@ -228,6 +243,7 @@ export function initialState(seed = 1): GameState {
     drawn: [],
     lastEvent: 0,
     pref: null,
+    gefeiert: [],
     seed,
   };
 }
@@ -399,6 +415,28 @@ export function drawEvent(s: GameState, all: GameEvent[]): GameEvent | null {
   );
   if (!offen.length) return null;
   return offen[Math.floor(rand(s.seed + s.month) * offen.length) % offen.length];
+}
+
+/* ── Erfolge ─────────────────────────────────────────────────── */
+
+/**
+ * Ein Moment, in dem es mal gut läuft.
+ *
+ * Ein Spiel, das nur Rechnungen stellt, ist eine Tabelle. Die erste
+ * bezahlte Rechnung und der erste Monat, der sich selbst trägt, sind
+ * die zwei Stellen, an denen die Uhr aufhört, gegen einen zu laufen —
+ * und das muss auf dem Bildschirm passieren, nicht im Kopf.
+ */
+export type Erfolg = {
+  id: string;
+  title: string;
+  beats: [string, string];
+  /** Gilt für den Übergang, nicht für den Zustand. */
+  when: (vorher: GameState, nachher: GameState) => boolean;
+};
+
+export function erfolge(vorher: GameState, nachher: GameState, alle: Erfolg[]): Erfolg[] {
+  return alle.filter((e) => !nachher.gefeiert.includes(e.id) && e.when(vorher, nachher));
 }
 
 /* ── The rival ───────────────────────────────────────────────── */
