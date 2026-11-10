@@ -52,22 +52,30 @@ startup numbers that are actually traceable to a source, in one Next.js app — 
 
 Plus a module that is not a calculator at all:
 
-- **Can you get to an exit?** (`/simulator`) — a decision game that follows one
-  company through the five stages it actually has: you notice a problem you
-  cannot stop seeing, you build the smallest thing that tests it, you find out
-  whether anybody cares, you send the first invoice, and then other people's
-  money arrives with conditions attached. Palettio fills the empty return trips
-  of mid-sized freight forwarders; you are Lena Brandt, who dispatched trucks
-  in Hamburg for three years and counted how many came home empty.
+- **Can you get to an exit?** (`/simulator`) — a decision game about one
+  concrete company. Palettio fills the empty return trips of mid-sized freight
+  forwarders; you are Lena Brandt, who dispatched trucks in Hamburg and counted
+  how many came home empty.
 
-  Modelled on GermanZero's *Klimakanzler:in* and the three things that game
-  gets right: the clock runs while you decide, so dithering costs months; the
-  meters twitch rather than slide; and consequences arrive in two beats — what
-  happened, then what it cost, with the number on a badge, usually against a
-  meter the decision was not aiming at. Fourteen events fire while you
-  deliberate, and the people recur: Ole Wendt dispatches for Krämer in chapter
-  three and what you did to him then is what he does to you in chapter five.
-  Five endings, four of them survivable.
+  You stand on a milestone, pick one measure out of a deck, months pass, and
+  then you find out what it did. The cards name their cost and their duration
+  because those are planning inputs; the effect is not on the card, because
+  learning what a trade fair actually buys is the thing the game is for. The
+  effects are fixed rather than rolled — unknown is not random, and on the
+  second run you know what the fair does.
+
+  Two kinds of pressure. A clock: your runway in months, the biggest thing on
+  the screen, which runs while you think and jumps forward with every measure
+  you commit to. It reads ∞ at the start because Lena still has a salary, and
+  the month that stops being true is the loudest moment in the game. And a
+  rival: Retoura in Rotterdam is building the same thing, moves on its own,
+  moves faster once it has raised, and takes the trade fair stand and the
+  90-truck account if it gets there first.
+
+  Underneath both, Jonas has an opinion about how this should be funded and
+  does not announce it. Every large decision quietly agrees or disagrees with
+  him, one card in the second deck is simply asking him, and a run can end in
+  the first year because the two of you never had that conversation.
 
 Plus two sections that are not tools:
 

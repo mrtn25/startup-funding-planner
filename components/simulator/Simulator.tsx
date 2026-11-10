@@ -1,182 +1,181 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import styles from "./Simulator.module.css";
 import {
-  advance,
-  applyChoice,
   applyEffects,
   badges,
-  brokeNow,
-  drawEvent,
-  eventDue,
+  beatsOf,
+  deckFor,
+  fmtEuro,
+  forcedEnding,
   initialState,
   meterViews,
+  rivalMove,
+  runTactic,
+  runway,
   tick,
-  type Choice,
   type Effects,
   type GameState,
+  type Tactic,
 } from "@/lib/simulator";
-import { CHAPTERS, ENDING_BY_ID, EVENTS, INTRO, SCENE_BY_ID, pickEnding } from "@/lib/simulator-scenes";
+import {
+  ENDING_BY_ID,
+  INTRO,
+  MILESTONES,
+  MILESTONE_BY_ID,
+  RIVAL_STEPS,
+  TACTICS,
+  pickEnding,
+} from "@/lib/simulator-scenes";
 
-/** One month of game time. Fourteen seconds: reading a scene properly
-    costs about a month, which is the pressure. Simulating the whole
-    story at three months of deliberation per scene ended insolvent in
-    four runs out of five — that is not tension, that is a tax on
-    reading. */
-const MS_PER_MONTH = 14000;
+/** One month of game time while you are only thinking. Twenty seconds:
+    the clock has to be visibly moving — that is the whole point of
+    having one — without charging rent on reading a card. The months
+    that actually hurt come from the cards you commit to. */
+const MS_PER_MONTH = 20_000;
 
 type Card = {
-  kind: "consequence" | "event" | "chapter";
+  kind: "result" | "rival" | "milestone";
+  kicker: string;
   title?: string;
-  kicker?: string;
   image?: string;
-  beats: { text: string; effects?: Effects }[];
-  /** Badges shown on the last beat, for a choice's mechanical result. */
+  beats: string[];
   summary?: Effects;
 };
-
-/** The card that opens a chapter — the spine of the thing, made visible. */
-function chapterCard(n: number): Card {
-  const ch = CHAPTERS.find((c) => c.number === n) ?? CHAPTERS[0];
-  return {
-    kind: "chapter",
-    kicker: `Chapter ${ch.number} of ${CHAPTERS.length}`,
-    title: ch.title,
-    image: ch.image,
-    beats: [{ text: ch.blurb }],
-  };
-}
 
 type Phase = "intro" | "play" | "ending";
 
 export default function Simulator() {
   const [phase, setPhase] = useState<Phase>("intro");
-  const [state, setState] = useState<GameState>(() => initialState(CHAPTERS[0]));
+  const [state, setState] = useState<GameState>(() => initialState(Date.now() % 1000));
   const [cards, setCards] = useState<Card[]>([]);
   const [beat, setBeat] = useState(0);
-  const card = cards[0] ?? null;
   const [paused, setPaused] = useState(false);
-  /* The clock runs while you are deciding and stops while the story is
-     talking. Klimakanzler lets it run through everything, which works
-     for a game whose cards are one line of policy — here the cards are
-     the story, and charging rent on it taught players to skim the best
-     part. Deliberation costs months; being told what happened does not. */
-  const running = phase === "play" && !paused && !card && !state.endingId;
-  const tickRef = useRef(0);
 
-  const scene = SCENE_BY_ID[state.sceneId];
+  const card = cards[0] ?? null;
+  const milestone = MILESTONE_BY_ID[state.milestoneId] ?? MILESTONES[0];
+  const deck = useMemo(() => deckFor(state, milestone, TACTICS), [state, milestone]);
   const meters = useMemo(() => meterViews(state), [state]);
-  const chapter = CHAPTERS.find((c) => c.number === state.chapter) ?? CHAPTERS[0];
+  const months = runway(state);
   const ending = state.endingId ? ENDING_BY_ID[state.endingId] : null;
+  const running = phase === "play" && !paused && !card && !state.endingId;
 
-  const finish = useCallback((s: GameState) => ({ ...s, endingId: pickEnding(s) }), []);
+  const milestoneCard = useCallback((id: string): Card => {
+    const m = MILESTONE_BY_ID[id];
+    return {
+      kind: "milestone",
+      kicker: `Milestone ${MILESTONES.findIndex((x) => x.id === id) + 1} of ${MILESTONES.length}`,
+      title: m.title,
+      image: m.image,
+      beats: [m.blurb, `What you need: ${m.gateLabel.toLowerCase()}.`],
+    };
+  }, []);
 
+  /* The clock. It runs while the board is in front of you and stops
+     while the game is talking, because a card is not a decision. */
   useEffect(() => {
     if (!running) return;
-    const id = window.setInterval(() => {
-      setState((s) => {
-        const next = tick(s);
-        if (brokeNow(next)) return { ...next, endingId: "insolvent" };
-        /* The chapter's clock running out is not a loss — it just means
-           the next thing happens with whatever you have by then. */
-        if (next.left === 0) {
-          if (next.chapter >= CHAPTERS.length) return finish(next);
-          const nextChapter = CHAPTERS[next.chapter];
-          return { ...next, chapter: nextChapter.number, left: nextChapter.months, sceneId: nextChapter.firstScene };
-        }
-        tickRef.current += 1;
-        return next;
-      });
-    }, MS_PER_MONTH);
+    const id = window.setInterval(() => setState((s) => settle(s)), MS_PER_MONTH);
     return () => window.clearInterval(id);
-  }, [running, finish]);
+  }, [running]);
 
-  /* Events are drawn on the beat rather than at random moments, so the
-     rhythm is predictable even though the content is not. */
+  /** One month of drift, then everything that falls out of it. */
+  const settle = (s: GameState): GameState => {
+    const next = tick(s);
+    const dead = forcedEnding(next);
+    return dead ? { ...next, endingId: dead } : next;
+  };
+
+  /* Retoura moves on its own clock, and says so when it passes you. */
   useEffect(() => {
-    if (!running || card || !eventDue(state)) return;
-    const ev = drawEvent(state, EVENTS);
-    if (!ev) return;
-    setState((s) => ({ ...s, fired: [...s.fired, ev.id], lastEvent: s.month }));
-    setCards([{ kind: "event", beats: ev.beats }]);
+    if (!running) return;
+    const move = rivalMove(state, RIVAL_STEPS);
+    if (!move) return;
+    setState((s) => applyEffects({ ...s, rivalSeen: [...s.rivalSeen, move.at] }, move.effects));
+    setCards((cs) => [...cs, { kind: "rival", kicker: "Rotterdam", title: move.label, beats: [...move.beats] }]);
     setBeat(0);
-  }, [state, running, card]);
+  }, [state, running]);
 
-  const choose = (choice: Choice) => {
-    const moved = applyChoice(state, choice);
-    const crossed = SCENE_BY_ID[choice.next]?.chapter;
-    const withChapter =
-      crossed && crossed > moved.chapter
-        ? { ...moved, chapter: crossed, left: (CHAPTERS.find((c) => c.number === crossed) ?? chapter).months }
-        : moved;
-    setState(brokeNow(withChapter) ? { ...withChapter, endingId: "insolvent" } : withChapter);
+  const commit = (t: Tactic) => {
+    const after = runTactic(state, t);
     const queue: Card[] = [
-      { kind: "consequence", beats: choice.beats.map((text) => ({ text })), summary: choice.effects },
+      {
+        kind: "result",
+        kicker: t.label,
+        beats: [...beatsOf(t, state.stance)],
+        summary: { ...t.effects, cash: (t.effects.cash ?? 0) - (t.cost ?? 0) || undefined },
+      },
     ];
-    if (crossed && crossed > state.chapter) queue.push(chapterCard(crossed));
+    const done = forcedEnding(after);
+    if (done) {
+      setState({ ...after, endingId: done });
+    } else if (milestone.gate(after) && milestone.next) {
+      const next = MILESTONE_BY_ID[milestone.next];
+      const enter = next.onEnter;
+      const fires = enter && (!enter.when || enter.when(after));
+      setState({ ...(fires ? applyEffects(after, enter!.effects) : after), milestoneId: milestone.next });
+      queue.push(milestoneCard(milestone.next));
+      if (fires) {
+        queue.push({ kind: "rival", kicker: "Monday morning", title: enter!.title, beats: [...enter!.beats], summary: enter!.effects });
+      }
+    } else if (milestone.gate(after) && !milestone.next) {
+      setState({ ...after, endingId: pickEnding(after) });
+    } else {
+      setState(after);
+    }
     setCards(queue);
     setBeat(0);
   };
 
   const nextBeat = () => {
     if (!card) return;
-    const current = card.beats[beat];
-    if (current?.effects) setState((s) => applyEffects(s, current.effects));
     if (beat + 1 < card.beats.length) {
       setBeat(beat + 1);
       return;
     }
     setCards((cs) => cs.slice(1));
     setBeat(0);
-    setState((s) => {
-      if (brokeNow(s)) return { ...s, endingId: "insolvent" };
-      if (s.sceneId === "@finale") return finish(s);
-      return s;
-    });
   };
 
   useEffect(() => {
     if (state.endingId && !card) setPhase("ending");
   }, [state.endingId, card]);
 
+  const start = () => {
+    setCards([milestoneCard(MILESTONES[0].id)]);
+    setBeat(0);
+    setPhase("play");
+  };
+
   const restart = () => {
-    setState(initialState(CHAPTERS[0], Math.floor(Math.random() * 100000)));
+    setState(initialState(Math.floor(Math.random() * 1000)));
     setCards([]);
     setBeat(0);
     setPaused(false);
     setPhase("intro");
   };
 
-  /* ── Intro ── */
   if (phase === "intro") {
     return (
       <div className={styles.root}>
         <div className={styles.card}>
-          <Scene image={INTRO.image} alt="Lena and Jonas at the kitchen table" />
+          <Scene image={INTRO.image} alt="Lena in the dispatch office" />
           <div className={styles.body}>
             <div className={styles.who}>{INTRO.who}</div>
-            <h1>You are about to start Palettio</h1>
+            <h1>Thirty-one percent of your trucks come home empty</h1>
             {INTRO.lines.map((l) => (
-              <p className={styles.text} key={l.slice(0, 24)}>
+              <p className={styles.text} key={l.slice(0, 20)}>
                 {l}
               </p>
             ))}
             <ul className={styles.rules}>
               {INTRO.rules.map((r) => (
-                <li key={r.slice(0, 20)}>{r}</li>
+                <li key={r.slice(0, 18)}>{r}</li>
               ))}
             </ul>
-            <button
-              type="button"
-              className={styles.primary}
-              onClick={() => {
-                setCards([chapterCard(1)]);
-                setBeat(0);
-                setPhase("play");
-              }}
-            >
+            <button type="button" className={styles.primary} onClick={start}>
               Start the clock
             </button>
           </div>
@@ -185,11 +184,9 @@ export default function Simulator() {
     );
   }
 
-  /* ── Ending ── */
   if (phase === "ending" && ending) {
     return (
       <div className={styles.root}>
-        <Hud state={state} meters={meters} chapter={chapter} paused onPause={() => {}} hideClock />
         <div className={styles.card}>
           <Scene image={ending.image} alt={ending.title} />
           <div className={styles.body}>
@@ -208,59 +205,51 @@ export default function Simulator() {
     );
   }
 
-  /* ── Playing ── */
   return (
     <div className={styles.root}>
-      <Hud state={state} meters={meters} chapter={chapter} paused={paused} onPause={() => setPaused((p) => !p)} />
+      <Hud state={state} meters={meters} months={months} paused={paused} onPause={() => setPaused((p) => !p)} />
 
       {card ? (
         <button type="button" className={`${styles.card} ${styles.cardTap}`} onClick={nextBeat}>
           {card.image && <Scene image={card.image} alt={card.title ?? ""} />}
           <div className={styles.body}>
-            <div className={styles.kicker}>
-              {card.kicker ?? (card.kind === "event" ? "Meanwhile" : "What happened")}
-            </div>
+            <div className={styles.kicker}>{card.kicker}</div>
             {card.title && <h2 className={styles.cardTitle}>{card.title}</h2>}
-            <p className={styles.beat}>{card.beats[beat]?.text}</p>
-            {beat === card.beats.length - 1 && (
+            <p className={styles.beat}>{card.beats[beat]}</p>
+            {beat === card.beats.length - 1 && card.summary && (
               <div className={styles.badges}>
-                {badges(card.summary ?? card.beats[beat]?.effects).map((b) => (
+                {badges(card.summary).map((b) => (
                   <span key={b.label} className={`${styles.badge} ${b.up ? styles.up : styles.down}`}>
                     {b.label}
                   </span>
                 ))}
               </div>
             )}
-            <span className={styles.tapHint}>
-              {card.kind === "chapter" ? "Tap to begin" : beat + 1 < card.beats.length ? "Tap to continue" : "Tap to carry on"}
-            </span>
+            <span className={styles.tapHint}>{beat + 1 < card.beats.length ? "Tap to continue" : "Tap to carry on"}</span>
           </div>
         </button>
       ) : (
-        scene && (
-          <div className={styles.card}>
-            <Scene image={scene.image} alt={scene.title} />
-            <div className={styles.body}>
-              <div className={styles.place}>{scene.place}</div>
-              <h2>{scene.title}</h2>
-              <p className={styles.text}>
-                {scene.speaker && <span className={styles.speaker}>{scene.speaker}</span>}
-                {scene.text}
-              </p>
-              <div className={styles.choices}>
-                {scene.choices.map((c) => (
-                  <button key={c.id} type="button" className={styles.choice} onClick={() => choose(c)}>
-                    <strong>{c.label}</strong>
-                    <span>
-                      {c.detail}
-                      {c.months ? ` · ${c.months} mo` : ""}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+        <>
+          <div className={styles.goal}>
+            <div className={styles.goalLabel}>Milestone {MILESTONES.findIndex((m) => m.id === milestone.id) + 1}</div>
+            <h2>{milestone.title}</h2>
+            <p>{milestone.gateLabel}</p>
           </div>
-        )
+
+          <div className={styles.deck}>
+            {deck.map((t) => (
+              <button key={t.id} type="button" className={styles.tactic} onClick={() => commit(t)}>
+                <strong>{t.label}</strong>
+                <span className={styles.flavour}>{t.flavour}</span>
+                <span className={styles.price}>
+                  <em>{t.months} {t.months === 1 ? "month" : "months"}</em>
+                  {t.cost ? <em className={styles.cost}>{fmtEuro(t.cost)}</em> : null}
+                </span>
+              </button>
+            ))}
+            {!deck.length && <p className={styles.empty}>Nothing left to try here. The clock is the only thing still moving.</p>}
+          </div>
+        </>
       )}
     </div>
   );
@@ -286,50 +275,65 @@ function Scene({ image, alt }: { image: string; alt: string }) {
 }
 
 /**
- * The HUD.
+ * The runway, large, with Retoura beside it.
  *
- * Countdown first and large, because it is the thing creating the
- * pressure; the four meters underneath in one grid, each a label with
- * its number directly beneath it rather than pushed to the far side of
- * the row — which is what made the first version read as four
- * unrelated words and four unrelated numbers.
+ * Two kinds of pressure on one line: the number that goes down on its
+ * own, and the company that goes up on its own. Everything else is a
+ * thin bar underneath, because five meters shouting at once is five
+ * meters nobody reads.
  */
 function Hud({
   state,
   meters,
-  chapter,
+  months,
   paused,
   onPause,
-  hideClock,
 }: {
   state: GameState;
   meters: ReturnType<typeof meterViews>;
-  chapter: (typeof CHAPTERS)[number];
+  months: number;
   paused: boolean;
   onPause: () => void;
-  hideClock?: boolean;
 }) {
-  const share = Math.max(0, Math.min(1, state.left / chapter.months));
+  const low = isFinite(months) && months <= 6;
   return (
     <div className={styles.hud}>
       <div className={styles.hudTop}>
-        <div className={styles.chapterLine}>
-          <span className={styles.chapterNo}>Chapter {chapter.number}</span>
-          <span className={styles.chapterName}>{chapter.title}</span>
+        <div className={styles.clockBox}>
+          <span className={`${styles.clock} ${low ? styles.clockLow : ""}`}>{isFinite(months) ? months : "∞"}</span>
+          <span className={styles.clockUnit}>
+            {isFinite(months) ? (
+              <>
+                months
+                <br />
+                of runway
+              </>
+            ) : (
+              /* An infinity sign on its own reads as "no clock". It is a
+                 clock that has not started: the salary is still paying. */
+              <>
+                runway
+                <br />
+                while you are employed
+              </>
+            )}
+          </span>
+          <button type="button" className={styles.pause} onClick={onPause} aria-label={paused ? "Resume" : "Pause"}>
+            {paused ? "▶" : "❚❚"}
+          </button>
         </div>
-        {!hideClock && (
-          <div className={styles.clockBox}>
-            <span className={`${styles.clock} ${state.left <= 3 ? styles.clockLow : ""}`}>{state.left}</span>
-            <span className={styles.clockUnit}>months left</span>
-            <button type="button" className={styles.pause} onClick={onPause} aria-label={paused ? "Resume" : "Pause"}>
-              {paused ? "▶" : "❚❚"}
-            </button>
+
+        <div className={styles.rival}>
+          <div className={styles.rivalTop}>
+            <span>Retoura · Rotterdam</span>
+            <strong>{Math.round(state.rival)}%</strong>
           </div>
-        )}
+          <span className={styles.rivalTrack}>
+            <span className={styles.rivalFill} style={{ width: `${Math.min(100, state.rival)}%` }} />
+          </span>
+          <span className={styles.rivalNote}>month {state.month} · {fmtEuro(state.cash)} in the bank</span>
+        </div>
       </div>
-      <span className={styles.clockTrack}>
-        <span className={styles.clockFill} style={{ width: `${share * 100}%` }} />
-      </span>
 
       <div className={styles.meters}>
         {meters.map((m) => (

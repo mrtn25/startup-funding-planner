@@ -41,79 +41,59 @@
 }
 
 /* ── The HUD ──
-   Countdown first and large, meters underneath in one grid. The first
-   version pushed each label and its number to opposite ends of a wide
-   row, which on a desktop read as four unrelated words followed by
-   four unrelated numbers. */
+   The runway is the biggest thing on the screen because it is the
+   number founders actually watch, and Retoura sits next to it because
+   a countdown alone is just arithmetic. The five meters are a thin
+   strip underneath: five bars shouting at once is five bars nobody
+   reads. */
 
 .hud {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: color-mix(in srgb, var(--sm-bg) 92%, transparent);
+  background: color-mix(in srgb, var(--sm-bg) 93%, transparent);
   backdrop-filter: blur(10px);
-  padding: 10px 14px 12px;
+  padding: 12px 14px 12px;
   margin-bottom: 14px;
   border: 1px solid var(--sm-line);
   border-radius: 14px;
 }
 .hudTop {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 7px;
-}
-.chapterLine {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.chapterNo {
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--sm-fg3);
-}
-.chapterName {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 18px;
+  margin-bottom: 14px;
 }
 .clockBox {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   flex: none;
 }
 .clock {
-  font-size: 26px;
+  font-size: 44px;
   font-weight: 500;
-  line-height: 1;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
 }
 .clockLow {
   color: var(--sm-bad);
 }
 .clockUnit {
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--sm-fg3);
+  line-height: 1.3;
 }
 .pause {
   font: inherit;
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1;
-  align-self: center;
-  margin-left: 4px;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border: 1px solid var(--sm-line2);
@@ -121,31 +101,60 @@
   background: var(--sm-bg);
   color: var(--sm-fg2);
   cursor: pointer;
+  margin-left: 2px;
 }
 .pause:hover {
   color: var(--sm-fg);
   border-color: var(--sm-accent);
 }
-.clockTrack {
-  display: block;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--sm-line);
-  overflow: hidden;
-  margin-bottom: 12px;
+
+.rival {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.clockFill {
+.rivalTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sm-fg3);
+}
+.rivalTop strong {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sm-warn);
+  font-variant-numeric: tabular-nums;
+}
+.rivalTrack {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--sm-bg2);
+  overflow: hidden;
+}
+.rivalFill {
   display: block;
   height: 100%;
-  background: var(--sm-accent);
-  border-radius: 2px;
-  transition: width 0.4s linear;
+  border-radius: 3px;
+  background: var(--sm-warn);
+  transition: width 0.5s linear;
+}
+.rivalNote {
+  font-size: 10px;
+  color: var(--sm-fg3);
+  font-variant-numeric: tabular-nums;
 }
 
 .meters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
 }
 .meter {
   display: flex;
@@ -154,20 +163,24 @@
   min-width: 0;
 }
 .meterLabel {
-  font-size: 9.5px;
+  font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--sm-fg3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .meterValue {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .meterTrack {
   display: block;
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
   background: var(--sm-bg2);
   overflow: hidden;
@@ -196,6 +209,94 @@
 }
 .bad {
   color: var(--sm-bad);
+}
+
+/* ── The milestone and its deck ── */
+
+.goal {
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+.goalLabel {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sm-accent);
+  margin-bottom: 3px;
+}
+.goal h2 {
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0 0 4px;
+}
+.goal p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--sm-fg3);
+  margin: 0;
+}
+
+.deck {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* The card says what it costs and how long it takes. What it does is
+   the part you are here to find out. */
+.tactic {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 15px;
+  border: 1px solid var(--sm-line2);
+  border-radius: 12px;
+  background: var(--sm-bg);
+  color: var(--sm-fg);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.08s;
+}
+.tactic:hover {
+  border-color: var(--sm-accent);
+}
+.tactic:active {
+  transform: translateY(1px);
+}
+.tactic strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.flavour {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--sm-fg2);
+}
+.price {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.price em {
+  font-style: normal;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--sm-bg2);
+  color: var(--sm-fg3);
+  font-variant-numeric: tabular-nums;
+}
+.cost {
+  color: var(--sm-warn) !important;
+}
+.empty {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sm-fg3);
+  padding: 18px 2px;
 }
 
 /* ── Cards ── */
@@ -255,28 +356,11 @@
   color: var(--sm-accent);
   margin-bottom: 6px;
 }
-.place {
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--sm-fg3);
-  margin-bottom: 5px;
-}
 .text {
   font-size: 14.5px;
   line-height: 1.65;
   color: var(--sm-fg2);
   margin: 0 0 14px;
-}
-.speaker {
-  display: inline-block;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--sm-accent);
-  margin-right: 8px;
-  vertical-align: 1px;
 }
 .rules {
   margin: 0 0 18px;
@@ -340,11 +424,6 @@
 
 /* ── Choices ── */
 
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .choice {
   font: inherit;
   text-align: left;
@@ -449,6 +528,15 @@
 }
 
 @media (max-width: 560px) {
+  .clock {
+    font-size: 36px;
+  }
+  .meters {
+    gap: 6px;
+  }
+  .meterValue {
+    font-size: 12.5px;
+  }
   .root {
     padding: 0.5rem 0.75rem 2.5rem;
   }

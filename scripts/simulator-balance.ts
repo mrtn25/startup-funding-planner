@@ -1,68 +1,79 @@
 /* ══════════════════════════════════════════════════════════════
-   Balance harness for the simulator.
+   Balance harness.
 
        node --experimental-strip-types scripts/simulator-balance.ts
 
-   Plays the whole story under five fixed strategies and three levels
-   of dithering, four seeds each, and prints which ending came out.
-   Content changes move these numbers, and the numbers are the only
-   way to see things reading cannot: that one ending was swallowing
-   three quarters of all games, that the seed ending was arithmetically
-   unreachable, that confidence bled out two chapters before anybody
-   could spend it.
-
-   Nothing here runs in the browser or in CI — it is a measuring stick
-   for whoever next writes a scene.
+   Plays the whole chain under several card-picking strategies and
+   prints where each run ended, how long it took and what Retoura was
+   doing by then. Content changes move these numbers; reading the
+   content does not show you that one ending swallows every run, or
+   that a milestone is unreachable with its own deck.
    ══════════════════════════════════════════════════════════════ */
 
-import {
-  advance,
-  applyChoice,
-  applyEffects,
-  brokeNow,
-  drawEvent,
-  eventDue,
-  initialState,
-  type GameState,
-} from "../lib/simulator.ts";
-import { CHAPTERS, EVENTS, SCENE_BY_ID, pickEnding } from "../lib/simulator-scenes.ts";
+import { applyEffects, deckFor, forcedEnding, initialState, runTactic, runway, type GameState } from "../lib/simulator.ts";
+import { MILESTONES, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
 
-/** One run: `pick` chooses an index, `idle` = months of deliberation per scene. */
+/** `pick` chooses a card; `idle` is months of dithering before each. */
 function play(pick: (n: number, step: number) => number, idle: number, seed: number) {
-  let s: GameState = { ...initialState(CHAPTERS[0], seed) };
+  let s: GameState = initialState(seed);
   let step = 0;
-  while (s.sceneId !== "@finale" && !brokeNow(s) && step < 30) {
-    const scene = SCENE_BY_ID[s.sceneId];
-    if (!scene) break;
-    s = advance(s, idle);                               // reading the scene
-    if (brokeNow(s)) break;
-    // events, as the UI fires them
-    if (eventDue(s)) {
-      const ev = drawEvent(s, EVENTS);
-      if (ev) { s = { ...s, fired: [...s.fired, ev.id], lastEvent: s.month };
-        for (const b of ev.beats) s = applyEffects(s, b.effects); }
+  while (step < 40) {
+    const m = MILESTONE_BY_ID[s.milestoneId];
+    if (!m) break;
+    if (m.gate(s)) {
+      if (!m.next) break;
+      const next = MILESTONE_BY_ID[m.next];
+      /* The stage's own arrival effect counts too — leaving it out here
+         is how a harness quietly stops describing the real game. */
+      const enter = next.onEnter;
+      s = { ...(enter && (!enter.when || enter.when(s)) ? applyEffects(s, enter.effects) : s), milestoneId: m.next };
+      continue;
     }
-    const c = scene.choices[pick(scene.choices.length, step)];
-    s = applyChoice(s, c);
-    const nextCh = SCENE_BY_ID[c.next]?.chapter;
-    if (nextCh && nextCh > s.chapter) s = { ...s, chapter: nextCh, left: CHAPTERS[nextCh - 1].months };
+    const deck = deckFor(s, m, TACTICS);
+    if (!deck.length) break;
+    // Dithering costs months like anything else.
+    for (let i = 0; i < idle; i++) s = runTactic(s, { ...deck[0], id: "__idle", months: 1, effects: {}, cost: 0 });
+    const dead = forcedEnding(s);
+    if (dead) return { ending: dead, ...snapshot(s) };
+    s = runTactic(s, deck[pick(deck.length, step)]);
+    const after = forcedEnding(s);
+    if (after) return { ending: after, ...snapshot(s) };
     step++;
   }
-  return { ending: brokeNow(s) ? "insolvent" : pickEnding(s), months: s.month, cash: Math.round(s.cash), eq: Math.round(s.equity), inv: Math.round(s.investors), cust: Math.round(s.customers) };
+  return { ending: pickEnding(s), ...snapshot(s) };
 }
 
+const snapshot = (s: GameState) => ({
+  months: s.month,
+  cash: Math.round(s.cash),
+  mrr: s.mrr,
+  customers: s.customers,
+  inv: Math.round(s.investors),
+  team: Math.round(s.team),
+  eq: Math.round(s.equity),
+  align: Math.round(s.alignment),
+  rival: Math.round(s.rival),
+  runway: runway(s),
+  stance: s.stance,
+});
+
 const styles: [string, (n: number, i: number) => number][] = [
-  ["always first", () => 0],
-  ["always second", (n) => Math.min(1, n - 1)],
-  ["always last", (n) => n - 1],
+  ["first card", () => 0],
+  ["second card", (n) => Math.min(1, n - 1)],
+  ["last card", (n) => n - 1],
   ["alternating", (n, i) => i % n],
-  ["mixed", (n, i) => (i % 2 ? 1 : Math.min(2, n - 1))],
+  ["cheapest-looking", (n, i) => (i % 2 ? 0 : Math.min(2, n - 1))],
 ];
+
 for (const [name, pick] of styles) {
-  for (const idle of [0, 1, 2]) {
-    const runs = [1, 7, 42, 99].map((seed) => play(pick, idle, seed));
-    const tally = runs.map((r) => r.ending).join(", ");
+  for (const idle of [0, 2]) {
+    const runs = [1, 2, 7, 42].map((seed) => play(pick, idle, seed));
+    const endings = runs.map((r) => r.ending).join(", ");
     const r = runs[0];
-    console.log(`${name.padEnd(15)} idle ${idle} → ${tally.padEnd(46)} | m${r.months} cash ${r.cash} eq ${r.eq}% inv ${r.inv} cust ${r.cust}`);
+    console.log(
+      `${name.padEnd(17)} idle ${idle} → ${endings.padEnd(42)} | m${String(r.months).padStart(2)} ` +
+        `cash ${String(r.cash).padStart(7)} mrr ${String(r.mrr).padStart(5)} cust ${r.customers} ` +
+        `inv ${r.inv} team ${r.team} eq ${r.eq}% align ${r.align} retoura ${r.rival}%`,
+    );
   }
 }
