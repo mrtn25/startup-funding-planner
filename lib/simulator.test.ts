@@ -5,6 +5,11 @@ import { test } from "node:test";
 import {
   advance,
   alignmentOf,
+  canStart,
+  capacity,
+  finishTactic,
+  startTactic,
+  tickBoard,
   drawEvent,
   eventDue,
   applyEffects,
@@ -28,11 +33,47 @@ const S = (patch: Partial<GameState> = {}): GameState => ({ ...initialState(1), 
 const T = (patch: Partial<Tactic> = {}): Tactic => ({
   id: "x",
   label: "x",
+  group: "Produkt",
   flavour: "x",
+  impact: { produkt: 2 },
   months: 1,
   effects: {},
   beats: ["a", "b"],
   ...patch,
+});
+
+const GRUPPEN = ["Produkt", "Vertrieb", "Team", "Geld"];
+
+/* ── Parallel laufende Maßnahmen ── */
+
+test("so viele Maßnahmen gleichzeitig, wie ihr Köpfe seid", () => {
+  const s = S({ headcount: 2 });
+  assert.equal(capacity(s), 2);
+  const a = startTactic(s, T({ id: "a", months: 2 }));
+  assert.equal(a.running.length, 1);
+  const b = startTactic(a, T({ id: "b", months: 3 }));
+  assert.equal(canStart(b, T({ id: "c" })), false, "zu zweit geht keine dritte");
+  assert.equal(canStart(b, T({ id: "a" })), false, "dieselbe nicht zweimal");
+  // Ein Hire macht einen Platz frei.
+  assert.equal(canStart({ ...b, headcount: 3 }, T({ id: "c" })), true);
+});
+
+test("die Zeit läuft für alle laufenden Maßnahmen gleichzeitig", () => {
+  let s = startTactic(S({ headcount: 2 }), T({ id: "a", months: 1 }));
+  s = startTactic(s, T({ id: "b", months: 3 }));
+  const erster = tickBoard(s);
+  assert.deepEqual(erster.done, ["a"], "nach einem Monat ist nur die kurze fertig");
+  assert.equal(erster.state.running.find((r) => r.id === "b")?.left, 2);
+});
+
+test("die Wirkung kommt beim Abschluss, die Kosten beim Start", () => {
+  const karte = T({ id: "a", months: 2, cost: 5_000, effects: { product: 20 } });
+  const gestartet = startTactic(S({ cash: 20_000, product: 10 }), karte);
+  assert.equal(gestartet.cash, 15_000, "Geld ist sofort weg");
+  assert.equal(gestartet.product, 10, "Wirkung noch nicht");
+  const fertig = finishTactic(gestartet, karte);
+  assert.equal(fertig.product, 30);
+  assert.equal(fertig.running.length, 0);
 });
 
 /* ── Die Uhr ── */
@@ -98,23 +139,22 @@ test("eine Maßnahme kostet sofort Geld, dann Zeit, dann wirkt sie", () => {
 });
 
 test("eine benutzte Karte liegt nicht mehr im Deck", () => {
-  const m = MILESTONE_BY_ID["problem"];
+  const m = MILESTONE_BY_ID["mvp"];
   const voll = deckFor(S(), m, TACTICS);
   const nachher = deckFor(S({ used: [voll[0].id] }), m, TACTICS);
   assert.equal(nachher.length, voll.length - 1);
 });
 
 test("Karten mit Bedingung tauchen erst auf, wenn sie dürfen", () => {
-  const m = MILESTONE_BY_ID["kunde"];
+  const m = MILESTONE_BY_ID["kunden"];
   const ohneProdukt = deckFor(S({ product: 10, mrr: 0, rival: 10 }), m, TACTICS).map((t) => t.id);
-  assert.ok(!ohneProdukt.includes("warme-kontakte"), "LinkedIn braucht ein Produkt");
-  assert.ok(!ohneProdukt.includes("feier-erste-rechnung"), "ohne Umsatz gibt es nichts zu feiern");
-  const mitAllem = deckFor(S({ product: 45, mrr: 890, rival: 10 }), m, TACTICS).map((t) => t.id);
-  assert.ok(mitAllem.includes("warme-kontakte") && mitAllem.includes("feier-erste-rechnung"));
+  assert.ok(!ohneProdukt.includes("warme-kontakte"), "warme Kontakte brauchen ein Produkt");
+  const mitProdukt = deckFor(S({ product: 45, mrr: 890, rival: 10 }), m, TACTICS).map((t) => t.id);
+  assert.ok(mitProdukt.includes("warme-kontakte"));
 });
 
 test("hat Retoura den Messestand, ist die Messe weg", () => {
-  const m = MILESTONE_BY_ID["kunde"];
+  const m = MILESTONE_BY_ID["kunden"];
   assert.ok(deckFor(S({ rival: 30 }), m, TACTICS).some((t) => t.id === "messe"));
   assert.ok(!deckFor(S({ rival: 50 }), m, TACTICS).some((t) => t.id === "messe"));
 });
@@ -153,8 +193,8 @@ test("gegen die Haltung des Co-Founders zu spielen beendet die Partie", () => {
   assert.equal(forcedEnding({ ...s, customers: 4 }), null);
 });
 
-test("spätestens beim ersten Kunden ist das Gehalt weg", () => {
-  const kunde = MILESTONE_BY_ID["kunde"];
+test("spätestens beim ersten fremden Geld ist das Gehalt weg", () => {
+  const kunde = MILESTONE_BY_ID["geld"];
   assert.ok(kunde.onEnter, "dieser Meilenstein muss die Uhr starten");
   assert.equal(kunde.onEnter!.when!(S({ salary: 2_300 })), true);
   assert.equal(kunde.onEnter!.when!(S({ salary: 0 })), false, "wer schon gekündigt hat, kündigt nicht nochmal");
@@ -188,8 +228,11 @@ test("wer bei 100 % Retoura keine Kunden hat, ist überholt worden", () => {
 
 test("jede Karte nennt Dauer und Wirkung, aber verrät nichts im Text", () => {
   for (const t of Object.values(TACTICS)) {
-    assert.ok(t.months >= 0 && t.months <= 6, `${t.id}: ${t.months} Monate`);
+    assert.ok(t.months >= 1 && t.months <= 6, `${t.id}: ${t.months} Monate`);
     assert.ok(t.flavour.length > 25, `${t.id} ohne Beschreibung`);
+    assert.ok(GRUPPEN.includes(t.group), `${t.id} hat die Gruppe "${t.group}"`);
+    assert.ok(Object.keys(t.impact).length > 0, `${t.id} ohne sichtbare Wirkung`);
+    for (const n of Object.values(t.impact)) assert.ok(n >= 1 && n <= 5, `${t.id}: Wirkung ${n}`);
     assert.ok(t.beats.length === 2 || t.beatsBy, `${t.id} ohne zwei Beats`);
     const wirkt = Object.keys(t.effects).length > 0 || t.beatsBy;
     assert.ok(wirkt, `${t.id} ist folgenlos`);
@@ -204,7 +247,7 @@ test("jede Karte nennt Dauer und Wirkung, aber verrät nichts im Text", () => {
 });
 
 test("jeder Meilenstein hat ein Deck, ein Tor und einen Nachfolger", () => {
-  assert.equal(MILESTONES.length, 8);
+  assert.equal(MILESTONES.length, 6);
   for (const m of MILESTONES) {
     assert.ok(m.tactics.length >= 4, `${m.id} hat nur ${m.tactics.length} Karten`);
     for (const id of m.tactics) assert.ok(TACTICS[id], `${m.id} verweist auf ${id}`);
@@ -268,7 +311,7 @@ test("das Onboarding erklärt in wenigen Sätzen, worum es geht", () => {
   assert.ok(ONBOARDING.length >= 5 && ONBOARDING.length <= 8);
   for (const z of ONBOARDING) assert.ok(z.text.length > 30 && z.text.length < 220, `zu lang oder zu kurz: ${z.text}`);
   const alles = ONBOARDING.map((z) => z.text).join(" ");
-  for (const begriff of ["Runway", "Retoura", "Maßnahme"]) {
+  for (const begriff of ["Runway", "Haulway", "Maßnahme"]) {
     assert.ok(alles.includes(begriff), `${begriff} wird nie erklärt`);
   }
 });
@@ -286,7 +329,7 @@ test("Ereigniskarten kommen mit Abstand und jede nur einmal", () => {
 });
 
 test("jede Ereigniskarte trifft etwas und erzählt es in zwei Sätzen", () => {
-  assert.ok(EVENTS.length >= 10, "zu wenige Ereignisse für acht Phasen");
+  assert.ok(EVENTS.length >= 10, "zu wenige Ereignisse für sechs Phasen");
   for (const e of EVENTS) {
     assert.equal(e.beats.length, 2, `${e.id} ohne zwei Beats`);
     assert.ok(Object.keys(e.effects).length > 0, `${e.id} bleibt folgenlos`);

@@ -10,39 +10,53 @@
    that a milestone is unreachable with its own deck.
    ══════════════════════════════════════════════════════════════ */
 
-import { applyEffects, deckFor, drawEvent, eventDue, forcedEnding, initialState, runTactic, runway, type GameState } from "../lib/simulator.ts";
-import { EVENTS, MILESTONES, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
+import { applyEffects, canStart, deckFor, drawEvent, eventDue, finishTactic, forcedEnding, initialState, startTactic, tickBoard, type GameState } from "../lib/simulator.ts";
+import { EVENTS, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
 
-/** `pick` chooses a card; `idle` is months of dithering before each. */
+/** `pick` wählt eine Karte; `idle` sind Monate Zögern vor jedem Start. */
 function play(pick: (n: number, step: number) => number, idle: number, seed: number) {
   let s: GameState = initialState(seed);
   let step = 0;
-  while (step < 60) {
-    const m = MILESTONE_BY_ID[s.milestoneId];
-    if (!m) break;
-    if (m.gate(s)) {
-      if (!m.next) break;
-      const next = MILESTONE_BY_ID[m.next];
-      /* The stage's own arrival effect counts too — leaving it out here
-         is how a harness quietly stops describing the real game. */
-      const enter = next.onEnter;
-      s = { ...(enter && (!enter.when || enter.when(s)) ? applyEffects(s, enter.effects) : s), milestoneId: m.next };
-      continue;
+  let monate = 0;
+
+  const monat = () => {
+    const { state, done } = tickBoard(s);
+    s = state;
+    for (const id of done) {
+      const t = TACTICS[id];
+      if (t) s = finishTactic(s, t);
     }
     if (eventDue(s)) {
       const e = drawEvent(s, EVENTS);
       if (e) s = applyEffects({ ...s, drawn: [...s.drawn, e.id], lastEvent: s.month }, e.effects);
     }
-    const deck = deckFor(s, m, TACTICS);
-    if (!deck.length) break;
-    // Dithering costs months like anything else.
-    for (let i = 0; i < idle; i++) s = runTactic(s, { ...deck[0], id: "__idle", months: 1, effects: {}, cost: 0 });
-    const dead = forcedEnding(s);
-    if (dead) return { ending: dead, ...snapshot(s) };
-    s = runTactic(s, deck[pick(deck.length, step)]);
-    const after = forcedEnding(s);
-    if (after) return { ending: after, ...snapshot(s) };
-    step++;
+    monate++;
+  };
+
+  while (monate < 140) {
+    const m = MILESTONE_BY_ID[s.milestoneId];
+    if (!m) break;
+    if (m.gate(s)) {
+      if (!m.next) break;
+      const next = MILESTONE_BY_ID[m.next];
+      const enter = next.onEnter;
+      s = { ...(enter && (!enter.when || enter.when(s)) ? applyEffects(s, enter.effects) : s), milestoneId: m.next };
+      continue;
+    }
+    const tot = forcedEnding(s);
+    if (tot) return { ending: tot, ...snapshot(s) };
+
+    const deck = deckFor(s, m, TACTICS).filter((t) => canStart(s, t));
+    if (deck.length && s.running.length < Math.max(1, s.headcount)) {
+      for (let i = 0; i < idle; i++) monat();
+      const t = deck[pick(deck.length, step)];
+      s = startTactic(s, t);
+      step++;
+    } else if (s.running.length) {
+      monat();
+    } else {
+      break;
+    }
   }
   return { ending: pickEnding(s), ...snapshot(s) };
 }
@@ -57,7 +71,6 @@ const snapshot = (s: GameState) => ({
   eq: Math.round(s.equity),
   align: Math.round(s.alignment),
   rival: Math.round(s.rival),
-  runway: runway(s),
   stance: s.stance,
 });
 

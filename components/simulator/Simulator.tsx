@@ -7,17 +7,20 @@ import {
   applyEffects,
   badges,
   beatsOf,
+  blockedReason,
+  canStart,
+  capacity,
   deckFor,
   drawEvent,
   eventDue,
+  finishTactic,
   fmtEuro,
   forcedEnding,
   initialState,
-  meterViews,
   rivalMove,
-  runTactic,
   runway,
-  tick,
+  startTactic,
+  tickBoard,
   type Effects,
   type GameState,
   type Tactic,
@@ -34,13 +37,12 @@ import {
   pickEnding,
 } from "@/lib/simulator-scenes";
 
-/** Ein Spielmonat, während du nur nachdenkst. Zwanzig Sekunden: die Uhr
-    muss sichtbar laufen, ohne Lesen zu bestrafen. Die Monate, die
-    wehtun, kommen von den Karten. */
-const MS_PER_MONTH = 20_000;
+/** Ein Spielmonat in Echtzeit. Die Uhr läuft, während du die Liste
+    liest — das ist der Druck. Elf Sekunden, weil die Liste kurz ist. */
+const MS_PER_MONTH = 11_000;
 
 type Card = {
-  kind: "ergebnis" | "ereignis" | "phase" | "retoura";
+  kind: "ergebnis" | "ereignis" | "phase" | "rivale";
   kicker: string;
   title?: string;
   image?: string;
@@ -50,22 +52,24 @@ type Card = {
 
 type Phase = "titel" | "onboarding" | "spiel" | "ende";
 
+const GROUPS = ["Produkt", "Vertrieb", "Team", "Geld"];
+
 export default function Simulator() {
   const [phase, setPhase] = useState<Phase>("titel");
   const [step, setStep] = useState(0);
   const [state, setState] = useState<GameState>(() => initialState(Date.now() % 1000));
   const [cards, setCards] = useState<Card[]>([]);
   const [beat, setBeat] = useState(0);
+  const [detail, setDetail] = useState<Tactic | null>(null);
   const [paused, setPaused] = useState(false);
 
   const card = cards[0] ?? null;
   const milestone = MILESTONE_BY_ID[state.milestoneId] ?? MILESTONES[0];
   const index = MILESTONES.findIndex((m) => m.id === milestone.id);
   const deck = useMemo(() => deckFor(state, milestone, TACTICS), [state, milestone]);
-  const meters = useMemo(() => meterViews(state), [state]);
   const months = runway(state);
   const ending = state.endingId ? ENDING_BY_ID[state.endingId] : null;
-  const running = phase === "spiel" && !paused && !card && !state.endingId;
+  const running = phase === "spiel" && !paused && !card && !detail && !state.endingId;
 
   const phasenKarte = useCallback((id: string): Card => {
     const m = MILESTONE_BY_ID[id];
@@ -78,21 +82,61 @@ export default function Simulator() {
     };
   }, []);
 
-  /* Die Uhr läuft, solange das Brett vor dir liegt, und steht, während
-     eine Karte spricht. Eine Karte ist keine Entscheidung. */
+  const weiterSchalten = useCallback(
+    (s: GameState): { state: GameState; karten: Card[] } => {
+      const karten: Card[] = [];
+      const m = MILESTONE_BY_ID[s.milestoneId];
+      if (!m || !m.gate(s)) return { state: s, karten };
+      if (!m.next) return { state: { ...s, endingId: pickEnding(s) }, karten };
+      const naechste = MILESTONE_BY_ID[m.next];
+      const bei = naechste.onEnter;
+      const feuert = bei && (!bei.when || bei.when(s));
+      karten.push(phasenKarte(m.next));
+      if (feuert) {
+        karten.push({ kind: "ereignis", kicker: "Montagmorgen", title: bei!.title, beats: [...bei!.beats], summary: bei!.effects });
+      }
+      return { state: { ...(feuert ? applyEffects(s, bei!.effects) : s), milestoneId: m.next }, karten };
+    },
+    [phasenKarte],
+  );
+
+  /* Die Uhr. Der Intervall-Callback tut genau eine Sache: einen Monat
+     weiterschalten. Alles, was daraus folgt, passiert im Effekt darunter. */
   useEffect(() => {
     if (!running) return;
-    const id = window.setInterval(() => {
-      setState((s) => {
-        const next = tick(s);
-        const tot = forcedEnding(next);
-        return tot ? { ...next, endingId: tot } : next;
-      });
-    }, MS_PER_MONTH);
+    const id = window.setInterval(() => setState((s) => tickBoard(s).state), MS_PER_MONTH);
     return () => window.clearInterval(id);
   }, [running]);
 
-  /* Retoura zieht von allein weiter und meldet sich, wenn sie vorbeiziehen. */
+  /* Was fertig geworden ist: auflösen, Karten zeigen, Phase prüfen. */
+  useEffect(() => {
+    if (!state.justDone.length) return;
+    setState((s) => {
+      let next = { ...s, justDone: [] as string[] };
+      const neue: Card[] = [];
+      for (const id of s.justDone) {
+        const t = TACTICS[id];
+        if (!t) continue;
+        next = finishTactic(next, t);
+        neue.push({
+          kind: "ergebnis",
+          kicker: t.label,
+          beats: [...beatsOf(t, next.stance)],
+          summary: { ...t.effects, cash: (t.effects.cash ?? 0) - (t.cost ?? 0) || undefined },
+        });
+      }
+      const tot = forcedEnding(next);
+      if (tot) {
+        queueMicrotask(() => setCards((cs) => [...cs, ...neue]));
+        return { ...next, endingId: tot };
+      }
+      const { state: weiter, karten } = weiterSchalten(next);
+      queueMicrotask(() => setCards((cs) => [...cs, ...neue, ...karten]));
+      return weiter;
+    });
+  }, [state.justDone, weiterSchalten]);
+
+  /* Haulway meldet sich selbst — kein Dauerbalken oben. */
   useEffect(() => {
     if (!running) return;
     const zug = rivalMove(state, RIVAL_STEPS);
@@ -100,53 +144,23 @@ export default function Simulator() {
     setState((s) => applyEffects({ ...s, rivalSeen: [...s.rivalSeen, zug.at] }, zug.effects));
     setCards((cs) => [
       ...cs,
-      { kind: "retoura", kicker: "Rotterdam", title: zug.label, beats: [...zug.beats], summary: zug.effects },
+      { kind: "rivale", kicker: "San Francisco", title: zug.label, image: "sf", beats: [...zug.beats], summary: zug.effects },
     ]);
     setBeat(0);
   }, [state, running]);
 
-  /* Ereigniskarten: höchstens alle drei Monate eine, jede nur einmal. */
   useEffect(() => {
     if (!running || !eventDue(state)) return;
     const e = drawEvent(state, EVENTS);
     if (!e) return;
     setState((s) => applyEffects({ ...s, drawn: [...s.drawn, e.id], lastEvent: s.month }, e.effects));
-    setCards((cs) => [
-      ...cs,
-      { kind: "ereignis", kicker: "Dazwischen", title: e.title, beats: [...e.beats], summary: e.effects },
-    ]);
+    setCards((cs) => [...cs, { kind: "ereignis", kicker: "Dazwischen", title: e.title, beats: [...e.beats], summary: e.effects }]);
     setBeat(0);
   }, [state, running]);
 
-  const spielen = (t: Tactic) => {
-    const danach = runTactic(state, t);
-    const queue: Card[] = [
-      {
-        kind: "ergebnis",
-        kicker: t.label,
-        beats: [...beatsOf(t, state.stance)],
-        summary: { ...t.effects, cash: (t.effects.cash ?? 0) - (t.cost ?? 0) || undefined },
-      },
-    ];
-    const tot = forcedEnding(danach);
-    if (tot) {
-      setState({ ...danach, endingId: tot });
-    } else if (milestone.gate(danach) && milestone.next) {
-      const naechste = MILESTONE_BY_ID[milestone.next];
-      const bei = naechste.onEnter;
-      const feuert = bei && (!bei.when || bei.when(danach));
-      setState({ ...(feuert ? applyEffects(danach, bei!.effects) : danach), milestoneId: milestone.next });
-      queue.push(phasenKarte(milestone.next));
-      if (feuert) {
-        queue.push({ kind: "ereignis", kicker: "Montagmorgen", title: bei!.title, beats: [...bei!.beats], summary: bei!.effects });
-      }
-    } else if (milestone.gate(danach) && !milestone.next) {
-      setState({ ...danach, endingId: pickEnding(danach) });
-    } else {
-      setState(danach);
-    }
-    setCards(queue);
-    setBeat(0);
+  const starten = (t: Tactic) => {
+    setDetail(null);
+    setState((s) => startTactic(s, t));
   };
 
   const weiter = () => {
@@ -168,6 +182,7 @@ export default function Simulator() {
     setCards([]);
     setBeat(0);
     setStep(0);
+    setDetail(null);
     setPaused(false);
     setPhase("titel");
   };
@@ -175,19 +190,17 @@ export default function Simulator() {
   /* ── Titel ── */
   if (phase === "titel") {
     return (
-      <div className={styles.root}>
-        <div className={styles.card}>
-          <Scene image={INTRO.image} alt="Lena im Dispositionsbüro" />
-          <div className={styles.body}>
+      <div className={styles.app}>
+        <div className={styles.sheet}>
+          <Bild src="kitchen-night" alt="Lena und Jonas" className={styles.titelBild} />
+          <div className={styles.sheetBody}>
             <div className={styles.who}>{INTRO.who}</div>
             <h1>Jede vierte Rückfahrt ist leer</h1>
             {INTRO.lines.map((l) => (
-              <p className={styles.text} key={l.slice(0, 18)}>
-                {l}
-              </p>
+              <p key={l.slice(0, 16)}>{l}</p>
             ))}
             <button type="button" className={styles.primary} onClick={() => setPhase("onboarding")}>
-              Los geht's
+              Los geht&apos;s
             </button>
           </div>
         </div>
@@ -195,36 +208,36 @@ export default function Simulator() {
     );
   }
 
-  /* ── Onboarding: das Brett liegt schon da, unscharf, und Tarek erklärt ── */
+  /* ── Onboarding ── */
   if (phase === "onboarding") {
     const satz = ONBOARDING[step];
     const letzter = step === ONBOARDING.length - 1;
     return (
-      <div className={styles.root}>
+      <div className={styles.app}>
         <div className={styles.blurred} aria-hidden="true">
-          <Hud state={state} meters={meters} months={months} paused onPause={() => {}} index={0} />
-          <div className={styles.goal}>
-            <div className={styles.goalLabel}>Phase 1</div>
-            <h2>{MILESTONES[0].title}</h2>
-            <p>{MILESTONES[0].gateLabel}</p>
-          </div>
-          <div className={styles.deck}>
-            {MILESTONES[0].tactics.slice(0, 3).map((id) => (
-              <div key={id} className={styles.tactic}>
-                <strong>{TACTICS[id].label}</strong>
-                <span className={styles.flavour}>{TACTICS[id].flavour}</span>
-              </div>
-            ))}
-          </div>
+          <Board
+            state={state}
+            months={months}
+            milestone={milestone}
+            index={index}
+            deck={deck}
+            paused
+            onPause={() => {}}
+            onPick={() => {}}
+          />
         </div>
-
         <button
           type="button"
           className={styles.coach}
-          onClick={() => (letzter ? (setCards([phasenKarte(MILESTONES[0].id)]), setBeat(0), setPhase("spiel")) : setStep(step + 1))}
+          onClick={() => {
+            if (!letzter) return setStep(step + 1);
+            setCards([phasenKarte(MILESTONES[0].id)]);
+            setBeat(0);
+            setPhase("spiel");
+          }}
         >
           <span className={styles.coachFigure}>
-            <Image src="/game/mentor.jpg" alt="Tarek, Gründungsberater" fill sizes="340px" className={styles.coachImg} priority />
+            <Image src="/game/mentor.jpg" alt="Tarek" fill sizes="300px" className={styles.coachImg} priority />
           </span>
           <span className={styles.bubble}>
             {satz.highlight ? (
@@ -237,9 +250,7 @@ export default function Simulator() {
               satz.text
             )}
           </span>
-          <span className={styles.coachHint}>
-            {letzter ? "Tippen und anfangen" : `Weiter · ${step + 1}/${ONBOARDING.length}`}
-          </span>
+          <span className={styles.coachHint}>{letzter ? "Tippen und anfangen" : `Weiter · ${step + 1}/${ONBOARDING.length}`}</span>
         </button>
       </div>
     );
@@ -248,15 +259,15 @@ export default function Simulator() {
   /* ── Ende ── */
   if (phase === "ende" && ending) {
     return (
-      <div className={styles.root}>
-        <div className={styles.card}>
-          <Scene image={ending.image} alt={ending.title} />
-          <div className={styles.body}>
+      <div className={styles.app}>
+        <div className={styles.sheet}>
+          <Bild src={ending.image} alt={ending.title} className={styles.titelBild} />
+          <div className={styles.sheetBody}>
             <div className={`${styles.tag} ${styles[ending.tone]}`}>
-              {ending.tone === "win" ? "Ein gutes Ende" : ending.tone === "loss" ? "Hier ist Schluss" : "Irgendwo dazwischen"}
+              {ending.tone === "win" ? "Gutes Ende" : ending.tone === "loss" ? "Hier ist Schluss" : "Dazwischen"}
             </div>
             <h2>{ending.title}</h2>
-            <p className={styles.text}>{ending.text}</p>
+            <p>{ending.text}</p>
             {ending.payout && <p className={styles.payout}>{ending.payout(state)}</p>}
             <button type="button" className={styles.primary} onClick={neustart}>
               Nochmal, anders
@@ -267,158 +278,240 @@ export default function Simulator() {
     );
   }
 
-  /* ── Das Brett ── */
+  /* ── Brett ── */
   return (
-    <div className={styles.root}>
-      <Hud state={state} meters={meters} months={months} paused={paused} onPause={() => setPaused((p) => !p)} index={index} />
+    <div className={styles.app}>
+      <Board
+        state={state}
+        months={months}
+        milestone={milestone}
+        index={index}
+        deck={deck}
+        paused={paused}
+        onPause={() => setPaused((p) => !p)}
+        onPick={(t) => setDetail(t)}
+      />
 
-      {card ? (
-        <button type="button" className={`${styles.card} ${styles.cardTap}`} onClick={weiter}>
-          {card.image && <Scene image={card.image} alt={card.title ?? ""} />}
-          <div className={styles.body}>
-            <div className={`${styles.kicker} ${card.kind === "ereignis" ? styles.kickerEvent : ""}`}>{card.kicker}</div>
-            {card.title && <h2 className={styles.cardTitle}>{card.title}</h2>}
-            <p className={styles.beat}>{card.beats[beat]}</p>
-            {beat === card.beats.length - 1 && card.summary && (
-              <div className={styles.badges}>
-                {badges(card.summary).map((b) => (
-                  <span key={b.label} className={`${styles.badge} ${b.up ? styles.up : styles.down}`}>
-                    {b.label}
-                  </span>
-                ))}
+      {detail && (
+        <div className={styles.overlay}>
+          <div className={styles.detail}>
+            <Bild src={milestone.image} alt="" className={styles.detailBild} />
+            <div className={styles.detailBody}>
+              <h3>{detail.label}</h3>
+              <p>{detail.flavour}</p>
+              <Wirkung t={detail} />
+              <div className={styles.detailMeta}>
+                <span>{detail.months} Mon.</span>
+                {detail.cost ? <span className={styles.kosten}>{fmtEuro(detail.cost)}</span> : null}
               </div>
-            )}
-            <span className={styles.tapHint}>{beat + 1 < card.beats.length ? "Weiter" : "Weiterspielen"}</span>
-          </div>
-        </button>
-      ) : (
-        <>
-          <div className={styles.goal}>
-            <div className={styles.goalLabel}>
-              Phase {index + 1} von {MILESTONES.length}
+              <div className={styles.detailActions}>
+                <button type="button" className={styles.ghost} onClick={() => setDetail(null)}>
+                  Zurück
+                </button>
+                <button
+                  type="button"
+                  className={styles.primary}
+                  disabled={!canStart(state, detail)}
+                  onClick={() => starten(detail)}
+                >
+                  {canStart(state, detail) ? "Starten" : (blockedReason(state, detail) ?? "Geht nicht")}
+                </button>
+              </div>
             </div>
-            <h2>{milestone.title}</h2>
-            <p>{milestone.gateLabel}</p>
           </div>
+        </div>
+      )}
 
-          <div className={styles.deck}>
-            {deck.map((t) => (
-              <button key={t.id} type="button" className={styles.tactic} onClick={() => spielen(t)}>
-                <strong>{t.label}</strong>
-                <span className={styles.flavour}>{t.flavour}</span>
-                <span className={styles.price}>
-                  <em>
-                    {t.months} {t.months === 1 ? "Monat" : "Monate"}
-                  </em>
-                  {t.cost ? <em className={styles.cost}>{fmtEuro(t.cost)}</em> : null}
-                </span>
-              </button>
-            ))}
-            {!deck.length && <p className={styles.empty}>Hier ist nichts mehr zu holen. Es läuft nur noch die Uhr.</p>}
-          </div>
-        </>
+      {card && (
+        <div className={styles.overlay}>
+          <button type="button" className={styles.karte} onClick={weiter}>
+            {card.image && <Bild src={card.image} alt="" className={styles.karteBild} />}
+            <div className={styles.karteBody}>
+              <div className={`${styles.kicker} ${card.kind === "ereignis" ? styles.kickerEvent : ""} ${card.kind === "rivale" ? styles.kickerRival : ""}`}>
+                {card.kicker}
+              </div>
+              {card.title && <h3>{card.title}</h3>}
+              <p>{card.beats[beat]}</p>
+              {beat === card.beats.length - 1 && card.summary && (
+                <div className={styles.badges}>
+                  {badges(card.summary).map((b) => (
+                    <span key={b.label} className={`${styles.badge} ${b.up ? styles.up : styles.down}`}>
+                      {b.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <span className={styles.tapHint}>{beat + 1 < card.beats.length ? "Weiter" : "Weiterspielen"}</span>
+            </div>
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-function Scene({ image, alt }: { image: string; alt: string }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <div className={styles.scene}>
-      {!failed && (
-        <Image
-          src={`/game/${image}.jpg`}
-          alt={alt}
-          fill
-          sizes="(max-width: 700px) 100vw, 620px"
-          className={styles.sceneImg}
-          onError={() => setFailed(true)}
-          priority
-        />
-      )}
-    </div>
-  );
-}
+/* ── Das Brett: links die Anzeigen, rechts die Liste ─────────── */
 
-function Hud({
+function Board({
   state,
-  meters,
   months,
+  milestone,
+  index,
+  deck,
   paused,
   onPause,
-  index,
+  onPick,
 }: {
   state: GameState;
-  meters: ReturnType<typeof meterViews>;
   months: number;
+  milestone: (typeof MILESTONES)[number];
+  index: number;
+  deck: Tactic[];
   paused: boolean;
   onPause: () => void;
-  index: number;
+  onPick: (t: Tactic) => void;
 }) {
   const knapp = isFinite(months) && months <= 6;
+  const frei = capacity(state) - state.running.length;
+  const gruppen = GROUPS.map((g) => ({ name: g, karten: deck.filter((t) => t.group === g) })).filter((g) => g.karten.length);
+
   return (
-    <div className={styles.hud}>
-      {/* Acht Felder, eins pro Phase: der Fortschritt muss zu sehen sein,
-          sonst fühlt sich eine Stunde Spiel an wie eine Stelle. */}
+    <div className={styles.board}>
       <div className={styles.phases}>
         {MILESTONES.map((m, i) => (
-          <span
-            key={m.id}
-            className={`${styles.phaseBar} ${i < index ? styles.phaseDone : ""} ${i === index ? styles.phaseNow : ""}`}
-            title={m.title}
-          />
+          <span key={m.id} className={`${styles.phaseBar} ${i < index ? styles.phaseDone : ""} ${i === index ? styles.phaseNow : ""}`}>
+            <em>{i === index ? m.title : ""}</em>
+          </span>
         ))}
       </div>
 
-      <div className={styles.hudTop}>
-        <div className={styles.clockBox}>
-          <span className={`${styles.clock} ${knapp ? styles.clockLow : ""}`}>{isFinite(months) ? months : "∞"}</span>
-          <span className={styles.clockUnit}>
-            {isFinite(months) ? (
-              <>
-                Monate
-                <br />
-                Runway
-              </>
-            ) : (
-              <>
-                Runway,
-                <br />
-                solange du angestellt bist
-              </>
-            )}
-          </span>
+      <div className={styles.boardMain}>
+        <aside className={styles.rail}>
+          <div className={styles.clockWrap}>
+            <span className={`${styles.clock} ${knapp ? styles.clockLow : ""}`}>{isFinite(months) ? months : "∞"}</span>
+            <span className={styles.clockUnit}>Monate Runway</span>
+          </div>
+
+          <div className={styles.stats}>
+            <Stat label="MRR" value={fmtEuro(state.mrr)} />
+            <Stat label="Kunden" value={String(state.customers)} />
+            <Stat label="Produkt" value={`${Math.round(state.product)}%`} bar={state.product} />
+            <Stat label="Investoren" value={`${Math.round(state.investors)}%`} bar={state.investors} />
+            <Stat label="Team" value={`${Math.round(state.team)}%`} bar={state.team} />
+            <Stat label="Anteile" value={`${Math.round(state.equity)}%`} bar={state.equity} />
+          </div>
+
           <button type="button" className={styles.pause} onClick={onPause} aria-label={paused ? "Weiter" : "Pause"}>
             {paused ? "▶" : "❚❚"}
           </button>
-        </div>
+          <span className={styles.railFoot}>
+            Monat {state.month} · {fmtEuro(state.cash)}
+          </span>
+        </aside>
 
-        <div className={styles.rival}>
-          <div className={styles.rivalTop}>
-            <span>Retoura · Rotterdam</span>
-            <strong>{Math.round(state.rival)}%</strong>
+        <div className={styles.list}>
+          <div className={styles.listHead}>
+            <strong>{milestone.gateLabel}</strong>
+            <span>{frei > 0 ? `${frei} von ${capacity(state)} frei` : "alle beschäftigt"}</span>
           </div>
-          <span className={styles.rivalTrack}>
-            <span className={styles.rivalFill} style={{ width: `${Math.min(100, state.rival)}%` }} />
-          </span>
-          <span className={styles.rivalNote}>
-            Monat {state.month} · {fmtEuro(state.cash)} auf dem Konto
-          </span>
+
+          {gruppen.map((g) => (
+            <div key={g.name} className={styles.group}>
+              <div className={styles.groupName}>{g.name}</div>
+              {g.karten.map((t) => {
+                const laeuft = state.running.find((r) => r.id === t.id);
+                const fertig = state.used.includes(t.id) && !laeuft;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`${styles.item} ${fertig ? styles.itemDone : ""}`}
+                    onClick={() => !fertig && onPick(t)}
+                    disabled={fertig}
+                  >
+                    <Ring laeuft={laeuft} fertig={fertig} />
+                    <span className={styles.itemLabel}>{t.label}</span>
+                    {laeuft && <span className={styles.itemLeft}>{laeuft.left}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className={styles.meters}>
-        {meters.map((m) => (
-          <div key={m.key} className={styles.meter}>
-            <span className={styles.meterLabel}>{m.label}</span>
-            <strong className={`${styles.meterValue} ${styles[m.tone]}`}>{m.value}</strong>
-            <span className={styles.meterTrack}>
-              <span className={`${styles.meterFill} ${styles[`fill_${m.tone}`]}`} style={{ width: `${m.fill}%` }} />
-            </span>
-          </div>
-        ))}
-      </div>
+/** Der Kreis links neben jeder Maßnahme: leer, laufend, erledigt. */
+function Ring({ laeuft, fertig }: { laeuft?: { left: number; total: number }; fertig: boolean }) {
+  const anteil = laeuft ? 1 - laeuft.left / laeuft.total : 0;
+  return (
+    <span className={`${styles.ring} ${fertig ? styles.ringDone : ""} ${laeuft ? styles.ringRun : ""}`} aria-hidden="true">
+      {laeuft && (
+        <svg viewBox="0 0 36 36">
+          <circle className={styles.ringTrack} cx="18" cy="18" r="15" />
+          <circle
+            className={styles.ringFill}
+            cx="18"
+            cy="18"
+            r="15"
+            style={{ strokeDasharray: `${anteil * 94.2} 94.2` }}
+          />
+        </svg>
+      )}
+      {fertig && <span className={styles.check}>✓</span>}
+    </span>
+  );
+}
+
+function Stat({ label, value, bar }: { label: string; value: string; bar?: number }) {
+  return (
+    <div className={styles.stat}>
+      <span className={styles.statLabel}>{label}</span>
+      <strong className={styles.statValue}>{value}</strong>
+      {bar !== undefined && (
+        <span className={styles.statTrack}>
+          <span className={styles.statFill} style={{ width: `${Math.max(0, Math.min(100, bar))}%` }} />
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Wirkung als Balken statt als Satz. */
+function Wirkung({ t }: { t: Tactic }) {
+  const labels: Record<string, string> = {
+    produkt: "Produkt",
+    umsatz: "Umsatz",
+    geld: "Geld",
+    team: "Team",
+    investoren: "Investoren",
+  };
+  const eintraege = Object.entries(t.impact) as [string, number][];
+  if (!eintraege.length) return null;
+  return (
+    <div className={styles.wirkung}>
+      {eintraege.map(([k, n]) => (
+        <div key={k} className={styles.wirkungZeile}>
+          <span>{labels[k] ?? k}</span>
+          <span className={styles.punkte}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <i key={i} className={i <= n ? styles.punktAn : ""} />
+            ))}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Bild({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <div className={className} />;
+  return (
+    <div className={className}>
+      <Image src={`/game/${src}.jpg`} alt={alt} fill sizes="(max-width: 700px) 100vw, 620px" className={styles.bildImg} onError={() => setFailed(true)} priority />
     </div>
   );
 }

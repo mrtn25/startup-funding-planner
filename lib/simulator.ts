@@ -59,11 +59,19 @@ export type Effects = {
   alignment?: number;
 };
 
+/** Wie stark eine Maßnahme worauf einzahlt — als Balken, nicht als Zahl.
+    Fünf Stufen, weil fünf Punkte man auf einen Blick zählt. */
+export type Impact = Partial<Record<"produkt" | "umsatz" | "geld" | "team" | "investoren", 1 | 2 | 3 | 4 | 5>>;
+
 export type Tactic = {
   id: string;
   label: string;
-  /** One line. Hints at the shape of it, names no numbers. */
+  /** Gruppe in der Liste: Produkt, Vertrieb, Team, Geld. */
+  group: string;
+  /** Ein Satz auf der Detailkarte. */
   flavour: string;
+  /** Was sie bewegt, grob und sichtbar vor dem Start. */
+  impact: Impact;
   /** € out of the bank the moment you commit. */
   cost?: number;
   months: number;
@@ -128,6 +136,9 @@ export type Ending = {
   payout?: (s: GameState) => string;
 };
 
+/** Eine laufende Maßnahme auf dem Brett. */
+export type Running = { id: string; left: number; total: number };
+
 export type GameState = {
   cash: number;
   burn: number;
@@ -145,8 +156,12 @@ export type GameState = {
   stance: Stance;
   month: number;
   milestoneId: string;
-  /** Tactics already used, so a deck shrinks as you work through it. */
+  /** Schon benutzt — jede Karte nur einmal. */
   used: string[];
+  /** Läuft gerade, mit Restmonaten. */
+  running: Running[];
+  /** Gerade fertig geworden — wird von der Oberfläche abgeräumt. */
+  justDone: string[];
   /** Retoura's progress, 0–100. */
   rival: number;
   rivalSeen: number[];
@@ -192,21 +207,23 @@ export function runway(s: GameState): number {
 
 export function initialState(seed = 1): GameState {
   return {
-    cash: 12_400,
+    cash: 18_000,
     burn: 1_900,
     salary: 2_300,
     mrr: 0,
     customers: 0,
     investors: 12,
     team: 70,
-    headcount: 1,
-    product: 5,
+    headcount: 2,
+    product: 12,
     equity: 100,
     alignment: 60,
     stance: seed % 2 === 0 ? "bootstrap" : "venture",
     month: 0,
-    milestoneId: "problem",
+    milestoneId: "mvp",
     used: [],
+    running: [],
+    justDone: [],
     rival: 8,
     rivalSeen: [],
     endingId: null,
@@ -277,14 +294,83 @@ export function alignmentOf(t: Tactic, stance: Stance): number {
 }
 
 /**
- * Commit to a measure: the money goes now, the months pass, the effect
- * lands at the end. Which is also the order it happens in real life.
+ * Wie viele Maßnahmen gleichzeitig laufen dürfen.
+ *
+ * So viele, wie ihr Köpfe seid. Zu zweit zwei — das ist der Grund,
+ * warum eine Einstellung sich sofort anders anfühlt, und der Grund,
+ * warum man nicht alles gleichzeitig kann.
  */
+export function capacity(s: GameState): number {
+  return Math.max(1, s.headcount);
+}
+
+/**
+ * Startbar?
+ *
+ * Kopf frei, nicht schon benutzt — und bezahlbar. Das Letzte fehlte,
+ * und die Simulation hat es sofort gefunden: sie buchte Messestand und
+ * Frachtbörse mit 8.000 € auf dem Konto und war im sechsten Monat
+ * pleite, ohne dass je eine Entscheidung falsch gewesen wäre.
+ */
+export function canStart(s: GameState, t: Tactic): boolean {
+  if (s.running.length >= capacity(s)) return false;
+  if (s.running.some((r) => r.id === t.id) || s.used.includes(t.id)) return false;
+  /* Und mit zwei Monaten Puffer: niemand bucht einen Messestand von
+     seinem letzten Euro, und ein Spiel, in dem genau das der häufigste
+     Tod ist, bestraft Rechnen statt Entscheiden. */
+  const puffer = Math.max(0, netBurn(s)) * 2;
+  return s.cash - (t.cost ?? 0) >= puffer;
+}
+
+/** Warum nicht — für die Beschriftung des Knopfs. */
+export function blockedReason(s: GameState, t: Tactic): string | null {
+  if (s.used.includes(t.id) || s.running.some((r) => r.id === t.id)) return "Läuft schon";
+  if (s.cash - (t.cost ?? 0) < Math.max(0, netBurn(s)) * 2) return "Zu teuer";
+  if (s.running.length >= capacity(s)) return "Kein Kopf frei";
+  return null;
+}
+
+/** Maßnahme starten: Geld ist sofort weg, die Wirkung kommt später. */
+export function startTactic(s: GameState, t: Tactic): GameState {
+  return {
+    ...s,
+    cash: s.cash - (t.cost ?? 0),
+    used: [...s.used, t.id],
+    running: [...s.running, { id: t.id, left: Math.max(1, t.months), total: Math.max(1, t.months) }],
+  };
+}
+
+/** Auflösen, wenn die Zeit um ist. */
+export function finishTactic(s: GameState, t: Tactic): GameState {
+  const done = applyEffects(s, t.effects);
+  return {
+    ...done,
+    alignment: clamp(done.alignment + alignmentOf(t, s.stance)),
+    running: done.running.filter((r) => r.id !== t.id),
+  };
+}
+
+/**
+ * Ein Monat auf dem Brett.
+ *
+ * Was fertig wird, landet in `justDone` im Zustand statt in einem
+ * Rückgabewert, den die Oberfläche mitten im State-Updater verarbeiten
+ * müsste. Genau das war der Fehler: der Updater rief setCards auf, React
+ * rechnete ihn mehrfach, die Komponente rendert neu, und das Intervall
+ * wurde vor jedem Feuern neu aufgesetzt — die Uhr stand still.
+ */
+export function tickBoard(s: GameState): { state: GameState; done: string[] } {
+  const next = tick(s);
+  const running = next.running.map((r) => ({ ...r, left: r.left - 1 }));
+  const done = running.filter((r) => r.left <= 0).map((r) => r.id);
+  return { state: { ...next, running, justDone: done }, done };
+}
+
+/** Nur fürs Testen und den Balance-Lauf: starten, warten, auflösen. */
 export function runTactic(s: GameState, t: Tactic): GameState {
-  const paid = { ...s, cash: s.cash - (t.cost ?? 0), used: [...s.used, t.id] };
-  const later = advance(paid, t.months);
-  const done = applyEffects(later, t.effects);
-  return { ...done, alignment: clamp(done.alignment + alignmentOf(t, s.stance)) };
+  const gestartet = startTactic(s, t);
+  const spaeter = advance(gestartet, t.months);
+  return finishTactic({ ...spaeter, running: spaeter.running.filter((r) => r.id !== t.id) }, t);
 }
 
 /** The deck for this milestone: not used yet, and allowed right now. */
@@ -292,7 +378,7 @@ export function deckFor(s: GameState, milestone: Milestone, all: Record<string, 
   return milestone.tactics
     .map((id) => all[id])
     .filter((t): t is Tactic => !!t)
-    .filter((t) => (t.repeatable || !s.used.includes(t.id)) && (!t.when || t.when(s)));
+    .filter((t) => (t.repeatable || !s.used.includes(t.id) || s.running.some((r) => r.id === t.id)) && (!t.when || t.when(s)));
 }
 
 /* ── Ereigniskarten ──────────────────────────────────────────── */

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Simulator from "@/components/simulator/Simulator";
-import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "Can you get to an exit? — backable",
@@ -9,10 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function SimulatorPage() {
-  return (
-    <>
-      <Simulator />
-      <SiteFooter />
-    </>
-  );
+  /* Das Spiel bekommt den ganzen Bildschirm: keine Fußzeile, kein
+     Scrollen der Seite. Gescrollt wird nur die Maßnahmenliste. */
+  return <Simulator />;
 }

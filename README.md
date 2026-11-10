@@ -54,25 +54,19 @@ Plus a module that is not a calculator at all:
 
 - **Palettio** (`/simulator`) — a decision game, in German, about one concrete
   company: software that fills the empty return trips of mid-sized freight
-  forwarders. You are Lena Brandt, a dispatcher in Hamburg who counted how many
-  trucks came home empty.
+  forwarders. Built as a board rather than a story: the runway on the left, a
+  grouped list of measures on the right, and up to one measure running per
+  person on the payroll. Tapping a measure opens a card with a picture, its
+  effect as bars rather than numbers, what it costs and how long it takes.
 
-  Eight phases from the first suspicion to a Series A. Each has a deck of
-  measures; a card names its cost and its duration and nothing else, because
-  what a trade fair actually buys is the thing worth finding out. Effects are
-  fixed rather than rolled — unknown is not random, and the second run is where
-  you use what you learned.
+  The clock runs while you look at the list and stops while a card is talking.
+  Interruptions arrive on their own — the Finanzamt reassesses, a truck goes to
+  Rostock instead of Rotterdam, and Haulway in San Francisco gets into Y
+  Combinator, opens in Berlin and signs the account you were courting.
 
-  The clock is your runway in months, the biggest thing on the screen. It reads
-  ∞ at the start because Lena still has a salary; the month that stops being
-  true is the loudest moment in the game. Retoura in Rotterdam builds the same
-  product, moves on its own, and takes the trade fair stand and the 90-truck
-  account if it arrives first. Event cards land in between — the Finanzamt
-  reassesses, Ole is on holiday for three weeks, the DVZ writes about you.
-
+  Six phases from the first prototype to a Series A, five to seven cards each.
   Jonas has an opinion about how this should be funded and does not announce
-  it. One card in the second deck is simply asking him; a run can end in the
-  first year because neither of you did.
+  it; one card is simply asking him.
 
 Plus two sections that are not tools:
 
