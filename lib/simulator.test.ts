@@ -23,6 +23,7 @@ import {
   rivalMove,
   runTactic,
   runway,
+  runwayFill,
   tick,
   type GameState,
   type Tactic,
@@ -80,13 +81,13 @@ test("die Wirkung kommt beim Abschluss, die Kosten beim Start", () => {
 
 test("der Runway ist Kasse durch das, was netto rausgeht", () => {
   // 1.900 € fix plus 3 Kunden à 180 € Betreuung, minus 1.000 € MRR.
-  const s = S({ cash: 10_080, burn: 1_900, customers: 3, mrr: 1_000, salary: 0 });
+  const s = S({ cash: 10_080, burn: 1_900, customers: 3, mrr: 1_000 });
   assert.equal(netBurn(s), 1_440);
   assert.equal(runway(s), 7);
 });
 
 test("wer mehr einnimmt als ausgibt, hat keinen Countdown mehr", () => {
-  const s = S({ cash: 5_000, burn: 1_900, customers: 4, mrr: 4_000, salary: 0 });
+  const s = S({ cash: 5_000, burn: 1_900, customers: 4, mrr: 4_000 });
   assert.equal(runway(s), Infinity);
   const v = meterViews(s);
   assert.equal(v.length, 6);
@@ -95,7 +96,7 @@ test("wer mehr einnimmt als ausgibt, hat keinen Countdown mehr", () => {
 });
 
 test("ein Monat kostet genau den Netto-Burn", () => {
-  const s = S({ cash: 20_000, burn: 1_900, customers: 0, mrr: 0, salary: 0 });
+  const s = S({ cash: 20_000, burn: 1_900, customers: 0, mrr: 0 });
   assert.equal(tick(s).cash, 18_100);
   assert.equal(tick(s).month, 1);
 });
@@ -114,24 +115,24 @@ test("Investoreninteresse verfällt erst, wenn es welches gibt", () => {
   assert.ok(laut.investors < 60);
 });
 
-test("solange ein Gehalt reinkommt, gibt es keinen Countdown", () => {
-  // Lena ist am Anfang angestellt: das Gehalt trägt die Fixkosten.
-  const angestellt = S();
-  assert.ok(angestellt.salary > 0);
-  assert.equal(runway(angestellt), Infinity);
+test("die Uhr läuft vom ersten Monat an", () => {
+  // Gekündigt wurde vor dem Spiel. Es gibt kein Gehalt, das sie anhält.
+  const start = S();
+  assert.ok(isFinite(runway(start)), "ohne Gehalt muss der Runway endlich sein");
+  assert.ok(runway(start) >= 8 && runway(start) <= 16, `Start-Runway: ${runway(start)}`);
+  assert.ok(runwayFill(start) > 0.4 && runwayFill(start) <= 1);
 
-  // Die Kündigung ist der Moment, in dem die Uhr etwas bedeutet.
-  const gekuendigt = runTactic(angestellt, TACTICS["kuendigen"]);
-  assert.equal(gekuendigt.salary, 0);
-  assert.ok(isFinite(runway(gekuendigt)), "nach der Kündigung muss der Runway endlich sein");
-  assert.ok(runway(gekuendigt) < 12);
+  // Umsatz füllt den Tank wieder auf.
+  const mitUmsatz = S({ mrr: 4_000, customers: 3 });
+  assert.ok(runway(mitUmsatz) > runway(start));
+  assert.equal(runwayFill(S({ mrr: 9_000, customers: 2 })), 1);
 });
 
 /* ── Maßnahmen ── */
 
 test("eine Maßnahme kostet sofort Geld, dann Zeit, dann wirkt sie", () => {
   const s = runTactic(
-    S({ cash: 20_000, burn: 1_900, customers: 0, mrr: 0, salary: 0 }),
+    S({ cash: 20_000, burn: 1_900, customers: 0, mrr: 0 }),
     T({ cost: 6_500, months: 2, effects: { customers: 2, mrr: 1_780 } }),
   );
   // 20.000 − 6.500 Kosten − 2 × 1.900 Burn, dann erst kommen Kunden und MRR.
@@ -196,14 +197,11 @@ test("gegen die Haltung des Co-Founders zu spielen beendet die Partie", () => {
   assert.equal(forcedEnding({ ...s, customers: 4 }), null);
 });
 
-test("spätestens beim ersten fremden Geld ist das Gehalt weg", () => {
-  const kunde = MILESTONE_BY_ID["geld"];
-  assert.ok(kunde.onEnter, "dieser Meilenstein muss die Uhr starten");
-  assert.equal(kunde.onEnter!.when!(S({ salary: 2_300 })), true);
-  assert.equal(kunde.onEnter!.when!(S({ salary: 0 })), false, "wer schon gekündigt hat, kündigt nicht nochmal");
-  const danach = applyEffects(S({ salary: 2_300 }), kunde.onEnter!.effects);
-  assert.equal(danach.salary, 0);
-  assert.ok(isFinite(runway(danach)));
+test("der Tank zeigt ein Jahr als voll und leer als leer", () => {
+  assert.equal(runwayFill(S({ cash: 0, mrr: 0, customers: 0 })), 0);
+  assert.equal(runwayFill(S({ cash: 100_000, mrr: 0, customers: 0 })), 1);
+  const halb = runwayFill(S({ cash: 16_800, burn: 2_800, mrr: 0, customers: 0 }));
+  assert.ok(halb > 0.4 && halb < 0.6, `halb voll wäre 0,5, ist ${halb}`);
 });
 
 /* ── Retoura ── */

@@ -38,10 +38,6 @@ export type Stance = "bootstrap" | "venture";
 
 export type Effects = {
   cash?: number;
-  /** Your own salary, while you still have one. Set to 0 by quitting. */
-  salary?: number;
-  /** Replaces rather than adds — quitting sets it to nothing. */
-  salaryTo?: number;
   /** Monthly recurring revenue, €. */
   mrr?: number;
   /** Paying forwarders, counted in whole companies. */
@@ -141,9 +137,8 @@ export type Running = { id: string; left: number; total: number };
 
 export type GameState = {
   cash: number;
+  /** Was jeden Monat rausgeht: Miete, Essen, später Server und Gehälter. */
   burn: number;
-  /** Income from the job you have not quit yet, €/month. */
-  salary: number;
   mrr: number;
   customers: number;
   investors: number;
@@ -180,18 +175,15 @@ const clamp = (v: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));
 /* ── The clock ───────────────────────────────────────────────── */
 
 /**
- * What actually leaves the account in a month.
+ * Was im Monat netto rausgeht.
  *
- * The salary matters more than anything else in the first year, and
- * leaving it out was why every simulated run died in month eight: Lena
- * is still employed at the start, so there is no countdown yet. The
- * clock becomes real the month she hands in her notice, which is the
- * point — that decision should be visible as the runway dropping from
- * nothing-to-worry-about to a number of months.
+ * Ihr habt gekündigt, bevor das Spiel anfängt — es gibt kein Gehalt,
+ * das die Uhr anhält. Raus gehen Lebenshaltung und Firma, rein kommt,
+ * was Speditionen zahlen, abzüglich dessen, was ihre Betreuung kostet.
  */
 export function netBurn(s: GameState): number {
-  const serving = Math.round(s.customers * 180);
-  return s.burn + serving - s.mrr - s.salary;
+  const betreuung = Math.round(s.customers * 180);
+  return s.burn + betreuung - s.mrr;
 }
 
 /**
@@ -205,11 +197,17 @@ export function runway(s: GameState): number {
   return Math.max(0, Math.floor(s.cash / net));
 }
 
+/** Wie voll der Tank ist: ein Jahr Luft ist voll, leer ist leer. */
+export function runwayFill(s: GameState): number {
+  const r = runway(s);
+  if (!isFinite(r)) return 1;
+  return Math.max(0, Math.min(1, r / 12));
+}
+
 export function initialState(seed = 1): GameState {
   return {
-    cash: 18_000,
-    burn: 1_900,
-    salary: 2_300,
+    cash: 32_000,
+    burn: 2_400,
     mrr: 0,
     customers: 0,
     investors: 0,
@@ -247,7 +245,6 @@ export function applyEffects(s: GameState, e: Effects | undefined): GameState {
     /* Equity only ever goes down. There is no scene that gives it back. */
     equity: clamp(s.equity + Math.min(0, e.equity ?? 0)),
     burn: Math.max(0, s.burn + (e.burn ?? 0)),
-    salary: Math.max(0, e.salaryTo !== undefined ? e.salaryTo : s.salary + (e.salary ?? 0)),
     headcount: Math.max(1, s.headcount + (e.headcount ?? 0)),
     alignment: clamp(s.alignment + (e.alignment ?? 0)),
   };

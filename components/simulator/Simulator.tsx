@@ -20,6 +20,7 @@ import {
   meterViews,
   rivalMove,
   runway,
+  runwayFill,
   startTactic,
   tickBoard,
   type Effects,
@@ -388,10 +389,7 @@ function Board({
 
       <div className={styles.boardMain}>
         <aside className={styles.rail}>
-          <div className={styles.clockWrap}>
-            <span className={`${styles.clock} ${knapp ? styles.clockLow : ""}`}>{isFinite(months) ? months : "∞"}</span>
-            <span className={styles.clockUnit}>{isFinite(months) ? "Monate Geld" : "Gehalt läuft"}</span>
-          </div>
+          <Tank months={months} fill={runwayFill(state)} cash={state.cash} knapp={knapp} />
 
           <div className={styles.stats}>
             {meterViews(state).map((v) => (
@@ -429,7 +427,7 @@ function Board({
                   >
                     <Ring laeuft={laeuft} fertig={fertig} />
                     <span className={styles.itemLabel}>{t.label}</span>
-                    {laeuft && <span className={styles.itemLeft}>{laeuft.left}</span>}
+                    {laeuft && <span className={styles.itemLeft}>läuft</span>}
                   </button>
                 );
               })}
@@ -441,24 +439,67 @@ function Board({
   );
 }
 
+/**
+ * Die große Uhr.
+ *
+ * Ein Tank, der leerläuft — die Zahl allein tickt zwar, sieht aber
+ * nicht aus wie Druck. Die Markierung bei drei Monaten ist die Stelle,
+ * ab der man nichts Langes mehr anfangen sollte.
+ */
+function Tank({ months, fill, cash, knapp }: { months: number; fill: number; cash: number; knapp: boolean }) {
+  const hoehe = Math.max(0, Math.min(1, fill));
+  return (
+    <div className={styles.tank}>
+      <svg viewBox="0 0 52 150" className={styles.tankSvg} aria-hidden="true">
+        <rect x="6" y="6" width="40" height="138" rx="20" className={styles.tankHuelle} />
+        <clipPath id="tankClip">
+          <rect x="9" y="9" width="34" height="132" rx="17" />
+        </clipPath>
+        <g clipPath="url(#tankClip)">
+          <rect
+            x="9"
+            width="34"
+            y={9 + 132 * (1 - hoehe)}
+            height={132 * hoehe}
+            className={`${styles.tankFuellung} ${knapp ? styles.tankKnapp : ""}`}
+          />
+        </g>
+        <line x1="6" x2="46" y1={9 + 132 * (1 - 0.25)} y2={9 + 132 * (1 - 0.25)} className={styles.tankMarke} />
+      </svg>
+      <div className={styles.tankText}>
+        <span className={`${styles.clock} ${knapp ? styles.clockLow : ""}`}>{isFinite(months) ? months : "12+"}</span>
+        <span className={styles.clockUnit}>
+          Monate
+          <br />
+          Geld
+        </span>
+        <span className={styles.tankCash}>{fmtEuro(cash)}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Der Kreis links neben jeder Maßnahme: leer, laufend, erledigt. */
 function Ring({ laeuft, fertig }: { laeuft?: { left: number; total: number }; fertig: boolean }) {
-  const anteil = laeuft ? 1 - laeuft.left / laeuft.total : 0;
+  const UMFANG = 2 * Math.PI * 15;
+  const anteil = laeuft ? Math.max(0, Math.min(1, 1 - laeuft.left / laeuft.total)) : 0;
   return (
-    <span className={`${styles.ring} ${fertig ? styles.ringDone : ""} ${laeuft ? styles.ringRun : ""}`} aria-hidden="true">
-      {laeuft && (
-        <svg viewBox="0 0 36 36">
-          <circle className={styles.ringTrack} cx="18" cy="18" r="15" />
+    <span className={`${styles.ring} ${fertig ? styles.ringDone : ""} ${laeuft ? styles.ringRun : ""}`}>
+      <svg viewBox="0 0 36 36" aria-hidden="true">
+        <circle cx="18" cy="18" r="15" className={styles.ringBahn} />
+        {laeuft && (
           <circle
-            className={styles.ringFill}
             cx="18"
             cy="18"
             r="15"
-            style={{ strokeDasharray: `${anteil * 94.2} 94.2` }}
+            className={styles.ringFill}
+            strokeDasharray={UMFANG}
+            strokeDashoffset={UMFANG * (1 - anteil)}
           />
-        </svg>
-      )}
+        )}
+      </svg>
       {fertig && <span className={styles.check}>✓</span>}
+      {laeuft && <span className={styles.ringZahl}>{laeuft.left}</span>}
     </span>
   );
 }

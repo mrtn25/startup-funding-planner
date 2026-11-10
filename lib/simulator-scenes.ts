@@ -13,9 +13,9 @@ import { fmtEuro } from "./simulator.ts";
 
 export const ONBOARDING: { text: string; highlight?: string }[] = [
   { text: "Moin. Ich bin Tarek. Ich habe selbst zwei Firmen gegründet, eine davon ging gut. Ich schau euch über die Schulter." },
-  { text: "Ihr beide teilt Lkw ein — Disponenten nennt man das. Euch ist aufgefallen: jede vierte Fahrt geht leer zurück, weil niemand die Zeit hat, eine Rückladung zu suchen." },
-  { text: "Genau das soll eure Software machen. Gebaut ist davon noch nichts, und einen einzigen zahlenden Kunden habt ihr auch nicht." },
-  { text: "Links steht, wie viele Monate euer Geld noch reicht. Solange ihr angestellt seid, zahlt das Gehalt die Rechnungen.", highlight: "wie viele Monate" },
+  { text: "Ihr beide habt Lkw eingeteilt — Disponenten nennt man das. Euch ist aufgefallen: jede vierte Fahrt geht leer zurück, weil niemand Zeit hat, eine Rückladung zu suchen." },
+  { text: "Genau das soll eure Software machen. Gekündigt habt ihr beide schon. Gebaut ist noch nichts, Kunden habt ihr keine." },
+  { text: "Links seht ihr euer Erspartes: 32.000 €. Davon gehen Miete und Essen ab, später Server und Gehälter. Das ist eure Uhr.", highlight: "eure Uhr" },
   { text: "Rechts wählt ihr, woran ihr arbeitet. Zwei Sachen gleichzeitig, eine pro Kopf. Jede dauert Monate." },
   { text: "Und in San Francisco baut Haulway dasselbe, bezahlt von Y Combinator. Die warten nicht auf euch.", highlight: "Haulway" },
 ];
@@ -24,8 +24,8 @@ export const INTRO = {
   image: "kitchen-night",
   who: "Lena Brandt & Jonas Ritter, Hamburg",
   lines: [
-    "Ihr teilt Lkw ein, für eine Spedition in Hamburg. Jede vierte Fahrt kommt leer zurück, weil niemand Zeit hat, für die Rückfahrt eine Ladung zu suchen.",
-    "Das ist eure Marktlücke: eine Software, die diese Rückladungen automatisch findet. Zwei Leute, 18.000 € gespart, nichts gebaut, kein Kunde.",
+    "Ihr habt Lkw eingeteilt, für eine Spedition in Hamburg. Jede vierte Fahrt kommt leer zurück, weil niemand Zeit hat, für die Rückfahrt eine Ladung zu suchen.",
+    "Das ist eure Marktlücke: eine Software, die diese Rückladungen automatisch findet. Ihr habt beide gekündigt und je 16.000 € gespart. Gebaut ist nichts, Kunden habt ihr keine.",
   ],
 };
 
@@ -77,28 +77,6 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       effects: { product: 24, burn: 340 },
       beats: ["Sechs Wochen statt sechs Monate.", "Dafür jeden Monat Lizenzgebühr — und eine Frage in jeder Due Diligence."],
     }),
-    T({
-      id: "kuendigen",
-      label: "Beide kündigen",
-      group: "Team",
-      flavour: "Drei Monate Frist. Danach kommt am 28. nichts mehr.",
-      impact: { produkt: 3, investoren: 4, geld: 5 },
-      months: 3,
-      effects: { salaryTo: 0, burn: 600, product: 10, investors: 12, team: 5 },
-      alignmentBy: { bootstrap: -4, venture: 8 },
-      beats: ["Dein Chef fragt, ob er Kunde werden kann.", "Ab jetzt bedeutet die Zahl links etwas."],
-    }),
-    T({
-      id: "teilzeit",
-      label: "Auf vier Tage reduzieren",
-      group: "Team",
-      flavour: "Euer Arbeitgeber sagt schneller ja als gedacht.",
-      impact: { produkt: 2, geld: 2 },
-      months: 2,
-      effects: { salary: -600, product: 8, team: -3 },
-      beats: ["Ein Tag pro Woche offiziell für Palettio.", "Praktisch der Tag, auf den alles andere verschoben wird."],
-    }),
-
     T({
       id: "jonas-fragen",
       label: "Jonas fragen, was er eigentlich will",
@@ -420,7 +398,7 @@ export const MILESTONES: Milestone[] = [
     image: "kitchen-night",
     gate: (s) => s.product >= 40,
     gateLabel: "Etwas, das eine Spedition ausprobieren kann",
-    tactics: ["tabelle", "handarbeit", "routing", "richtig-bauen", "teilzeit", "jonas-fragen", "durchatmen"],
+    tactics: ["tabelle", "handarbeit", "routing", "richtig-bauen", "jonas-fragen", "durchatmen"],
     next: "kunden",
   },
   {
@@ -430,7 +408,7 @@ export const MILESTONES: Milestone[] = [
     image: "first-customer",
     gate: (s) => s.mrr > 0 && s.customers >= 2,
     gateLabel: "Zwei Speditionen zahlen jeden Monat",
-    tactics: ["pilot", "warme-kontakte", "kaltakquise", "messe", "boerse", "kuendigen", "durchatmen"],
+    tactics: ["pilot", "warme-kontakte", "kaltakquise", "messe", "boerse", "durchatmen"],
     next: "geld",
   },
   {
@@ -440,16 +418,6 @@ export const MILESTONES: Milestone[] = [
     image: "angel-cafe",
     gate: (s) => s.cash >= 45_000 || s.mrr >= 3_500,
     gateLabel: "45.000 € auf dem Konto oder 3.500 € Umsatz im Monat",
-    onEnter: {
-      title: "Euer Arbeitgeber hat davon gehört",
-      when: (s) => s.salary > 0,
-      beats: [
-        "Krämers Disponent hat es beim Regionaltreffen erzählt. Das Gespräch am Montag dauert vier Minuten.",
-        "Am 28. kommt kein Gehalt mehr. Die Zahl links war bis heute Dekoration.",
-      ],
-      effects: { salaryTo: 0, burn: 700, investors: 4, team: -5 },
-    },
-
     tactics: ["exist", "aus-umsatz", "wandeldarlehen", "angel-40", "fff", "durchatmen"],
     next: "team",
   },
