@@ -88,7 +88,10 @@ test("der Runway ist Kasse durch das, was netto rausgeht", () => {
 test("wer mehr einnimmt als ausgibt, hat keinen Countdown mehr", () => {
   const s = S({ cash: 5_000, burn: 1_900, customers: 4, mrr: 4_000, salary: 0 });
   assert.equal(runway(s), Infinity);
-  assert.equal(meterViews(s).length, 5);
+  const v = meterViews(s);
+  assert.equal(v.length, 6);
+  // Keine nackten Prozente mehr, wo niemand weiß, was hundert wäre.
+  assert.ok(!v.some((x) => ["Produkt", "Stimmung", "Investoren"].includes(x.label) && x.value.includes("%")));
 });
 
 test("ein Monat kostet genau den Netto-Burn", () => {
@@ -224,6 +227,26 @@ test("wer bei 100 % Retoura keine Kunden hat, ist überholt worden", () => {
   assert.equal(forcedEnding(S({ rival: 100, customers: 12 })), null);
 });
 
+test("die Anzeigen sagen etwas, das man benennen kann", () => {
+  const anfang = meterViews(S());
+  const investoren = anfang.find((v) => v.label === "Investoren")!;
+  assert.equal(investoren.value, "niemand", "ohne Investoren steht da nicht 12 %");
+  assert.equal(investoren.punkte, 0);
+
+  const kunden = anfang.find((v) => v.label === "Kunden")!;
+  assert.equal(kunden.value, "0");
+  assert.equal(kunden.note, "Speditionen");
+
+  const team = anfang.find((v) => v.label === "Stimmung")!;
+  assert.equal(team.note, "2 Köpfe");
+  assert.ok(team.punkte !== undefined && team.punkte >= 1);
+
+  const spaet = meterViews(S({ investors: 95, product: 92, customers: 1 }));
+  assert.equal(spaet.find((v) => v.label === "Investoren")!.value, "Term Sheets");
+  assert.equal(spaet.find((v) => v.label === "Produkt")!.value, "rund");
+  assert.equal(spaet.find((v) => v.label === "Kunden")!.note, "Spedition");
+});
+
 /* ── Der Inhalt ── */
 
 test("jede Karte nennt Dauer und Wirkung, aber verrät nichts im Text", () => {
@@ -311,9 +334,11 @@ test("das Onboarding erklärt in wenigen Sätzen, worum es geht", () => {
   assert.ok(ONBOARDING.length >= 5 && ONBOARDING.length <= 8);
   for (const z of ONBOARDING) assert.ok(z.text.length > 30 && z.text.length < 220, `zu lang oder zu kurz: ${z.text}`);
   const alles = ONBOARDING.map((z) => z.text).join(" ");
-  for (const begriff of ["Runway", "Haulway", "Maßnahme"]) {
+  // Das Onboarding muss die Begriffe erklären, die man sonst nicht kennt.
+  for (const begriff of ["Disponent", "Haulway", "Monate"]) {
     assert.ok(alles.includes(begriff), `${begriff} wird nie erklärt`);
   }
+  assert.ok(alles.includes("kein") || alles.includes("nichts"), "es muss klar sein, dass noch nichts da ist");
 });
 
 test("Ereigniskarten kommen mit Abstand und jede nur einmal", () => {

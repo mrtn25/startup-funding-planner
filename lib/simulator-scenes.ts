@@ -12,20 +12,20 @@ import type { Ending, GameEvent, GameState, Milestone, RivalStep, Tactic } from 
 import { fmtEuro } from "./simulator.ts";
 
 export const ONBOARDING: { text: string; highlight?: string }[] = [
-  { text: "Moin. Ich bin Tarek, ich berate Gründerinnen beim Starthilfe-Zentrum." },
-  { text: "Ihr seid Lena und Jonas. Eure Software füllt leere Lkw-Rückfahrten. Noch ist nichts davon fertig." },
-  { text: "Links steht euer Runway. Solange ihr angestellt seid, läuft er nicht.", highlight: "Runway" },
-  { text: "Rechts die Maßnahmen. Zwei könnt ihr gleichzeitig laufen lassen — eine pro Kopf." },
-  { text: "In San Francisco baut Haulway dasselbe, mit Y-Combinator-Geld.", highlight: "Haulway" },
-  { text: "Ziel: eine Series A. Oder eine Firma, die sich selbst trägt. Los." },
+  { text: "Moin. Ich bin Tarek. Ich habe selbst zwei Firmen gegründet, eine davon ging gut. Ich schau euch über die Schulter." },
+  { text: "Ihr beide teilt Lkw ein — Disponenten nennt man das. Euch ist aufgefallen: jede vierte Fahrt geht leer zurück, weil niemand die Zeit hat, eine Rückladung zu suchen." },
+  { text: "Genau das soll eure Software machen. Gebaut ist davon noch nichts, und einen einzigen zahlenden Kunden habt ihr auch nicht." },
+  { text: "Links steht, wie viele Monate euer Geld noch reicht. Solange ihr angestellt seid, zahlt das Gehalt die Rechnungen.", highlight: "wie viele Monate" },
+  { text: "Rechts wählt ihr, woran ihr arbeitet. Zwei Sachen gleichzeitig, eine pro Kopf. Jede dauert Monate." },
+  { text: "Und in San Francisco baut Haulway dasselbe, bezahlt von Y Combinator. Die warten nicht auf euch.", highlight: "Haulway" },
 ];
 
 export const INTRO = {
   image: "kitchen-night",
   who: "Lena Brandt & Jonas Ritter, Hamburg",
   lines: [
-    "Ihr habt neun Jahre lang Lkw disponiert und zugesehen, wie jede vierte Rückfahrt leer heimfährt.",
-    "Seit drei Wochen baut ihr abends etwas dagegen. Ab heute meint ihr es ernst.",
+    "Ihr teilt Lkw ein, für eine Spedition in Hamburg. Jede vierte Fahrt kommt leer zurück, weil niemand Zeit hat, für die Rückfahrt eine Ladung zu suchen.",
+    "Das ist eure Marktlücke: eine Software, die diese Rückladungen automatisch findet. Zwei Leute, 18.000 € gespart, nichts gebaut, kein Kunde.",
   ],
 };
 
@@ -118,6 +118,19 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
           "Er will eine Runde. Jeder Monat ohne Investorengespräch ist einer, in dem er zweifelt.",
         ],
       },
+    }),
+
+    T({
+      id: "durchatmen",
+      label: "Ein Wochenende nicht arbeiten",
+      group: "Team",
+      flavour: "Zwei Tage, an denen keiner aufs Matching-Dashboard schaut.",
+      impact: { team: 4 },
+      months: 1,
+      effects: { team: 14, product: -2 },
+      when: (s: GameState) => s.team < 55,
+      repeatable: true,
+      beats: ["Jonas fährt zu seiner Schwester, du schläfst.", "Am Montag ist alles noch genauso kaputt — und ihr könnt es ansehen, ohne zu zucken."],
     }),
 
     /* 2 · Erste Kunden */
@@ -402,31 +415,31 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
 export const MILESTONES: Milestone[] = [
   {
     id: "mvp",
-    title: "Baut das Ding",
-    blurb: "Auf eine Beschreibung reagiert niemand. Es braucht etwas, das ein Disponent benutzen kann.",
+    title: "Baut eine erste Version",
+    blurb: "Niemand kauft eine Idee. Ihr braucht etwas, das eine Spedition ausprobieren kann — und sei es eine Tabelle.",
     image: "kitchen-night",
     gate: (s) => s.product >= 40,
-    gateLabel: "Produkt, das ein Disponent dienstags benutzt",
-    tactics: ["tabelle", "handarbeit", "routing", "richtig-bauen", "teilzeit", "jonas-fragen"],
+    gateLabel: "Etwas, das eine Spedition ausprobieren kann",
+    tactics: ["tabelle", "handarbeit", "routing", "richtig-bauen", "teilzeit", "jonas-fragen", "durchatmen"],
     next: "kunden",
   },
   {
     id: "kunden",
-    title: "Die erste Rechnung",
-    blurb: "Interesse ist gratis. Sobald ihr Geld verlangt, wisst ihr, was es wert war.",
+    title: "Die ersten zahlenden Kunden",
+    blurb: "„Interessant“ sagen alle. Erst wenn jemand eine Rechnung bezahlt, wisst ihr, ob es etwas taugt.",
     image: "first-customer",
     gate: (s) => s.mrr > 0 && s.customers >= 2,
-    gateLabel: "Zwei Speditionen, die monatlich zahlen",
-    tactics: ["pilot", "warme-kontakte", "kaltakquise", "messe", "boerse", "kuendigen"],
+    gateLabel: "Zwei Speditionen zahlen jeden Monat",
+    tactics: ["pilot", "warme-kontakte", "kaltakquise", "messe", "boerse", "kuendigen", "durchatmen"],
     next: "geld",
   },
   {
     id: "geld",
     title: "Fremdes Geld",
-    blurb: "Es kommt mit Bedingungen, und die Bedingungen überleben das Geld.",
+    blurb: "Jetzt braucht ihr Geld, das nicht von Kunden kommt — oder so viel Umsatz, dass ihr keins braucht.",
     image: "angel-cafe",
     gate: (s) => s.cash >= 45_000 || s.mrr >= 3_500,
-    gateLabel: "Genug auf dem Konto oder genug Umsatz fürs nächste Jahr",
+    gateLabel: "45.000 € auf dem Konto oder 3.500 € Umsatz im Monat",
     onEnter: {
       title: "Euer Arbeitgeber hat davon gehört",
       when: (s) => s.salary > 0,
@@ -437,37 +450,37 @@ export const MILESTONES: Milestone[] = [
       effects: { salaryTo: 0, burn: 700, investors: 4, team: -5 },
     },
 
-    tactics: ["exist", "aus-umsatz", "wandeldarlehen", "angel-40", "fff"],
+    tactics: ["exist", "aus-umsatz", "wandeldarlehen", "angel-40", "fff", "durchatmen"],
     next: "team",
   },
   {
     id: "team",
     title: "Büro und erste Leute",
-    blurb: "Ab hier hängen andere mit drin.",
+    blurb: "Zu zweit schafft ihr zwei Sachen gleichzeitig. Jede weitere Person ist eine mehr.",
     image: "first-hire",
     gate: (s) => s.headcount >= 3 && s.mrr >= 4_000,
-    gateLabel: "Drei auf der Gehaltsliste, 4.000 € MRR",
-    tactics: ["buero", "hire-vertrieb", "hire-eng", "werkstudenten", "ausflug"],
+    gateLabel: "Drei Leute an Bord und 4.000 € Umsatz im Monat",
+    tactics: ["buero", "hire-vertrieb", "hire-eng", "werkstudenten", "ausflug", "durchatmen"],
     next: "seed",
   },
   {
     id: "seed",
     title: "Die Seed-Runde",
-    blurb: "Drei Wege zum selben Geld. Die Bedingungen unterscheiden sich mehr als die Summen.",
+    blurb: "Mehrere Investoren wollen rein. Was sie verlangen, unterscheidet sich stärker als das, was sie zahlen.",
     image: "the-round",
     gate: (s) => s.cash >= 400_000 || s.mrr >= 14_000,
-    gateLabel: "Eine Runde abschließen — oder ohne eine weiterkommen",
-    tactics: ["anker-vc", "angel-club", "stratege", "runde-schieben", "bruecke"],
+    gateLabel: "400.000 € einsammeln — oder 14.000 € Umsatz im Monat",
+    tactics: ["anker-vc", "angel-club", "stratege", "runde-schieben", "bruecke", "durchatmen"],
     next: "skalieren",
   },
   {
     id: "skalieren",
     title: "Skalieren",
-    blurb: "Das Geld ist da. Jetzt entscheidet sich, ob daraus eine Firma wird.",
+    blurb: "Mit Geld wachsen ist leicht. Mit Geld wachsen, ohne alles zu verbrennen, ist die Aufgabe.",
     image: "first-hire",
     gate: (s) => s.mrr >= 25_000 || s.investors >= 70,
-    gateLabel: "25.000 € MRR oder eine Series A in Reichweite",
-    tactics: ["vertrieb-ausbauen", "produkt-tiefer", "usa", "halten", "series-a"],
+    gateLabel: "25.000 € Umsatz im Monat — dann kommt die Series A",
+    tactics: ["vertrieb-ausbauen", "produkt-tiefer", "usa", "halten", "series-a", "durchatmen"],
     next: null,
   },
 ];
@@ -556,6 +569,66 @@ export const EVENTS: GameEvent[] = [
     title: "Jonas liegt flach",
     beats: ["Drei Wochen, erst Grippe, dann Nachwirkungen.", "Du machst Vertrieb und Entwicklung gleichzeitig. Beides halb."],
     effects: { team: -8, product: -3, mrr: -300 },
+  },
+  {
+    id: "grosskunde-weg",
+    title: "Euer größter Kunde kündigt",
+    beats: [
+      "Neuer Fuhrparkleiter, alter Lieferant, Mail am Donnerstag um 8:15.",
+      "Ein Drittel eures Umsatzes geht mit einem Mann, den ihr nie getroffen habt.",
+    ],
+    effects: { customers: -2, mrr: -1_780, investors: -5, team: -6 },
+    when: (s) => s.customers >= 5,
+  },
+  {
+    id: "engineer-weg",
+    title: "Eure Entwicklerin wird abgeworben",
+    beats: [
+      "Haulway bietet ihr das Doppelte und ein Visum.",
+      "Sie geht. Zwei Monate lang weiß niemand mehr, wie das nächtliche Matching wirklich funktioniert.",
+    ],
+    effects: { headcount: -1, product: -12, team: -10, burn: -8_000 },
+    when: (s) => s.headcount >= 3,
+  },
+  {
+    id: "nachverhandeln",
+    title: "Der Investor will nachverhandeln",
+    beats: [
+      "Zwei Wochen vor Unterschrift: die Bewertung sei „im aktuellen Marktumfeld nicht haltbar“.",
+      "20 % runter, sonst steigt er aus. Ihr habt sechs Wochen Exklusivität unterschrieben und könnt niemand anderen fragen.",
+    ],
+    effects: { equity: -6, investors: -4, team: -5 },
+    when: (s) => s.cash >= 80_000,
+  },
+  {
+    id: "insolvenz-kunde",
+    title: "Eine Spedition geht insolvent",
+    beats: [
+      "Vierzig Lkw, achtzig Jahre alt, am Dienstag vorläufiger Insolvenzverwalter.",
+      "Zwei offene Rechnungen von euch stehen auf der Gläubigerliste ganz unten.",
+    ],
+    effects: { customers: -1, mrr: -890, cash: -3_400 },
+    when: (s) => s.customers >= 4,
+  },
+  {
+    id: "presse-schlecht",
+    title: "Ein Disponent schreibt einen Verriss",
+    beats: [
+      "LinkedIn, 600 Wörter, „nettes Tool für Leute, die nie disponiert haben“.",
+      "Er hat in drei Punkten recht. Die Branche liest mit.",
+    ],
+    effects: { customers: -1, investors: -6, product: 3 },
+    when: (s) => s.customers >= 3,
+  },
+  {
+    id: "grosse-anfrage",
+    title: "Ein Konzern meldet sich",
+    beats: [
+      "Zentraleinkauf einer Handelskette, 400 Lkw im Werkverkehr.",
+      "Sie wollen ein Pilotprojekt — und einen Fragebogen mit 120 Positionen beantwortet haben.",
+    ],
+    effects: { customers: 2, mrr: 3_560, team: -8, product: 4 },
+    when: (s) => s.customers >= 4 && s.product >= 55,
   },
   {
     id: "altkunde",

@@ -17,6 +17,7 @@ import {
   fmtEuro,
   forcedEnding,
   initialState,
+  meterViews,
   rivalMove,
   runway,
   startTactic,
@@ -389,16 +390,13 @@ function Board({
         <aside className={styles.rail}>
           <div className={styles.clockWrap}>
             <span className={`${styles.clock} ${knapp ? styles.clockLow : ""}`}>{isFinite(months) ? months : "∞"}</span>
-            <span className={styles.clockUnit}>Monate Runway</span>
+            <span className={styles.clockUnit}>{isFinite(months) ? "Monate Geld" : "Gehalt läuft"}</span>
           </div>
 
           <div className={styles.stats}>
-            <Stat label="MRR" value={fmtEuro(state.mrr)} />
-            <Stat label="Kunden" value={String(state.customers)} />
-            <Stat label="Produkt" value={`${Math.round(state.product)}%`} bar={state.product} />
-            <Stat label="Investoren" value={`${Math.round(state.investors)}%`} bar={state.investors} />
-            <Stat label="Team" value={`${Math.round(state.team)}%`} bar={state.team} />
-            <Stat label="Anteile" value={`${Math.round(state.equity)}%`} bar={state.equity} />
+            {meterViews(state).map((v) => (
+              <Stat key={v.key} view={v} />
+            ))}
           </div>
 
           <button type="button" className={styles.pause} onClick={onPause} aria-label={paused ? "Weiter" : "Pause"}>
@@ -465,16 +463,19 @@ function Ring({ laeuft, fertig }: { laeuft?: { left: number; total: number }; fe
   );
 }
 
-function Stat({ label, value, bar }: { label: string; value: string; bar?: number }) {
+function Stat({ view }: { view: ReturnType<typeof meterViews>[number] }) {
   return (
     <div className={styles.stat}>
-      <span className={styles.statLabel}>{label}</span>
-      <strong className={styles.statValue}>{value}</strong>
-      {bar !== undefined && (
-        <span className={styles.statTrack}>
-          <span className={styles.statFill} style={{ width: `${Math.max(0, Math.min(100, bar))}%` }} />
+      <span className={styles.statLabel}>{view.label}</span>
+      <strong className={`${styles.statValue} ${styles[view.tone]}`}>{view.value}</strong>
+      {view.punkte !== undefined && (
+        <span className={styles.punkteReihe} aria-hidden="true">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <i key={i} className={i <= (view.punkte ?? 0) ? styles.punktAn : ""} />
+          ))}
         </span>
       )}
+      {view.note && <span className={styles.statNote}>{view.note}</span>}
     </div>
   );
 }

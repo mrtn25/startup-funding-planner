@@ -212,8 +212,8 @@ export function initialState(seed = 1): GameState {
     salary: 2_300,
     mrr: 0,
     customers: 0,
-    investors: 12,
-    team: 70,
+    investors: 0,
+    team: 62,
     headcount: 2,
     product: 12,
     equity: 100,
@@ -425,47 +425,64 @@ export function forcedEnding(s: GameState): string | null {
 
 /* ── Display ─────────────────────────────────────────────────── */
 
-export type MeterView = { key: MeterKey; label: string; value: string; fill: number; tone: "ok" | "warn" | "bad" };
+/**
+ * Die Anzeigen.
+ *
+ * Prozente waren hier falsch: „Investoren 12 %“ beantwortet nicht, was
+ * 100 % wären, und am Anfang hat man gar keine Investoren — dann muss
+ * da null stehen und nicht zwölf. Also Dinge, die man benennen kann:
+ * Geld in Euro, Kunden in Speditionen, und alles Weiche als fünf Punkte
+ * mit einem Wort darunter.
+ */
+export type MeterView = {
+  key: string;
+  label: string;
+  value: string;
+  /** Null bis fünf gefüllte Punkte, wo eine Zahl nichts sagen würde. */
+  punkte?: number;
+  note?: string;
+  tone: "ok" | "warn" | "bad";
+};
+
+const WORTE = {
+  produkt: ["Idee", "Skizze", "Prototyp", "benutzbar", "stabil", "rund"],
+  stimmung: ["am Ende", "angespannt", "okay", "gut", "stark", "eingeschworen"],
+  investoren: ["niemand", "ein Kontakt", "erste Gespräche", "warm", "sie fragen nach", "Term Sheets"],
+};
+
+const stufe = (v: number) => Math.max(0, Math.min(5, Math.round(v / 20)));
 
 export function meterViews(s: GameState): MeterView[] {
-  const r = runway(s);
+  const produkt = stufe(s.product);
+  const stimmung = stufe(s.team);
+  const investoren = stufe(s.investors);
   return [
+    { key: "mrr", label: "Umsatz", value: s.mrr > 0 ? `${fmtEuro(s.mrr)}` : "—", note: s.mrr > 0 ? "pro Monat" : "noch keiner", tone: s.mrr > 0 ? "ok" : "warn" },
     {
-      key: "mrr",
-      label: "MRR",
-      value: fmtEuro(s.mrr),
-      fill: clamp((s.mrr / 12_000) * 100),
-      tone: s.mrr > 0 ? "ok" : "warn",
-    },
-    {
-      key: "customers",
+      key: "kunden",
       label: "Kunden",
       value: String(s.customers),
-      fill: clamp((s.customers / 20) * 100),
+      note: s.customers === 1 ? "Spedition" : "Speditionen",
       tone: s.customers > 0 ? "ok" : "warn",
     },
-    {
-      key: "investors",
-      label: "Investoren",
-      value: `${Math.round(s.investors)}%`,
-      fill: s.investors,
-      tone: s.investors <= 20 ? "bad" : s.investors <= 40 ? "warn" : "ok",
-    },
+    { key: "produkt", label: "Produkt", value: WORTE.produkt[produkt], punkte: produkt, tone: produkt >= 3 ? "ok" : produkt >= 2 ? "warn" : "bad" },
     {
       key: "team",
-      label: "Team",
-      value: `${Math.round(s.team)}%`,
-      fill: s.team,
-      tone: s.team <= 30 ? "bad" : s.team <= 50 ? "warn" : "ok",
+      label: "Stimmung",
+      value: WORTE.stimmung[stimmung],
+      punkte: stimmung,
+      note: `${s.headcount} ${s.headcount === 1 ? "Kopf" : "Köpfe"}`,
+      tone: stimmung >= 3 ? "ok" : stimmung >= 2 ? "warn" : "bad",
     },
     {
-      key: "equity",
-      label: "Deine Anteile",
-      value: `${Math.round(s.equity)}%`,
-      fill: s.equity,
-      tone: s.equity < 50 ? "warn" : "ok",
+      key: "investoren",
+      label: "Investoren",
+      value: WORTE.investoren[investoren],
+      punkte: investoren,
+      tone: investoren >= 3 ? "ok" : investoren >= 1 ? "warn" : "bad",
     },
-  ].map((m) => ({ ...m, fill: clamp(m.fill) })) as MeterView[];
+    { key: "equity", label: "Euch gehören", value: `${Math.round(s.equity)} %`, tone: s.equity >= 50 ? "ok" : "warn" },
+  ];
 }
 
 export function fmtEuro(v: number): string {

@@ -5,11 +5,13 @@
    Spiel. Hochformat zuerst, weil man es auf dem Handy spielt. */
 
 .app {
-  --bg: #f6c945;
-  --ink: #15202b;
+  /* backable: Papierweiß, Tinte, das Blau der Seite, Lime als Aktion. */
+  --bg: #f1efe9;
+  --ink: #141413;
   --karte: #ffffff;
-  --linie: rgba(21, 32, 43, 0.14);
+  --linie: rgba(20, 20, 19, 0.12);
   --akzent: #2200ff;
+  --lime: #a8cf12;
   --ok: #1d9e75;
   --warn: #d2810f;
   --bad: #d85a30;
@@ -217,7 +219,7 @@
 .statTrack {
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(20, 20, 19, 0.1);
   overflow: hidden;
   margin-top: 2px;
 }
@@ -250,6 +252,28 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
   padding-bottom: 2px;
+}
+
+.punkteReihe {
+  display: inline-flex;
+  gap: 3px;
+  margin-top: 3px;
+}
+.punkteReihe i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: transparent;
+  border: 1.5px solid rgba(20, 20, 19, 0.25);
+}
+.punkteReihe i.punktAn {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.statNote {
+  font-size: 9px;
+  opacity: 0.55;
+  margin-top: 1px;
 }
 
 /* ── Die Liste rechts ── */
@@ -286,7 +310,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #3aa0d8;
+  color: var(--akzent);
   padding: 10px 8px 4px;
 }
 .item {
@@ -330,12 +354,12 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 4px solid #3aa0d8;
+  border: 4px solid var(--akzent);
   display: grid;
   place-items: center;
 }
 .ringRun {
-  border-color: #cfe4f2;
+  border-color: rgba(34, 0, 255, 0.22);
 }
 .ringDone {
   border-color: var(--ok);
@@ -356,7 +380,7 @@
 }
 .ringFill {
   fill: none;
-  stroke: #3aa0d8;
+  stroke: var(--akzent);
   stroke-width: 4;
   transition: stroke-dasharray 0.4s linear;
 }
@@ -431,7 +455,7 @@
 }
 
 .wirkung {
-  background: #eaf4fa;
+  background: #f3f2ee;
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 12px;
@@ -455,11 +479,11 @@
   height: 13px;
   border-radius: 4px;
   background: #fff;
-  border: 1.5px solid #9ec6dd;
+  border: 1.5px solid rgba(20, 20, 19, 0.2);
 }
 .punkte i.punktAn {
-  background: #3aa0d8;
-  border-color: #3aa0d8;
+  background: var(--akzent);
+  border-color: var(--akzent);
 }
 .detailMeta {
   display: flex;
@@ -537,7 +561,7 @@
   padding: 12px 22px;
   border: 0;
   border-radius: 999px;
-  background: #a8d46a;
+  background: var(--lime);
   color: var(--ink);
   cursor: pointer;
   flex: 1;
