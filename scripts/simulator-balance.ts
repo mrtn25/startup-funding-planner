@@ -10,14 +10,14 @@
    that a milestone is unreachable with its own deck.
    ══════════════════════════════════════════════════════════════ */
 
-import { applyEffects, deckFor, forcedEnding, initialState, runTactic, runway, type GameState } from "../lib/simulator.ts";
-import { MILESTONES, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
+import { applyEffects, deckFor, drawEvent, eventDue, forcedEnding, initialState, runTactic, runway, type GameState } from "../lib/simulator.ts";
+import { EVENTS, MILESTONES, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
 
 /** `pick` chooses a card; `idle` is months of dithering before each. */
 function play(pick: (n: number, step: number) => number, idle: number, seed: number) {
   let s: GameState = initialState(seed);
   let step = 0;
-  while (step < 40) {
+  while (step < 60) {
     const m = MILESTONE_BY_ID[s.milestoneId];
     if (!m) break;
     if (m.gate(s)) {
@@ -28,6 +28,10 @@ function play(pick: (n: number, step: number) => number, idle: number, seed: num
       const enter = next.onEnter;
       s = { ...(enter && (!enter.when || enter.when(s)) ? applyEffects(s, enter.effects) : s), milestoneId: m.next };
       continue;
+    }
+    if (eventDue(s)) {
+      const e = drawEvent(s, EVENTS);
+      if (e) s = applyEffects({ ...s, drawn: [...s.drawn, e.id], lastEvent: s.month }, e.effects);
     }
     const deck = deckFor(s, m, TACTICS);
     if (!deck.length) break;

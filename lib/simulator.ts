@@ -99,6 +99,18 @@ export type Milestone = {
   next: string | null;
 };
 
+/** Eine Ereigniskarte. Kommt ungefragt, trifft meist etwas anderes als
+    das, woran man gerade arbeitet. */
+export type GameEvent = {
+  id: string;
+  title: string;
+  beats: [string, string];
+  effects: Effects;
+  /** Nur in dieser Phase, oder in jeder. */
+  milestone?: string;
+  when?: (s: GameState) => boolean;
+};
+
 export type RivalStep = {
   /** Fires when Retoura's own progress passes this. */
   at: number;
@@ -139,6 +151,12 @@ export type GameState = {
   rival: number;
   rivalSeen: number[];
   endingId: string | null;
+  /** Gezogene Ereigniskarten, damit keine zweimal kommt. */
+  drawn: string[];
+  /** Monat der letzten Ereigniskarte — sie sollen nicht im Rudel kommen. */
+  lastEvent: number;
+  /** Liquidationspräferenz aus der Runde, die man genommen hat. */
+  pref: "1x" | "2x" | null;
   seed: number;
 };
 
@@ -187,11 +205,14 @@ export function initialState(seed = 1): GameState {
     alignment: 60,
     stance: seed % 2 === 0 ? "bootstrap" : "venture",
     month: 0,
-    milestoneId: "observe",
+    milestoneId: "problem",
     used: [],
     rival: 8,
     rivalSeen: [],
     endingId: null,
+    drawn: [],
+    lastEvent: 0,
+    pref: null,
     seed,
   };
 }
@@ -274,6 +295,29 @@ export function deckFor(s: GameState, milestone: Milestone, all: Record<string, 
     .filter((t) => (t.repeatable || !s.used.includes(t.id)) && (!t.when || t.when(s)));
 }
 
+/* ── Ereigniskarten ──────────────────────────────────────────── */
+
+/** Mulberry32 — klein, schnell, reicht zum Ziehen einer Karte. */
+function rand(seed: number): number {
+  let t = (seed + 0x6d2b79f5) | 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/** Alle drei Monate höchstens eine, und jede nur einmal im Spiel. */
+export function eventDue(s: GameState): boolean {
+  return s.month >= 3 && s.month - s.lastEvent >= 3;
+}
+
+export function drawEvent(s: GameState, all: GameEvent[]): GameEvent | null {
+  const offen = all.filter(
+    (e) => !s.drawn.includes(e.id) && (!e.milestone || e.milestone === s.milestoneId) && (!e.when || e.when(s)),
+  );
+  if (!offen.length) return null;
+  return offen[Math.floor(rand(s.seed + s.month) * offen.length) % offen.length];
+}
+
 /* ── The rival ───────────────────────────────────────────────── */
 
 /** Retoura's next move, if it has reached one you have not seen. */
@@ -309,14 +353,14 @@ export function meterViews(s: GameState): MeterView[] {
     },
     {
       key: "customers",
-      label: "Customers",
+      label: "Kunden",
       value: String(s.customers),
       fill: clamp((s.customers / 20) * 100),
       tone: s.customers > 0 ? "ok" : "warn",
     },
     {
       key: "investors",
-      label: "Investors",
+      label: "Investoren",
       value: `${Math.round(s.investors)}%`,
       fill: s.investors,
       tone: s.investors <= 20 ? "bad" : s.investors <= 40 ? "warn" : "ok",
@@ -330,7 +374,7 @@ export function meterViews(s: GameState): MeterView[] {
     },
     {
       key: "equity",
-      label: "Yours",
+      label: "Deine Anteile",
       value: `${Math.round(s.equity)}%`,
       fill: s.equity,
       tone: s.equity < 50 ? "warn" : "ok",
@@ -357,12 +401,12 @@ export function badges(e: Effects | undefined): { label: string; up: boolean }[]
   };
   push(e.cash, (n) => `${(e.cash ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)}`);
   push(e.mrr, (n) => `${(e.mrr ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)} MRR`);
-  push(e.customers, (n) => `${(e.customers ?? 0) > 0 ? "+" : "−"}${n} customer${n === 1 ? "" : "s"}`);
-  push(e.product, (n) => `${(e.product ?? 0) > 0 ? "+" : "−"}${n} product`);
-  push(e.investors, (n) => `${(e.investors ?? 0) > 0 ? "+" : "−"}${n} investors`);
-  push(e.team, (n) => `${(e.team ?? 0) > 0 ? "+" : "−"}${n} team`);
-  push(e.headcount, (n) => `${(e.headcount ?? 0) > 0 ? "+" : "−"}${n} on payroll`);
-  push(e.burn, (n) => `${(e.burn ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)}/mo burn`, false);
-  push(e.equity, (n) => `−${n}% of the company`, false);
+  push(e.customers, (n) => `${(e.customers ?? 0) > 0 ? "+" : "−"}${n} ${n === 1 ? "Kunde" : "Kunden"}`);
+  push(e.product, (n) => `${(e.product ?? 0) > 0 ? "+" : "−"}${n} Produkt`);
+  push(e.investors, (n) => `${(e.investors ?? 0) > 0 ? "+" : "−"}${n} Investoren`);
+  push(e.team, (n) => `${(e.team ?? 0) > 0 ? "+" : "−"}${n} Team`);
+  push(e.headcount, (n) => `${(e.headcount ?? 0) > 0 ? "+" : "−"}${n} auf der Gehaltsliste`);
+  push(e.burn, (n) => `${(e.burn ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)}/Monat Fixkosten`, false);
+  push(e.equity, (n) => `−${n} % der Firma`, false);
   return out;
 }

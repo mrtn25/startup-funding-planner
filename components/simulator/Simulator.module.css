@@ -211,6 +211,90 @@
   color: var(--sm-bad);
 }
 
+/* ── Phasenleiste ── */
+
+.phases {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 11px;
+}
+.phaseBar {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--sm-line);
+}
+.phaseDone {
+  background: var(--sm-accent);
+  opacity: 0.45;
+}
+.phaseNow {
+  background: var(--sm-accent);
+}
+
+/* ── Onboarding ──
+   Das Brett liegt schon da, unscharf, und Tarek steht davor. Erklären,
+   während man schon sieht, worüber geredet wird. */
+
+.blurred {
+  filter: blur(5px);
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+.coach {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0;
+  padding: 0 0 34px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.coachFigure {
+  position: relative;
+  width: min(330px, 78vw);
+  aspect-ratio: 1;
+  margin-bottom: -58px;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.22));
+  border-radius: 18px;
+  overflow: hidden;
+}
+.coachImg {
+  object-fit: cover;
+}
+.bubble {
+  position: relative;
+  max-width: min(520px, 90vw);
+  background: var(--sm-bg);
+  border: 1px solid var(--sm-line);
+  border-radius: 18px;
+  padding: 16px 18px;
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--sm-fg);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.16);
+}
+.bubble em {
+  font-style: normal;
+  color: var(--sm-accent);
+  font-weight: 500;
+}
+.coachHint {
+  margin-top: 12px;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--sm-fg3);
+}
+
 /* ── The milestone and its deck ── */
 
 .goal {
@@ -375,6 +459,9 @@
 
 /* ── The consequence beat ── */
 
+.kickerEvent {
+  color: var(--sm-warn) !important;
+}
 .kicker {
   font-size: 10.5px;
   letter-spacing: 0.07em;

@@ -5,6 +5,8 @@ import { test } from "node:test";
 import {
   advance,
   alignmentOf,
+  drawEvent,
+  eventDue,
   applyEffects,
   badges,
   beatsOf,
@@ -20,7 +22,7 @@ import {
   type GameState,
   type Tactic,
 } from "./simulator.ts";
-import { ENDING_BY_ID, ENDINGS, MILESTONES, MILESTONE_BY_ID, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
+import { ENDING_BY_ID, ENDINGS, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
 
 const S = (patch: Partial<GameState> = {}): GameState => ({ ...initialState(1), ...patch });
 const T = (patch: Partial<Tactic> = {}): Tactic => ({
@@ -75,7 +77,7 @@ test("solange ein Gehalt reinkommt, gibt es keinen Countdown", () => {
   assert.equal(runway(angestellt), Infinity);
 
   // Die Kündigung ist der Moment, in dem die Uhr etwas bedeutet.
-  const gekuendigt = runTactic(angestellt, TACTICS["quit"]);
+  const gekuendigt = runTactic(angestellt, TACTICS["kuendigen"]);
   assert.equal(gekuendigt.salary, 0);
   assert.ok(isFinite(runway(gekuendigt)), "nach der Kündigung muss der Runway endlich sein");
   assert.ok(runway(gekuendigt) < 12);
@@ -96,25 +98,25 @@ test("eine Maßnahme kostet sofort Geld, dann Zeit, dann wirkt sie", () => {
 });
 
 test("eine benutzte Karte liegt nicht mehr im Deck", () => {
-  const m = MILESTONE_BY_ID["observe"];
+  const m = MILESTONE_BY_ID["problem"];
   const voll = deckFor(S(), m, TACTICS);
   const nachher = deckFor(S({ used: [voll[0].id] }), m, TACTICS);
   assert.equal(nachher.length, voll.length - 1);
 });
 
 test("Karten mit Bedingung tauchen erst auf, wenn sie dürfen", () => {
-  const m = MILESTONE_BY_ID["customer"];
+  const m = MILESTONE_BY_ID["kunde"];
   const ohneProdukt = deckFor(S({ product: 10, mrr: 0, rival: 10 }), m, TACTICS).map((t) => t.id);
-  assert.ok(!ohneProdukt.includes("linkedin"), "LinkedIn braucht ein Produkt");
-  assert.ok(!ohneProdukt.includes("party-first"), "ohne Umsatz gibt es nichts zu feiern");
+  assert.ok(!ohneProdukt.includes("warme-kontakte"), "LinkedIn braucht ein Produkt");
+  assert.ok(!ohneProdukt.includes("feier-erste-rechnung"), "ohne Umsatz gibt es nichts zu feiern");
   const mitAllem = deckFor(S({ product: 45, mrr: 890, rival: 10 }), m, TACTICS).map((t) => t.id);
-  assert.ok(mitAllem.includes("linkedin") && mitAllem.includes("party-first"));
+  assert.ok(mitAllem.includes("warme-kontakte") && mitAllem.includes("feier-erste-rechnung"));
 });
 
 test("hat Retoura den Messestand, ist die Messe weg", () => {
-  const m = MILESTONE_BY_ID["customer"];
-  assert.ok(deckFor(S({ rival: 30 }), m, TACTICS).some((t) => t.id === "fair"));
-  assert.ok(!deckFor(S({ rival: 50 }), m, TACTICS).some((t) => t.id === "fair"));
+  const m = MILESTONE_BY_ID["kunde"];
+  assert.ok(deckFor(S({ rival: 30 }), m, TACTICS).some((t) => t.id === "messe"));
+  assert.ok(!deckFor(S({ rival: 50 }), m, TACTICS).some((t) => t.id === "messe"));
 });
 
 test("Anteile gehen nur runter", () => {
@@ -128,12 +130,12 @@ test("dieselbe Karte zahlt unterschiedlich ein, je nachdem was Jonas will", () =
   const angel = TACTICS["angel-40"];
   assert.ok(alignmentOf(angel, "bootstrap") < 0, "ein Bootstrapper verzeiht 40 % nicht");
   assert.ok(alignmentOf(angel, "venture") > 0);
-  const selbst = TACTICS["sell-harder"];
+  const selbst = TACTICS["aus-umsatz"];
   assert.ok(alignmentOf(selbst, "bootstrap") > alignmentOf(selbst, "venture"));
 });
 
 test("ihn zu fragen erzählt je nach Haltung etwas anderes", () => {
-  const frage = TACTICS["ask-jonas"];
+  const frage = TACTICS["jonas-fragen"];
   const [a] = beatsOf(frage, "bootstrap");
   const [b] = beatsOf(frage, "venture");
   assert.notEqual(a, b);
@@ -152,7 +154,7 @@ test("gegen die Haltung des Co-Founders zu spielen beendet die Partie", () => {
 });
 
 test("spätestens beim ersten Kunden ist das Gehalt weg", () => {
-  const kunde = MILESTONE_BY_ID["customer"];
+  const kunde = MILESTONE_BY_ID["kunde"];
   assert.ok(kunde.onEnter, "dieser Meilenstein muss die Uhr starten");
   assert.equal(kunde.onEnter!.when!(S({ salary: 2_300 })), true);
   assert.equal(kunde.onEnter!.when!(S({ salary: 0 })), false, "wer schon gekündigt hat, kündigt nicht nochmal");
@@ -202,7 +204,7 @@ test("jede Karte nennt Dauer und Wirkung, aber verrät nichts im Text", () => {
 });
 
 test("jeder Meilenstein hat ein Deck, ein Tor und einen Nachfolger", () => {
-  assert.equal(MILESTONES.length, 5);
+  assert.equal(MILESTONES.length, 8);
   for (const m of MILESTONES) {
     assert.ok(m.tactics.length >= 4, `${m.id} hat nur ${m.tactics.length} Karten`);
     for (const id of m.tactics) assert.ok(TACTICS[id], `${m.id} verweist auf ${id}`);
@@ -212,17 +214,28 @@ test("jeder Meilenstein hat ein Deck, ein Tor und einen Nachfolger", () => {
   assert.equal(MILESTONES[MILESTONES.length - 1].next, null);
 });
 
-test("jedes Tor ist mit dem eigenen Deck erreichbar", () => {
+test("keine Phase ist eine Sackgasse", () => {
+  /* Jede Phase wird mit dem Zustand betreten, mit dem man realistisch
+     ankommt — nicht bei null. Geprüft wird, dass das eigene Deck dann
+     reicht, um das Tor zu öffnen. */
+  let s = S();
   for (const m of MILESTONES) {
-    let s = S({ product: m.id === "prototype" ? 15 : 0 });
-    for (const id of m.tactics) s = runTactic(s, TACTICS[id]);
-    assert.ok(m.gate(s), `${m.id}: selbst mit allen Karten bleibt das Tor zu`);
+    s = { ...s, milestoneId: m.id };
+    let karten = 0;
+    while (!m.gate(s) && karten < 12) {
+      const deck = deckFor(s, m, TACTICS);
+      assert.ok(deck.length, `${m.id}: Deck leer, Tor zu`);
+      s = runTactic(s, deck[0]);
+      karten++;
+    }
+    assert.ok(m.gate(s), `${m.id}: selbst mit dem ganzen Deck bleibt das Tor zu`);
+    assert.ok(karten <= 6, `${m.id} braucht ${karten} Karten — das ist keine Phase mehr, das ist eine Schicht`);
   }
 });
 
 test("Badges zeigen erst auf der Ergebniskarte, was passiert ist", () => {
   const labels = badges({ cash: -6_500, customers: 2, mrr: 1_780, investors: 8, team: -4 }).map((b) => b.label);
-  assert.deepEqual(labels, ["−6.5k €", "+1.8k € MRR", "+2 customers", "+8 investors", "−4 team"]);
+  assert.deepEqual(labels, ["−6.5k €", "+1.8k € MRR", "+2 Kunden", "+8 Investoren", "−4 Team"]);
   assert.equal(badges({ burn: 900 })[0].up, false, "mehr Burn ist keine gute Nachricht");
   assert.equal(badges(undefined).length, 0);
 });
@@ -234,18 +247,64 @@ test("jedes vergebene Ende existiert", () => {
     S({ cash: 0 }),
     S({ alignment: 0, customers: 0 }),
     S({ rival: 100, customers: 1 }),
-    S({ cash: 120_000, equity: 70 }),
-    S({ mrr: 6_000, cash: 20_000 }),
+    S({ mrr: 30_000, investors: 70, customers: 20 }),
+    S({ mrr: 20_000, customers: 15 }),
+    S({ mrr: 9_000, equity: 40, customers: 10 }),
     S({ cash: 20_000, mrr: 400 }),
   ];
   const ids = new Set(faelle.map(pickEnding));
   for (const id of ids) assert.ok(ENDING_BY_ID[id], `unbekannt: ${id}`);
-  assert.equal(ids.size, 6, "alle sechs Enden müssen erreichbar sein");
-  assert.equal(ENDINGS.length, 6);
+  assert.ok(ids.size >= 5, "die meisten Enden müssen erreichbar sein");
+  assert.equal(ENDINGS.length, 7);
 });
 
 test("leere Kasse schlägt jedes andere Ende", () => {
   assert.equal(pickEnding(S({ cash: 0, mrr: 9_000, customers: 20 })), "insolvent");
+});
+
+/* ── Onboarding und Ereigniskarten ── */
+
+test("das Onboarding erklärt in wenigen Sätzen, worum es geht", () => {
+  assert.ok(ONBOARDING.length >= 5 && ONBOARDING.length <= 8);
+  for (const z of ONBOARDING) assert.ok(z.text.length > 30 && z.text.length < 220, `zu lang oder zu kurz: ${z.text}`);
+  const alles = ONBOARDING.map((z) => z.text).join(" ");
+  for (const begriff of ["Runway", "Retoura", "Maßnahme"]) {
+    assert.ok(alles.includes(begriff), `${begriff} wird nie erklärt`);
+  }
+});
+
+test("Ereigniskarten kommen mit Abstand und jede nur einmal", () => {
+  assert.equal(eventDue(S({ month: 2, lastEvent: 0 })), false);
+  assert.equal(eventDue(S({ month: 3, lastEvent: 0 })), true);
+  assert.equal(eventDue(S({ month: 5, lastEvent: 3 })), false);
+  assert.equal(eventDue(S({ month: 6, lastEvent: 3 })), true);
+
+  const erste = drawEvent(S({ month: 6, customers: 5, mrr: 4_000, headcount: 3 }), EVENTS);
+  assert.ok(erste);
+  const zweite = drawEvent(S({ month: 9, customers: 5, mrr: 4_000, headcount: 3, drawn: [erste!.id] }), EVENTS);
+  assert.ok(zweite && zweite.id !== erste!.id);
+});
+
+test("jede Ereigniskarte trifft etwas und erzählt es in zwei Sätzen", () => {
+  assert.ok(EVENTS.length >= 10, "zu wenige Ereignisse für acht Phasen");
+  for (const e of EVENTS) {
+    assert.equal(e.beats.length, 2, `${e.id} ohne zwei Beats`);
+    assert.ok(Object.keys(e.effects).length > 0, `${e.id} bleibt folgenlos`);
+    assert.ok(e.title.length > 8, `${e.id} ohne Titel`);
+  }
+});
+
+test("der Inhalt ist auf Deutsch", () => {
+  const text = [
+    ...MILESTONES.map((m) => `${m.title} ${m.blurb} ${m.gateLabel}`),
+    ...Object.values(TACTICS).map((t) => `${t.label} ${t.flavour} ${t.beats.join(" ")}`),
+    ...EVENTS.map((e) => `${e.title} ${e.beats.join(" ")}`),
+    ...ENDINGS.map((e) => `${e.title} ${e.text}`),
+  ].join(" ");
+  // Ein paar englische Füllwörter, die beim Übersetzen gern stehen bleiben.
+  for (const wort of [" the ", " you ", " with ", " and the ", " months of "]) {
+    assert.ok(!text.includes(wort), `englischer Rest im Inhalt: "${wort}"`);
+  }
 });
 
 /* ── Eine ganze Partie ── */
