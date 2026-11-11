@@ -169,6 +169,10 @@ export type GameState = {
   pref: "1x" | "2x" | null;
   /** Schon gefeierte Erfolge — jeder Moment kommt genau einmal. */
   gefeiert: string[];
+  /** Schon getroffene Entscheidungen. Jede Frage wird einmal gestellt. */
+  entschieden: string[];
+  /** Monat der letzten Entscheidung — zwei an einem Abend sind keine. */
+  lastChoice: number;
   seed: number;
 };
 
@@ -184,8 +188,21 @@ const clamp = (v: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));
  * was Speditionen zahlen, abzüglich dessen, was ihre Betreuung kostet.
  */
 export function netBurn(s: GameState): number {
+  const f = fluss(s);
+  return f.raus - f.rein;
+}
+
+/**
+ * Dasselbe aufgeschlüsselt: was rausgeht, was reinkommt.
+ *
+ * Die Zahl allein beantwortet nicht, wofür. Auf dem Schirm stehen
+ * deshalb beide Richtungen getrennt — und „Betreuung“ ist die Zeile,
+ * die erklärt, warum der zehnte Kunde weniger bringt als der erste:
+ * jeder kostet Server, Rückfragen und einen Anruf im Monat.
+ */
+export function fluss(s: GameState): { raus: number; rein: number; betreuung: number } {
   const betreuung = Math.round(s.customers * 120);
-  return s.burn + betreuung - s.mrr;
+  return { raus: s.burn + betreuung, rein: s.mrr, betreuung };
 }
 
 /**
@@ -244,6 +261,8 @@ export function initialState(seed = 1): GameState {
     lastEvent: 0,
     pref: null,
     gefeiert: [],
+    entschieden: [],
+    lastChoice: 0,
     seed,
   };
 }
@@ -439,6 +458,104 @@ export function erfolge(vorher: GameState, nachher: GameState, alle: Erfolg[]): 
   return alle.filter((e) => !nachher.gefeiert.includes(e.id) && e.when(vorher, nachher));
 }
 
+/* ── Entscheidungen ──────────────────────────────────────────── */
+
+/**
+ * Eine Frage mit zwei oder drei Antworten, von denen keine gratis ist.
+ *
+ * Maßnahmen sind eine Liste, aus der man wählt, woran gearbeitet wird.
+ * Eine Entscheidung ist das Gegenteil: sie kommt ungefragt, man kann
+ * sie nicht einem Kopf zuweisen und nicht auf nächsten Monat schieben.
+ * Wer entscheidet, was zugesagt wird; ob man überhaupt fremdes Geld
+ * will; wie die Anteile geteilt werden; ob es eine GmbH gibt — das
+ * sind nicht Aufgaben, das sind die Abende, an denen eine Firma
+ * entweder sortiert wird oder auseinanderfällt. Vorher gab es diese
+ * Abende im Spiel nicht, und damit fehlte die Hälfte des Gründens.
+ */
+export type Weg = {
+  id: string;
+  label: string;
+  /** Ein Satz darunter: was man damit eigentlich tut. */
+  hint: string;
+  effects: Effects;
+  /** Wie überall: erst der Vollzug, dann der Preis. */
+  beats: [string, string];
+  /** Wo der Preis davon abhängt, was Jonas will. */
+  alignmentBy?: Record<Stance, number>;
+};
+
+export type Entscheidung = {
+  id: string;
+  /** Streit, Struktur oder Richtung. Nur für Farbe und Kicker. */
+  art: "streit" | "struktur" | "weg";
+  kicker: string;
+  title: string;
+  /** Die Lage, zwei Sätze. Danach kommen die Wege. */
+  beats: [string, string];
+  wege: Weg[];
+  /** Erst, wenn das hier gilt. */
+  when?: (s: GameState) => boolean;
+};
+
+/**
+ * Die erste Frage kommt früh, jede weitere mit drei Monaten Abstand.
+ *
+ * Früh, weil die Anteilsfrage am Anfang gehört und nicht in Monat
+ * sechs. Danach mit Abstand, weil zwei Grundsatzgespräche an einem
+ * Abend keine Entscheidungen sind, sondern ein Fragebogen.
+ */
+export function entscheidungDue(s: GameState): boolean {
+  if (s.lastChoice === 0) return s.month >= 2;
+  return s.month - s.lastChoice >= 3;
+}
+
+/**
+ * Die nächste offene Frage — in der Reihenfolge, in der sie im Inhalt
+ * steht, nicht gewürfelt. Der Anteilsschlüssel muss vor der Rechtsform
+ * kommen und die Rechtsform vor der Holding; andersherum ergibt keine
+ * der drei Fragen einen Sinn.
+ */
+export function drawEntscheidung(s: GameState, alle: Entscheidung[]): Entscheidung | null {
+  const offen = alle.filter((e) => !s.entschieden.includes(e.id) && (!e.when || e.when(s)));
+  return offen.length ? offen[0] : null;
+}
+
+export function alignmentOfWeg(w: Weg, stance: Stance): number {
+  if (w.alignmentBy) return w.alignmentBy[stance];
+  return w.effects.alignment ?? 0;
+}
+
+/** Einen Weg nehmen. Wirkt sofort, und die Frage kommt nicht wieder. */
+export function entscheiden(s: GameState, e: Entscheidung, w: Weg): GameState {
+  const nach = applyEffects(s, { ...w.effects, alignment: 0 });
+  return {
+    ...nach,
+    alignment: clamp(nach.alignment + alignmentOfWeg(w, s.stance)),
+    entschieden: [...s.entschieden, e.id],
+    lastChoice: s.month,
+  };
+}
+
+/**
+ * „Sind wir investor-ready?“
+ *
+ * In Wahrheit sind das fünf Fragen, und keine davon beantwortet man im
+ * Gefühl. Also stehen sie auf der Karte, als Haken oder eben nicht,
+ * und daneben entscheidet man. Abhaken ist keine Pflicht: man darf mit
+ * zwei von fünf losgehen, man weiß dann nur, was man tut.
+ */
+export type Reifepunkt = { label: string; ok: boolean };
+
+export function reifegrad(s: GameState): Reifepunkt[] {
+  return [
+    { label: "Etwas, das ohne euch läuft", ok: s.product >= 45 },
+    { label: "Zwei zahlende Speditionen", ok: s.customers >= 2 },
+    { label: "1.500 € Umsatz im Monat", ok: s.mrr >= 1_500 },
+    { label: "Noch sechs Monate Geld", ok: runway(s) >= 6 },
+    { label: "Ihr zwei seid euch einig", ok: s.alignment >= 50 },
+  ];
+}
+
 /* ── The rival ───────────────────────────────────────────────── */
 
 /** Retoura's next move, if it has reached one you have not seen. */
@@ -518,6 +635,33 @@ export function meterViews(s: GameState): MeterView[] {
     },
     { key: "equity", label: "Euch gehören", value: `${Math.round(s.equity)} %`, tone: s.equity >= 50 ? "ok" : "warn" },
   ];
+}
+
+/**
+ * Der Maßstab für den Geldbalken.
+ *
+ * Eine Stufenleiter statt des eigenen Höchststands: halb voll heißt
+ * dann immer dieselben 25.000 €, und eine Runde springt sichtbar eine
+ * Stufe hoch, statt den Maßstab heimlich zu dehnen und so zu tun, als
+ * wäre nichts passiert.
+ */
+export function geldSkala(cash: number): number {
+  for (const s of [50_000, 150_000, 500_000, 1_500_000, 5_000_000]) if (cash <= s) return s;
+  /* Über der höchsten Sprosse ist der Balken voll, statt überzulaufen. */
+  return Math.max(15_000_000, cash);
+}
+
+/**
+ * Für die Zahl, die in Echtzeit läuft: jeder Euro, mit Punkten.
+ *
+ * Von Hand gruppiert und nicht über `toLocaleString`, weil die Zahl
+ * auf Server und Client zeichengleich sein muss.
+ */
+export function fmtEuroExakt(v: number): string {
+  if (!isFinite(v)) return "–";
+  const n = Math.round(v);
+  const ziffern = Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${n < 0 ? "−" : ""}${ziffern} €`;
 }
 
 export function fmtEuro(v: number): string {

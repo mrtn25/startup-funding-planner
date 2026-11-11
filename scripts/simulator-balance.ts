@@ -10,8 +10,8 @@
    that a milestone is unreachable with its own deck.
    ══════════════════════════════════════════════════════════════ */
 
-import { applyEffects, canStart, deckFor, drawEvent, eventDue, finishTactic, forcedEnding, initialState, startTactic, tickBoard, type GameState } from "../lib/simulator.ts";
-import { EVENTS, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
+import { applyEffects, canStart, deckFor, drawEntscheidung, drawEvent, entscheiden, entscheidungDue, eventDue, finishTactic, forcedEnding, initialState, startTactic, tickBoard, type GameState } from "../lib/simulator.ts";
+import { ENTSCHEIDUNGEN, EVENTS, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
 
 /** `pick` wählt eine Karte; `idle` sind Monate Zögern vor jedem Start. */
 function play(pick: (n: number, step: number) => number, idle: number, seed: number) {
@@ -25,6 +25,13 @@ function play(pick: (n: number, step: number) => number, idle: number, seed: num
     for (const id of done) {
       const t = TACTICS[id];
       if (t) s = finishTactic(s, t);
+    }
+    /* Entscheidungen vor Ereignissen, wie auf dem Brett. Gewählt wird
+       mit derselben Strategie wie bei den Maßnahmen — sonst bliebe der
+       Lauf blind für Wege, die Geld oder Anteile kosten. */
+    if (entscheidungDue(s)) {
+      const e = drawEntscheidung(s, ENTSCHEIDUNGEN);
+      if (e) s = entscheiden(s, e, e.wege[pick(e.wege.length, step) % e.wege.length]);
     }
     if (eventDue(s)) {
       const e = drawEvent(s, EVENTS);

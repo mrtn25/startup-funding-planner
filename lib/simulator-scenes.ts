@@ -8,14 +8,14 @@
    Texte sind kurz. Wer spielt, will nicht lesen.
    ══════════════════════════════════════════════════════════════ */
 
-import type { Ending, Erfolg, GameEvent, GameState, Milestone, RivalStep, Tactic } from "./simulator.ts";
+import type { Ending, Entscheidung, Erfolg, GameEvent, GameState, Milestone, RivalStep, Tactic } from "./simulator.ts";
 import { fmtEuro, saldo } from "./simulator.ts";
 
 export const ONBOARDING: { text: string; highlight?: string }[] = [
   { text: "Moin. Ich bin Tarek. Ich habe selbst zwei Firmen gegründet, eine davon ging gut. Ich schau euch über die Schulter." },
   { text: "Ihr beide habt Lkw eingeteilt — Disponenten nennt man das. Euch ist aufgefallen: jede vierte Fahrt geht leer zurück, weil niemand Zeit hat, eine Rückladung zu suchen." },
   { text: "Genau das soll eure Software machen. Gekündigt habt ihr beide schon. Gebaut ist noch nichts, Kunden habt ihr keine." },
-  { text: "Links seht ihr euer Erspartes: 32.000 €. Davon gehen Miete und Essen ab, später Server und Gehälter. Das ist eure Uhr.", highlight: "eure Uhr" },
+  { text: "Links seht ihr euer Erspartes: 32.000 €. Die Zahl läuft, während ihr überlegt — nach unten, bis die erste Spedition zahlt.", highlight: "läuft, während ihr überlegt" },
   { text: "Rechts wählt ihr, woran ihr arbeitet. Zwei Sachen gleichzeitig, eine pro Kopf. Unter jeder steht, wie viele Monate sie dauert und was sie kostet." },
   { text: "Und in San Francisco baut Haulway dasselbe, bezahlt von Y Combinator. Die warten nicht auf euch.", highlight: "Haulway" },
 ];
@@ -38,13 +38,16 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
     /* 1 · MVP */
     T({
       id: "tabelle",
-      label: "Tabelle mit Makro",
+      label: "Erst mal in Excel lösen",
       group: "Produkt",
-      flavour: "Zwei Wochen. Freitags lasst ihr es einmal von Hand durchlaufen.",
+      flavour: "Eine Tabelle mit zwei Listen: leere Lkw und offene Ladungen. Freitags drückt ihr auf Start und schaut, was zusammenpasst.",
       impact: { produkt: 2 },
       months: 1,
       effects: { product: 16 },
-      beats: ["Zwei Spalten, ein Knopf, ein Makro.", "Ole bei Krämer findet damit am Dienstag eine Rückladung."],
+      beats: [
+        "Keine App, keine Anmeldung. Eine Datei, die ihr selbst startet.",
+        "Ole bei Krämer findet damit am Dienstag eine Rückladung. Mehr muss eine erste Version nicht beweisen.",
+      ],
     }),
     T({
       id: "handarbeit",
@@ -60,7 +63,7 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       id: "richtig-bauen",
       label: "Richtig bauen",
       group: "Produkt",
-      flavour: "Login, Karte, Matching-Engine. Fünf Monate, in denen ihr sonst nichts macht.",
+      flavour: "Login, Karte, und ein Matching, das nachts von allein läuft. Fünf Monate, in denen ihr sonst nichts macht.",
       impact: { produkt: 5, team: 2, investoren: 2 },
       months: 5,
       effects: { product: 34, investors: 6, team: -5 },
@@ -68,14 +71,17 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
     }),
     T({
       id: "routing",
-      label: "Routing-Engine einkaufen",
+      label: "Die Streckenberechnung einkaufen",
       group: "Produkt",
-      flavour: "Die schwierige Geometrie hat jemand anders gelöst.",
+      flavour: "Welcher Umweg wie viel kostet, hat schon jemand gelöst. Für 4.200 € dürft ihr seine Karte benutzen, statt sie selbst zu bauen.",
       impact: { produkt: 4, geld: 2 },
       cost: 4_200,
       months: 2,
-      effects: { product: 24, burn: 340 },
-      beats: ["Sechs Wochen statt sechs Monate.", "Dafür jeden Monat Lizenzgebühr — und eine Frage in jeder Due Diligence."],
+      effects: { product: 24, burn: 340, investors: -5 },
+      beats: [
+        "Sechs Wochen statt sechs Monate. Das Matching rechnet ab Montag auf fremden Karten.",
+        "„Und was davon ist jetzt eure Software?“ — die Frage kommt in jedem Investorengespräch, und eine gute Antwort habt ihr noch nicht.",
+      ],
     }),
     T({
       id: "jonas-fragen",
@@ -102,7 +108,7 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       id: "durchatmen",
       label: "Ein Wochenende nicht arbeiten",
       group: "Team",
-      flavour: "Zwei Tage, an denen keiner aufs Matching-Dashboard schaut.",
+      flavour: "Zwei Tage, an denen keiner auf die Trefferliste schaut.",
       impact: { team: 4 },
       months: 1,
       effects: { team: 14, product: -2 },
@@ -476,6 +482,292 @@ export const ERFOLGE: Erfolg[] = [
       "Die Uhr läuft nicht mehr runter, sondern rauf. Ab hier könnt ihr auch Nein sagen — zu Investoren, zu Kunden, zu Bedingungen.",
     ],
     when: (v, n) => saldo(v) < 0 && saldo(n) >= 0,
+  },
+];
+
+/* ── Entscheidungen ──────────────────────────────────────────── */
+
+/**
+ * Die Abende, an denen nicht gearbeitet wird.
+ *
+ * Gezogen wird die erste Frage, deren Bedingung gilt — die Reihenfolge
+ * hier ist also die Reihenfolge im Spiel, und sie ist Absicht: erst
+ * gehört die Firma jemandem, dann existiert sie, dann hält sie jemand,
+ * dann bekommen Angestellte etwas davon.
+ */
+export const ENTSCHEIDUNGEN: Entscheidung[] = [
+  {
+    id: "anteile",
+    art: "struktur",
+    kicker: "Am Küchentisch",
+    title: "Wie teilt ihr die Firma?",
+    beats: [
+      "Jonas hatte die Idee und kennt die Höfe. Du hast in sechs Wochen das gebaut, was Ole jetzt jeden Dienstag benutzt. Wem wie viel gehört, steht bis heute nirgendwo.",
+      "Wenn ihr es nicht aufschreibt, schreibt es später jemand anders für euch: ein Investor, ein Anwalt oder ein Gericht.",
+    ],
+    wege: [
+      {
+        id: "5050-vesting",
+        label: "50/50, über vier Jahre verdient",
+        hint: "Gleich viel für beide — behalten darf es, wer bleibt.",
+        effects: { team: 8, alignment: 6, investors: 6 },
+        beats: [
+          "Zwei Seiten, zwei Unterschriften: je die Hälfte, davon Jahr für Jahr ein Viertel endgültig.",
+          "Wer im achten Monat aufhört, nimmt nicht die halbe Firma mit. Es fühlt sich an wie Misstrauen und ist genau das Gegenteil.",
+        ],
+      },
+      {
+        id: "5050-blank",
+        label: "50/50, ohne Bedingungen",
+        hint: "Ihr kennt euch seit zehn Jahren. Muss man das aufschreiben?",
+        effects: { team: 5, alignment: 4, investors: -9 },
+        beats: [
+          "Ein Satz, ein Handschlag, zurück an die Arbeit.",
+          "Im ersten Term Sheet steht Vesting trotzdem drin. Nur verhandelt ihr es dann gegeneinander statt miteinander.",
+        ],
+      },
+      {
+        id: "60-40",
+        label: "60 für dich, 40 für Jonas",
+        hint: "Du baust das Produkt. Das ist die Arbeit, die gerade zählt.",
+        effects: { team: -12, alignment: -10, product: 4 },
+        beats: [
+          "Jonas sagt Ja. Er sagt sonst nichts dazu.",
+          "Zwanzig Punkte Unterschied, die in jedem schwierigen Gespräch der nächsten drei Jahre mit am Tisch sitzen.",
+        ],
+      },
+    ],
+    when: (s) => s.product >= 30,
+  },
+  {
+    id: "rollen",
+    art: "streit",
+    kicker: "Streit",
+    title: "Wer von euch sagt eigentlich zu?",
+    beats: [
+      "Jonas hat Ole versprochen, dass Palettio ab Juni auch Teilladungen kann. Du erfährst es, als Ole dich danach fragt.",
+      "Es ist das dritte Mal. Beim ersten Mal war es praktisch, beim zweiten ärgerlich.",
+    ],
+    wege: [
+      {
+        id: "aufteilen",
+        label: "Aufschreiben, wer was entscheidet",
+        hint: "Eine Stunde, zwei Spalten: Produkt bei dir, Kunden bei ihm.",
+        effects: { team: 11, alignment: 7 },
+        beats: [
+          "Produkt und Preis bei dir, Kunden und Termine bei ihm. Eine Seite, zwei Unterschriften.",
+          "Für zwei Leute an einem Küchentisch fühlt sich das albern an. Es ist das erste Dokument, das ihr eurer ersten Einstellung zeigen werdet.",
+        ],
+      },
+      {
+        id: "weiter-so",
+        label: "Weiter wie bisher",
+        hint: "Ihr seid zwei. Wer anfängt, macht es fertig.",
+        effects: { team: -9, alignment: -5, product: 5 },
+        beats: [
+          "Keine Sitzung, kein Dokument. Diese Woche wird mehr geschafft als in der davor.",
+          "Zwei Wochen später nennt ihr einem Kunden zwei verschiedene Termine. Er sagt es nicht euch, sondern dem Hof nebenan.",
+        ],
+      },
+    ],
+    when: (s) => s.customers >= 1,
+  },
+  {
+    id: "rechtsform",
+    art: "struktur",
+    kicker: "Beim Notar",
+    title: "Palettio gibt es offiziell noch nicht",
+    beats: [
+      "Ole braucht eine Rechnung mit Steuernummer. Bisher ist Palettio zwei Namen, ein gemeinsames Konto und eine Domain.",
+      "Was ihr hier wählt, steht in jedem Vertrag der nächsten Jahre — und in jeder Due Diligence.",
+    ],
+    wege: [
+      {
+        id: "gmbh",
+        label: "Eine GmbH gründen",
+        hint: "25.000 € Stammkapital, die Hälfte davon eingezahlt. Notar, Handelsregister, Buchhaltung.",
+        effects: { cash: -2_100, burn: 260, investors: 7, team: 3 },
+        beats: [
+          "Zwei Notartermine in der Neustadt, drei Wochen bis zum Eintrag, 2.100 € für Notar und Register.",
+          "Das Stammkapital bleibt euer Geld — nur eben das der Firma. Dafür haftet ab jetzt sie und nicht ihr, und die Buchhaltung kostet jeden Monat.",
+        ],
+      },
+      {
+        id: "ug",
+        label: "Eine UG, das reicht erst mal",
+        hint: "Geht ab 1 € Stammkapital, sonst fast dasselbe. Schneller und billiger.",
+        effects: { cash: -800, burn: 180, investors: -3 },
+        beats: [
+          "Musterprotokoll, ein Termin, nach zehn Tagen eingetragen.",
+          "Auf jedem Briefkopf steht „haftungsbeschränkt“, und ein Viertel vom Gewinn müsst ihr stehen lassen, bis 25.000 € zusammen sind. Ein Einkäufer fragt nach.",
+        ],
+      },
+      {
+        id: "gbr",
+        label: "Erst mal als GbR weiter",
+        hint: "Keine Gründung, keine Kosten. Ihr beide seid die Firma.",
+        effects: { investors: -8, team: -3, cash: 400 },
+        beats: [
+          "Ihr schreibt die Rechnung als Gesellschaft bürgerlichen Rechts. Hat zehn Minuten gedauert und nichts gekostet.",
+          "Ihr haftet beide persönlich, mit allem, was ihr habt. Solange nichts passiert, fällt das niemandem auf.",
+        ],
+      },
+    ],
+    when: (s) => s.mrr > 0,
+  },
+  {
+    id: "weg",
+    art: "weg",
+    kicker: "Die Frage dahinter",
+    title: "Wollt ihr überhaupt fremdes Geld?",
+    beats: [
+      "Oltmanns fragt, ob ihr Donnerstag Zeit habt. Er investiert in acht Firmen im Jahr und hat sich eure Zahlen schon angesehen.",
+      "Fremdes Geld kauft Tempo und kostet Anteile und Mitbestimmung. Umsatz kostet nur Zeit. Beide Wege gleichzeitig gibt es nicht.",
+    ],
+    wege: [
+      {
+        id: "ja",
+        label: "Ja, wir nehmen Geld auf",
+        hint: "Ab jetzt gehört ein Teil jeder Woche den Investoren.",
+        effects: { investors: 12, team: -3 },
+        alignmentBy: { bootstrap: -10, venture: 10 },
+        beats: [
+          "Du schreibst zurück: Donnerstag passt. Daraus werden drei weitere Termine im selben Monat.",
+          "Ein Tag jeder Woche gehört ab jetzt Leuten, die nicht zahlen, sondern kaufen wollen. Dafür geht in sechs Monaten mehr, als Umsatz je bezahlen könnte.",
+        ],
+      },
+      {
+        id: "nein",
+        label: "Nein, es trägt sich selbst oder gar nicht",
+        hint: "Keine Anteile, kein Board, kein Termindruck von außen.",
+        effects: { investors: -14, team: 6 },
+        alignmentBy: { bootstrap: 12, venture: -14 },
+        beats: [
+          "Du schreibst zurück, dass ihr erst mal weiter verkaufen wollt. Er antwortet freundlich und kurz.",
+          "Niemand redet euch rein. Niemand bezahlt aber auch die Monate, in denen Haulway Geld hat und ihr nicht.",
+        ],
+      },
+      {
+        id: "zuhoeren",
+        label: "Hingehen und nur zuhören",
+        hint: "Kennenlernen, nichts zusagen.",
+        effects: { investors: 4, team: -2 },
+        beats: [
+          "Zwei Stunden Kaffee, keine Zusage, abends ein Term Sheet im Anhang „nur zur Info“.",
+          "Jetzt wisst ihr, was eine Runde kosten würde. Entschieden ist nichts, und Oltmanns erwartet in vier Wochen eine Antwort.",
+        ],
+      },
+    ],
+    when: (s) => s.customers >= 2,
+  },
+  {
+    id: "kommunikation",
+    art: "streit",
+    kicker: "Streit",
+    title: "Zwei Wochen nur über Aufgaben geredet",
+    beats: [
+      "Das letzte Gespräch zwischen euch, in dem es nicht um ein Ticket oder einen Kunden ging, war vor zwei Wochen.",
+      "Jonas antwortet seit Tagen kürzer als früher. Du hast es gemerkt und nichts gesagt.",
+    ],
+    wege: [
+      {
+        id: "freitags",
+        label: "Freitags eine halbe Stunde, fest",
+        hint: "Kein Laptop, keine Liste. Nur: wie läuft es.",
+        effects: { team: 13, alignment: 8, product: -3 },
+        beats: [
+          "Freitag 16 Uhr, im Hinterhof, dreißig Minuten.",
+          "Am vierten Freitag erzählt er, dass er seit sechs Wochen überlegt aufzuhören. Jetzt weißt du es, solange es noch zu klären ist.",
+        ],
+      },
+      {
+        id: "durchziehen",
+        label: "Dafür ist gerade keine Zeit",
+        hint: "Erst der Pilot, dann reden.",
+        effects: { team: -11, product: 7 },
+        beats: [
+          "Zwei Wochen, in denen mehr fertig wird als im Monat davor.",
+          "Dann sagt er einen Kundentermin ab, von dem du nichts wusstest. Gesagt wird weiter nichts.",
+        ],
+      },
+    ],
+    when: (s) => s.month >= 7 && s.team < 62,
+  },
+  {
+    id: "holding",
+    art: "struktur",
+    kicker: "Bei der Steuerberaterin",
+    title: "Wem gehören die Anteile?",
+    beats: [
+      "Sie fragt, ob die Anteile euch persönlich gehören sollen — oder je einer eigenen kleinen Gesellschaft, die nichts tut, außer sie zu halten.",
+      "Die Frage ist langweilig und kostet zwei Nachmittage. Sie entscheidet, was bei einem Verkauf in zehn Jahren tatsächlich bei euch ankommt.",
+    ],
+    wege: [
+      {
+        id: "holdings",
+        label: "Je eine Holding davor",
+        hint: "Zwei weitere Gesellschaften, zwei weitere Jahresabschlüsse.",
+        effects: { cash: -2_600, burn: 150, investors: 3 },
+        beats: [
+          "Zwei Notartermine, zwei Eintragungen, 2.600 € und ein verlorener Nachmittag.",
+          "Bei einem Verkauf landet der Erlös zuerst in eurer Holding und wird erst versteuert, wenn ihr ihn euch auszahlt. Bis dahin kostet er nur Geld und Papier.",
+        ],
+      },
+      {
+        id: "direkt",
+        label: "Direkt halten, einfacher",
+        hint: "Ihr beide steht persönlich in der Gesellschafterliste.",
+        effects: { team: 2 },
+        beats: [
+          "Keine weitere Gesellschaft, kein weiterer Abschluss, kein weiterer Termin.",
+          "Einfacher in jedem Jahr außer einem: dem, in dem verkauft wird. Dann ist alles sofort fällig.",
+        ],
+      },
+    ],
+    when: (s) => s.entschieden.includes("rechtsform") && s.cash >= 60_000,
+  },
+  {
+    id: "vsop",
+    art: "struktur",
+    kicker: "Nach dem Montagstermin",
+    title: "Marie fragt, was sie davon hat",
+    beats: [
+      "„Ich komme von einer Frachtbörse zu zwei Leuten in Ottensen. Wenn das hier groß wird — was habe ich davon?“",
+      "Sie hat recht, und sie ist nicht die Letzte, die fragt.",
+    ],
+    wege: [
+      {
+        id: "pool",
+        label: "6 % virtuelle Anteile (VSOP)",
+        hint: "Kein Notar, keine Gesellschafterin. Geld gibt es, wenn verkauft wird.",
+        effects: { equity: -6, team: 12, investors: 5 },
+        beats: [
+          "Ein Vertrag pro Person, vier Jahre, ein Jahr Sperrfrist. Marie bekommt 1,5 %.",
+          "Sechs Prozent sind weg, bevor ein Investor einen Euro bezahlt hat. Dafür fragt die nächste Kandidatin zuerst nach dem Pool — und bleibt.",
+        ],
+      },
+      {
+        id: "echte",
+        label: "Echte Anteile: 2 % für Marie",
+        hint: "Notartermin, Gesellschafterliste, volles Stimmrecht.",
+        effects: { equity: -2, team: 8, investors: -5, cash: -1_300 },
+        beats: [
+          "Ab Mittwoch steht sie im Handelsregister.",
+          "Bei jeder künftigen Runde muss sie mit unterschreiben. Der nächste Konflikt ist kein Personalgespräch mehr, sondern eine Gesellschafterversammlung.",
+        ],
+      },
+      {
+        id: "gehalt",
+        label: "Mehr Gehalt statt Anteile",
+        hint: "900 € mehr im Monat, ab sofort.",
+        effects: { burn: 1_400, team: 5 },
+        beats: [
+          "900 € mehr, zugesagt in zehn Minuten, ohne Notar.",
+          "Kostet jeden Monat Geld statt einmal Prozente. Nach achtzehn Monaten habt ihr mehr bezahlt als der Pool gekostet hätte — und sie hat nichts, wenn es gut ausgeht.",
+        ],
+      },
+    ],
+    when: (s) => s.headcount >= 3,
   },
 ];
 

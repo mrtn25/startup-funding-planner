@@ -16,13 +16,20 @@ import {
   badges,
   beatsOf,
   deckFor,
+  drawEntscheidung,
+  entscheiden,
+  entscheidungDue,
+  fluss,
+  fmtEuroExakt,
   forcedEnding,
+  geldSkala,
   initialState,
   meterViews,
   erfolge,
   netBurn,
   rivalMove,
   runTactic,
+  reifegrad,
   runway,
   runwayFill,
   saldo,
@@ -30,7 +37,7 @@ import {
   type GameState,
   type Tactic,
 } from "./simulator.ts";
-import { ENDING_BY_ID, ENDINGS, ERFOLGE, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
+import { ENDING_BY_ID, ENDINGS, ENTSCHEIDUNGEN, ERFOLGE, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
 
 const S = (patch: Partial<GameState> = {}): GameState => ({ ...initialState(1), ...patch });
 const T = (patch: Partial<Tactic> = {}): Tactic => ({
@@ -415,10 +422,147 @@ test("der Inhalt ist auf Deutsch", () => {
     ...Object.values(TACTICS).map((t) => `${t.label} ${t.flavour} ${t.beats.join(" ")}`),
     ...EVENTS.map((e) => `${e.title} ${e.beats.join(" ")}`),
     ...ENDINGS.map((e) => `${e.title} ${e.text}`),
+    ...ENTSCHEIDUNGEN.map((e) => `${e.title} ${e.beats.join(" ")} ${e.wege.map((w) => `${w.label} ${w.hint} ${w.beats.join(" ")}`).join(" ")}`),
   ].join(" ");
   // Ein paar englische Füllwörter, die beim Übersetzen gern stehen bleiben.
   for (const wort of [" the ", " you ", " with ", " and the ", " months of "]) {
     assert.ok(!text.includes(wort), `englischer Rest im Inhalt: "${wort}"`);
+  }
+});
+
+/* ── Entscheidungen ── */
+
+test("Entscheidungen kommen mit Abstand und jede Frage nur einmal", () => {
+  assert.equal(entscheidungDue(S({ month: 1 })), false);
+  assert.equal(entscheidungDue(S({ month: 2, lastChoice: 0 })), true);
+  assert.equal(entscheidungDue(S({ month: 4, lastChoice: 3 })), false);
+  assert.equal(entscheidungDue(S({ month: 6, lastChoice: 3 })), true);
+
+  const lage = S({ product: 40, customers: 2, mrr: 890 });
+  const erste = drawEntscheidung(lage, ENTSCHEIDUNGEN);
+  assert.ok(erste, "in dieser Lage muss eine Frage offen sein");
+  const danach = entscheiden(lage, erste!, erste!.wege[0]);
+  assert.ok(danach.entschieden.includes(erste!.id));
+  assert.equal(danach.lastChoice, lage.month);
+  assert.notEqual(drawEntscheidung(danach, ENTSCHEIDUNGEN)?.id, erste!.id, "dieselbe Frage wird zweimal gestellt");
+});
+
+test("die Reihenfolge der Entscheidungen ergibt einen Sinn", () => {
+  const ids = ENTSCHEIDUNGEN.map((e) => e.id);
+  for (const id of ["anteile", "rollen", "rechtsform", "weg", "vsop", "holding"]) {
+    assert.ok(ids.includes(id), `${id} fehlt`);
+  }
+  // Anteile vor Rechtsform, Rechtsform vor Holding: andersherum ergibt keine der Fragen einen Sinn.
+  assert.ok(ids.indexOf("anteile") < ids.indexOf("rechtsform"));
+  assert.ok(ids.indexOf("rechtsform") < ids.indexOf("holding"));
+  // Und die Holding fragt niemand, solange es keine Gesellschaft gibt.
+  const ohne = S({ cash: 200_000 });
+  const holding = ENTSCHEIDUNGEN.find((e) => e.id === "holding")!;
+  assert.equal(holding.when!(ohne), false);
+  assert.equal(holding.when!({ ...ohne, entschieden: ["rechtsform"] }), true);
+});
+
+test("jede Entscheidung ist ein Abwägen und kein Geschenk", () => {
+  assert.ok(ENTSCHEIDUNGEN.length >= 6, "zu wenige Entscheidungen für sechs Phasen");
+  for (const e of ENTSCHEIDUNGEN) {
+    assert.equal(e.beats.length, 2, `${e.id} ohne zwei Beats`);
+    assert.ok(e.wege.length >= 2, `${e.id} ist keine Wahl`);
+    const abdruecke = new Set<string>();
+    for (const w of e.wege) {
+      assert.equal(w.beats.length, 2, `${e.id}/${w.id} ohne zwei Beats`);
+      assert.ok(w.hint.length > 12, `${e.id}/${w.id} erklärt sich nicht`);
+      assert.ok(Object.keys(w.effects).length > 0 || w.alignmentBy, `${e.id}/${w.id} bleibt folgenlos`);
+      abdruecke.add(JSON.stringify(w.effects) + JSON.stringify(w.alignmentBy ?? null));
+    }
+    assert.equal(abdruecke.size, e.wege.length, `${e.id}: zwei Wege wirken gleich`);
+    // Mindestens ein Weg muss wehtun, sonst ist es keine Entscheidung.
+    const weh = e.wege.some(
+      (w) =>
+        Object.values(w.effects).some((v) => typeof v === "number" && v < 0) ||
+        Object.values(w.alignmentBy ?? {}).some((v) => v < 0),
+    );
+    assert.ok(weh, `${e.id}: jeder Weg ist gut, also ist keiner eine Entscheidung`);
+  }
+});
+
+test("aus jeder Entscheidung führt ein Weg, der kein Geld kostet", () => {
+  // Entscheidungen lassen sich nicht verschieben. Eine Frage, die in
+  // jeder Antwort Geld verlangt, kann einen also zwingend ruinieren.
+  for (const e of ENTSCHEIDUNGEN) {
+    assert.ok(
+      e.wege.some((w) => (w.effects.cash ?? 0) >= 0),
+      `${e.id}: jeder Weg kostet Geld, das ist eine Falle und keine Wahl`,
+    );
+  }
+});
+
+test("bei der Frage nach fremdem Geld zählt, was Jonas will", () => {
+  const weg = ENTSCHEIDUNGEN.find((e) => e.id === "weg")!;
+  const ja = weg.wege.find((w) => w.id === "ja")!;
+  const spar = entscheiden(S({ stance: "bootstrap", alignment: 60 }), weg, ja);
+  const wachs = entscheiden(S({ stance: "venture", alignment: 60 }), weg, ja);
+  assert.ok(spar.alignment < 60, "wer bootstrappen will, nimmt das Geld nicht gern");
+  assert.ok(wachs.alignment > 60, "wer eine Runde will, findet es gut");
+  // Und die Wirkung selbst wird genau einmal angewandt.
+  assert.equal(wachs.investors, Math.min(100, 0 + 12));
+});
+
+test("der Reifegrad sagt, was noch fehlt", () => {
+  const punkte = reifegrad(S());
+  assert.equal(punkte.length, 5);
+  // Am Anfang stimmt nur, dass noch Geld da ist und ihr euch einig seid.
+  assert.deepEqual(
+    punkte.filter((p) => p.ok).map((p) => p.label),
+    ["Noch sechs Monate Geld", "Ihr zwei seid euch einig"],
+  );
+  const reif = reifegrad(S({ product: 60, customers: 3, mrr: 2_700, cash: 60_000, alignment: 70 }));
+  assert.ok(reif.every((p) => p.ok), `noch offen: ${reif.filter((p) => !p.ok).map((p) => p.label)}`);
+});
+
+/* ── Geld sichtbar machen ── */
+
+test("der Fluss erklärt die Zahl, die unter der Uhr steht", () => {
+  const s = S({ burn: 2_400, mrr: 890, customers: 2 });
+  const f = fluss(s);
+  assert.equal(f.betreuung, 240, "jeder Kunde kostet Betreuung");
+  assert.equal(f.raus, 2_640);
+  assert.equal(f.rein, 890);
+  assert.equal(f.raus - f.rein, netBurn(s), "die Aufschlüsselung muss dieselbe Zahl ergeben");
+  assert.equal(saldo(s), -netBurn(s));
+});
+
+test("der Geldbalken hat einen festen Maßstab, der nur nach oben springt", () => {
+  assert.equal(geldSkala(32_000), 50_000);
+  assert.equal(geldSkala(50_000), 50_000);
+  assert.equal(geldSkala(50_001), 150_000);
+  assert.equal(geldSkala(2_500_000), 5_000_000);
+  // Monoton: mehr Geld heißt nie ein kleinerer Maßstab.
+  let vor = 0;
+  for (const c of [0, 10_000, 60_000, 400_000, 900_000, 4_000_000, 20_000_000]) {
+    const sk = geldSkala(c);
+    assert.ok(sk >= vor && sk >= c, `Maßstab springt zurück bei ${c}`);
+    vor = sk;
+  }
+});
+
+test("die laufende Zahl zeigt jeden Euro und hängt nicht an der Spracheinstellung", () => {
+  assert.equal(fmtEuroExakt(32_000), "32.000 €");
+  assert.equal(fmtEuroExakt(1_234_567), "1.234.567 €");
+  assert.equal(fmtEuroExakt(890), "890 €");
+  assert.equal(fmtEuroExakt(-1_500), "−1.500 €");
+  assert.equal(fmtEuroExakt(32_000.4), "32.000 €");
+});
+
+test("eine Maßnahme heißt, wie sie heißt, und nicht wie ein Datenblatt", () => {
+  const text = Object.values(TACTICS)
+    .map((t) => `${t.label} ${t.flavour}`)
+    .join(" ");
+  // Begriffe, die niemand erklärt bekommt und die deshalb nichts sagen.
+  for (const wort of ["Makro", "Engine", "Dashboard", "Wrapper", "Pipeline", "Funnel"]) {
+    assert.ok(!text.includes(wort), `unerklärtes Fachwort auf einer Karte: ${wort}`);
+  }
+  for (const t of Object.values(TACTICS)) {
+    assert.ok(t.flavour.length > 25, `${t.id} erklärt sich nicht`);
   }
 });
 
