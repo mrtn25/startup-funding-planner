@@ -1,0 +1,305 @@
+/* The shelf of tools.
+
+   White tiles with one blue line drawing each, so the set reads as one
+   system and a tool is recognisable before it is opened. The game is
+   the exception on purpose: a photograph in a blue frame, above the
+   grid, because it is the one thing here you play rather than fill in. */
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 3rem;
+  scroll-margin-top: 1rem;
+}
+
+.head {
+  max-width: 640px;
+  margin-bottom: 1.75rem;
+}
+.head h2 {
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 0 0 0.5rem;
+  color: var(--text);
+}
+.head p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text2);
+  margin: 0;
+}
+
+/* ── Das Spiel: hervorgehoben, mit blauem Rahmen ── */
+
+.game {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  gap: 0;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 18px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 14%, transparent);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.game:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 38px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.gameArt {
+  position: relative;
+  display: block;
+  min-height: 190px;
+  background: var(--surface2);
+  border-right: 2px solid var(--accent);
+}
+.gameImg {
+  object-fit: cover;
+}
+.gameBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1.5rem 1.6rem;
+}
+.gameBody h3 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  color: var(--text);
+}
+.gameBody p {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text2);
+  margin: 0 0 1rem;
+  max-width: 46ch;
+}
+.tags {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0.7rem;
+}
+.neu,
+.lang {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+.neu {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.lang {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text2);
+}
+
+/* ── Die Kacheln ── */
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  color: inherit;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 10%, transparent);
+}
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Die Zeichnung sitzt immer auf Weiß, auch im Dunkelmodus: die acht
+   Kacheln sind ein Satz, und ein Satz, der die Hälfte seiner Flächen
+   umfärbt, ist keiner mehr. */
+.art {
+  display: block;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  padding: 18px 20px;
+  color: hsl(var(--hue) 100% 50%);
+}
+.artInner {
+  display: block;
+}
+.artInner svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 160 / 100;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  padding: 14px 16px 16px;
+}
+.body h3 {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0 0 0.35rem;
+  color: var(--text);
+}
+.body p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text2);
+  margin: 0 0 0.9rem;
+}
+
+.cta {
+  margin-top: auto;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cta span {
+  transition: transform 0.18s ease;
+}
+.card:hover .cta span,
+.game:hover .cta span {
+  transform: translateX(3px);
+}
+
+/* ── Lesestoff ── */
+
+.more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+.more button {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.more button span {
+  transition: transform 0.18s ease;
+}
+.more button:hover span {
+  transform: translateX(3px);
+}
+
+@media (max-width: 760px) {
+  .game {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gameArt {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+    border-right: 0;
+    border-bottom: 2px solid var(--accent);
+  }
+  .gameBody {
+    padding: 1.25rem;
+  }
+  .wrap {
+    padding: 2rem 1rem 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .game,
+  .cta span,
+  .more button span {
+    transition: none;
+  }
+  .card:hover,
+  .game:hover {
+    transform: none;
+  }
+}
+
+/* ── Zurück zum Regal ──
+   Statt der Pillbar: ein schmaler Streifen über dem offenen Tool, der
+   sagt, wo man ist und wie man zurückkommt. */
+
+.backBar {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.back {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.back span {
+  transition: transform 0.18s ease;
+}
+.back:hover span {
+  transform: translateX(-3px);
+}
+.backName {
+  font-size: 13px;
+  color: var(--text3);
+  border-left: 1px solid var(--border);
+  padding-left: 0.75rem;
+}
+@media (max-width: 760px) {
+  .backBar {
+    padding: 1rem 1rem 0;
+  }
+}

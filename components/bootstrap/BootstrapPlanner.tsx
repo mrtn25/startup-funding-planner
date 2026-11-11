@@ -14,7 +14,7 @@ import {
 import { Line } from "react-chartjs-2";
 import styles from "./BootstrapPlanner.module.css";
 import { DEFAULT_CASH, computeCash, fmtK, type CashInputs, type CashMonth } from "@/lib/bootstrap-cash";
-import type { ToolId } from "@/components/PillNav";
+import type { ToolId } from "@/lib/tools";
 import {
   AMBITIONS,
   DEFAULT_BOOTSTRAP,

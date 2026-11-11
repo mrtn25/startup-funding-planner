@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import styles from "./InfoCards.module.css";
 import { CATEGORIES, ENTRIES, SRC, type Category } from "@/lib/glossary";
-import type { ToolId } from "@/components/PillNav";
+import type { ToolId } from "@/lib/tools";
 
 type Props = { onOpenTool?: (id: ToolId) => void };
 

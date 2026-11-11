@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { RoundId } from "@/lib/planner";
 import BootstrapPlanner from "./bootstrap/BootstrapPlanner";
 import NetworkStrategy from "./network/NetworkStrategy";
-import PillNav, { TOOLS, type ToolId } from "./PillNav";
 import ScrollHero from "./ScrollHero";
+import ToolGallery from "./ToolGallery";
+import gallery from "./ToolGallery.module.css";
+import { TOOLS, TOOL_BY_ID, type ToolId } from "@/lib/tools";
 import SiteHeader from "./SiteHeader";
 import InfoCards from "./infos/InfoCards";
 import StatsBoard from "./stats/StatsBoard";
@@ -17,12 +19,13 @@ import ReadyToRaise from "./ready/ReadyToRaise";
 
 const DEFAULT_TOOL: ToolId = "bootstrap";
 
-export type View = "tools" | "infos" | "stats";
+export type View = "gallery" | "tools" | "infos" | "stats";
 
 /**
  * All seven tools stay mounted and the inactive ones are `hidden`, so
- * switching tabs never discards what you entered. The choice is mirrored
- * into `?tool=` so a tab can be linked to directly.
+ * switching tabs never discards what you entered — that holds for the
+ * gallery too, where every panel is hidden at once. The choice is
+ * mirrored into `?tool=` so a tool can be linked to directly.
  */
 /** Maps a Round Planner stage onto the matching round in the Dilution Planner. */
 const STAGE_TO_ROUND: Record<string, RoundId> = {
@@ -34,7 +37,9 @@ const STAGE_TO_ROUND: Record<string, RoundId> = {
 
 export default function ToolSwitcher() {
   const [active, setActive] = useState<ToolId>(DEFAULT_TOOL);
-  const [view, setView] = useState<View>("tools");
+  /* The front page opens on the shelf, not inside a tool: seven pills
+     told you the tools existed and nothing about what any of them did. */
+  const [view, setView] = useState<View>("gallery");
   /* Amount handed over from the Round Planner. The token makes a repeat
      hand-off of the same number still register as a new instruction. */
   const [seed, setSeed] = useState<{ roundId: RoundId; investM: number; token: number } | null>(null);
@@ -43,7 +48,10 @@ export default function ToolSwitcher() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const param = q.get("tool");
-    if (TOOLS.some((t) => t.id === param)) setActive(param as ToolId);
+    if (TOOLS.some((t) => t.id === param)) {
+      setActive(param as ToolId);
+      setView("tools");
+    }
     const v = q.get("view");
     if (v === "infos" || v === "stats") setView(v);
   }, []);
@@ -53,9 +61,19 @@ export default function ToolSwitcher() {
     setView("tools");
     const url = new URL(window.location.href);
     url.searchParams.delete("view");
-    if (id === DEFAULT_TOOL) url.searchParams.delete("tool");
-    else url.searchParams.set("tool", id);
+    url.searchParams.set("tool", id);
     window.history.replaceState(null, "", url);
+  }, []);
+
+  /* Back to the shelf. The tool keeps everything you typed into it —
+     it is only hidden — so this is a navigation, not a reset. */
+  const openGallery = useCallback(() => {
+    setView("gallery");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("view");
+    url.searchParams.delete("tool");
+    window.history.replaceState(null, "", url);
+    requestAnimationFrame(() => document.getElementById("tools")?.scrollIntoView({ behavior: "smooth" }));
   }, []);
 
   // Jumping between tools from inside a tool should land you at the top of it.
@@ -98,7 +116,24 @@ export default function ToolSwitcher() {
           rendered after the hero is invisible until you scroll past it. */}
       <SiteHeader active={active} onOpenTool={openTool} onOpenView={openView} view={view} />
       <ScrollHero ctaHref="#tools" />
-      <PillNav active={active} onChange={select} view={view} onOpenView={openView} />
+
+      {/* The anchor lives on the wrapper, not on the gallery: the hero's
+          CTA points at #tools and has to land somewhere even when a tool
+          is open and the shelf itself is not rendered. */}
+      <div id="tools" className="no-print">
+        {view === "gallery" ? (
+          <ToolGallery onOpenTool={openTool} onOpenView={openView} />
+        ) : (
+          <div className={gallery.backBar}>
+            <button type="button" className={gallery.back} onClick={openGallery}>
+              <span aria-hidden="true">←</span> All tools
+            </button>
+            <span className={gallery.backName}>
+              {view === "infos" ? "Term sheet glossary" : view === "stats" ? "What the data says" : TOOL_BY_ID[active].label}
+            </span>
+          </div>
+        )}
+      </div>
 
       <div id="panel-bootstrap" role="tabpanel" aria-labelledby="tab-bootstrap" hidden={view !== "tools" || active !== "bootstrap"}>
         <BootstrapPlanner onOpenTool={openTool} />

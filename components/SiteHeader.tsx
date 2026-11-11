@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import styles from "./SiteHeader.module.css";
-import { TOOLS, type ToolId } from "./PillNav";
+import { TOOLS, type ToolId } from "@/lib/tools";
 
 type Props = {
   active: ToolId;
   onOpenTool: (id: ToolId) => void;
   onOpenView: (v: "infos" | "stats") => void;
-  view: "tools" | "infos" | "stats";
+  view: "gallery" | "tools" | "infos" | "stats";
 };
 
 /**
