@@ -36,6 +36,46 @@ export type MeterKey = "runway" | "mrr" | "customers" | "investors" | "team" | "
 /** What Jonas thinks this company should be. He will not volunteer it. */
 export type Stance = "bootstrap" | "venture";
 
+/**
+ * Wer was kann.
+ *
+ * „Zwei Köpfe“ war gelogen. Eine Firma besteht aus Leuten mit einem
+ * Fach, und genau daran hängt die Spannung zwischen zwei Gründern:
+ * Jonas kann verkaufen und nicht bauen, Lena kann bauen und nicht
+ * verkaufen. Wer fünf Monate baut, verkauft in diesen fünf Monaten
+ * nichts — und wer verkauft, was es noch nicht gibt, hat es hinterher
+ * versprochen.
+ */
+export type Rolle = "entwicklung" | "vertrieb" | "marketing" | "operations";
+
+export const ROLLE_LABEL: Record<Rolle, string> = {
+  entwicklung: "Entwicklung",
+  vertrieb: "Vertrieb",
+  marketing: "Marketing",
+  operations: "Operations",
+};
+
+/** Kurz, für die Leiste links. */
+export const ROLLE_KURZ: Record<Rolle, string> = {
+  entwicklung: "baut",
+  vertrieb: "verkauft",
+  marketing: "macht sichtbar",
+  operations: "hält am Laufen",
+};
+
+export type Person = {
+  id: string;
+  name: string;
+  rolle: Rolle;
+  /** Gründer zahlen sich nichts. Sie leben vom Ersparten. */
+  gruender?: boolean;
+  /** Was diese Person im Monat kostet, inklusive Arbeitgeberanteil. */
+  kosten: number;
+};
+
+/** Was eine Maßnahme an Leuten mitbringt. */
+export type Einstellung = { name: string; rolle: Rolle; kosten: number };
+
 export type Effects = {
   cash?: number;
   /** Monthly recurring revenue, €. */
@@ -48,9 +88,13 @@ export type Effects = {
   /** How finished the thing is, 0–100. Gates what sales can close. */
   product?: number;
   equity?: number;
-  /** Fixed costs per month, €. */
+  /** Sonstige Fixkosten pro Monat, € — Server, Büro, Buchhaltung.
+      Gehälter stehen nicht hier, die hängen an den Leuten. */
   burn?: number;
-  headcount?: number;
+  /** Wer dazukommt. */
+  einstellen?: Einstellung[];
+  /** Wer geht: die erste angestellte Person dieser Rolle. */
+  verlassen?: Rolle;
   /** Agreement with Jonas about the path. */
   alignment?: number;
 };
@@ -58,6 +102,9 @@ export type Effects = {
 /** Wie stark eine Maßnahme worauf einzahlt — als Balken, nicht als Zahl.
     Fünf Stufen, weil fünf Punkte man auf einen Blick zählt. */
 export type Impact = Partial<Record<"produkt" | "umsatz" | "geld" | "team" | "investoren", 1 | 2 | 3 | 4 | 5>>;
+
+/** Ein Fachwort, das auf der Karte steht und das niemand erklärt bekommt. */
+export type Begriff = { wort: string; erklaerung: string; quelle?: { text: string; href: string } };
 
 export type Tactic = {
   id: string;
@@ -68,6 +115,16 @@ export type Tactic = {
   flavour: string;
   /** Was sie bewegt, grob und sichtbar vor dem Start. */
   impact: Impact;
+  /** Wer das macht. Ohne Angabe: irgendwer, der frei ist. */
+  braucht?: Rolle;
+  /**
+   * Warum sie wehtut, in einem Satz.
+   *
+   * Die Balken sagen „Team −2 Punkte“ und erklären nichts. Dass sechs
+   * Wochen Handarbeit bis elf Uhr abends an die Stimmung gehen, muss
+   * dastehen, sonst ist der Abzug eine Zahl, die vom Himmel fällt.
+   */
+  preis?: string;
   /** € out of the bank the moment you commit. */
   cost?: number;
   months: number;
@@ -83,6 +140,8 @@ export type Tactic = {
   when?: (s: GameState) => boolean;
   /** Offered once per run. Most are. */
   repeatable?: boolean;
+  /** Was das Fachwort auf der Karte bedeutet. */
+  begriffe?: Begriff[];
 };
 
 export type Milestone = {
@@ -132,18 +191,19 @@ export type Ending = {
   payout?: (s: GameState) => string;
 };
 
-/** Eine laufende Maßnahme auf dem Brett. */
-export type Running = { id: string; left: number; total: number };
+/** Eine laufende Maßnahme auf dem Brett — und wer daran sitzt. */
+export type Running = { id: string; left: number; total: number; wer: string };
 
 export type GameState = {
   cash: number;
-  /** Was jeden Monat rausgeht: Miete, Essen, später Server und Gehälter. */
+  /** Sonstige Fixkosten: Server, Büro, Buchhaltung. Ohne Gehälter. */
   burn: number;
   mrr: number;
   customers: number;
   investors: number;
   team: number;
-  headcount: number;
+  /** Wer an Bord ist, mit Namen und Fach. */
+  leute: Person[];
   product: number;
   equity: number;
   alignment: number;
@@ -192,17 +252,30 @@ export function netBurn(s: GameState): number {
   return f.raus - f.rein;
 }
 
+/** Was ein Gründer im Monat zum Leben braucht: Miete, Essen, Versicherung. */
+export const LEBEN_PRO_KOPF = 1_100;
+
 /**
- * Dasselbe aufgeschlüsselt: was rausgeht, was reinkommt.
+ * Wofür das Ersparte draufgeht, Zeile für Zeile.
  *
- * Die Zahl allein beantwortet nicht, wofür. Auf dem Schirm stehen
- * deshalb beide Richtungen getrennt — und „Betreuung“ ist die Zeile,
- * die erklärt, warum der zehnte Kunde weniger bringt als der erste:
- * jeder kostet Server, Rückfragen und einen Anruf im Monat.
+ * Eine Zahl beantwortet nicht, wohin das Geld geht. Vier Posten tun
+ * es: ihr müsst wohnen und essen, Angestellte bekommen Gehalt, jeder
+ * Kunde kostet Betreuung, und der Rest sind Server, Büro und
+ * Buchhaltung. Erst damit ist klar, warum die Zahl fällt — und warum
+ * die erste Einstellung sie viel schneller fallen lässt.
  */
-export function fluss(s: GameState): { raus: number; rein: number; betreuung: number } {
+export function fluss(s: GameState): {
+  leben: number;
+  gehaelter: number;
+  betreuung: number;
+  sonstiges: number;
+  raus: number;
+  rein: number;
+} {
+  const leben = s.leute.filter((p) => p.gruender).length * LEBEN_PRO_KOPF;
+  const gehaelter = s.leute.filter((p) => !p.gruender).reduce((n, p) => n + p.kosten, 0);
   const betreuung = Math.round(s.customers * 120);
-  return { raus: s.burn + betreuung, rein: s.mrr, betreuung };
+  return { leben, gehaelter, betreuung, sonstiges: s.burn, raus: leben + gehaelter + betreuung + s.burn, rein: s.mrr };
 }
 
 /**
@@ -229,6 +302,31 @@ export function runway(s: GameState): number {
   return Math.max(0, Math.floor(s.cash / net));
 }
 
+/** Über dieser Grenze zeigt die Uhr „36+“ und rechnet nicht weiter. */
+export const UHR_MAX = 36;
+
+/**
+ * Was auf der Uhr steht.
+ *
+ * Unendlich stand da vorher, und das war schlicht falsch: wer sich
+ * gerade trägt, hat trotzdem Gehälter zu zahlen und einen Kunden, der
+ * morgen kündigen kann. Also eine Zahl mit Deckel, und daneben die
+ * ehrlichere: wie lange das Geld reichen würde, wenn der Umsatz heute
+ * wegbricht. Das ist der Satz, den jeder Gründer kennt.
+ */
+export function uhrMonate(s: GameState): { monate: number; gedeckelt: boolean } {
+  const r = runway(s);
+  if (!isFinite(r) || r > UHR_MAX) return { monate: UHR_MAX, gedeckelt: true };
+  return { monate: r, gedeckelt: false };
+}
+
+/** Monate, die das Geld ohne jeden Umsatz noch reichen würde. */
+export function monateOhneUmsatz(s: GameState): number {
+  const raus = fluss(s).raus;
+  if (raus <= 0) return UHR_MAX;
+  return Math.max(0, Math.floor(s.cash / raus));
+}
+
 /** Wie voll der Tank ist: ein Jahr Luft ist voll, leer ist leer. */
 export function runwayFill(s: GameState): number {
   const r = runway(s);
@@ -236,15 +334,21 @@ export function runwayFill(s: GameState): number {
   return Math.max(0, Math.min(1, r / 12));
 }
 
+/** Die zwei, die gekündigt haben. Eine baut, einer verkauft. */
+export const GRUENDER: Person[] = [
+  { id: "lena", name: "Lena", rolle: "entwicklung", gruender: true, kosten: 0 },
+  { id: "jonas", name: "Jonas", rolle: "vertrieb", gruender: true, kosten: 0 },
+];
+
 export function initialState(seed = 1): GameState {
   return {
     cash: 32_000,
-    burn: 2_400,
+    burn: 200,
     mrr: 0,
     customers: 0,
     investors: 0,
     team: 62,
-    headcount: 2,
+    leute: GRUENDER.map((p) => ({ ...p })),
     product: 12,
     equity: 100,
     alignment: 60,
@@ -269,6 +373,18 @@ export function initialState(seed = 1): GameState {
 
 export function applyEffects(s: GameState, e: Effects | undefined): GameState {
   if (!e) return s;
+  let leute = s.leute;
+  if (e.verlassen) {
+    /* Es geht, wer angestellt ist — Gründer kündigen nicht per Ereignis. */
+    const weg = leute.find((p) => !p.gruender && p.rolle === e.verlassen);
+    if (weg) leute = leute.filter((p) => p.id !== weg.id);
+  }
+  if (e.einstellen?.length) {
+    leute = [
+      ...leute,
+      ...e.einstellen.map((n, i) => ({ ...n, id: `${n.rolle}-${leute.length + i}-${n.name.toLowerCase()}` })),
+    ];
+  }
   return {
     ...s,
     cash: s.cash + (e.cash ?? 0),
@@ -280,7 +396,9 @@ export function applyEffects(s: GameState, e: Effects | undefined): GameState {
     /* Equity only ever goes down. There is no scene that gives it back. */
     equity: clamp(s.equity + Math.min(0, e.equity ?? 0)),
     burn: Math.max(0, s.burn + (e.burn ?? 0)),
-    headcount: Math.max(1, s.headcount + (e.headcount ?? 0)),
+    leute,
+    /* Wer geht, nimmt seine laufende Maßnahme mit. */
+    running: leute.length === s.leute.length ? s.running : s.running.filter((r) => leute.some((p) => p.id === r.wer)),
     alignment: clamp(s.alignment + (e.alignment ?? 0)),
   };
 }
@@ -333,7 +451,30 @@ export function alignmentOf(t: Tactic, stance: Stance): number {
  * warum man nicht alles gleichzeitig kann.
  */
 export function capacity(s: GameState): number {
-  return Math.max(1, s.headcount);
+  return Math.max(1, s.leute.length);
+}
+
+/** Wer gerade an nichts sitzt. */
+export function frei(s: GameState): Person[] {
+  const belegt = new Set(s.running.map((r) => r.wer));
+  return s.leute.filter((p) => !belegt.has(p.id));
+}
+
+/**
+ * Wer diese Maßnahme übernehmen würde.
+ *
+ * Eine Verkaufsmaßnahme braucht jemanden, der verkauft. Dass Lena
+ * nicht nebenbei telefoniert, während sie fünf Monate baut, ist keine
+ * Schikane — es ist der Grund, warum zwei Gründer sich streiten.
+ */
+export function werKann(s: GameState, t: Tactic): Person | null {
+  const kandidaten = frei(s).filter((p) => !t.braucht || p.rolle === t.braucht);
+  return kandidaten[0] ?? null;
+}
+
+/** Was eine laufende Maßnahme gerade blockiert, für die Leiste links. */
+export function woranSitzt(s: GameState, p: Person): Running | null {
+  return s.running.find((r) => r.wer === p.id) ?? null;
 }
 
 /**
@@ -345,7 +486,7 @@ export function capacity(s: GameState): number {
  * pleite, ohne dass je eine Entscheidung falsch gewesen wäre.
  */
 export function canStart(s: GameState, t: Tactic): boolean {
-  if (s.running.length >= capacity(s)) return false;
+  if (!werKann(s, t)) return false;
   if (s.running.some((r) => r.id === t.id) || s.used.includes(t.id)) return false;
   /* Und mit zwei Monaten Puffer: niemand bucht einen Messestand von
      seinem letzten Euro, und ein Spiel, in dem genau das der häufigste
@@ -358,17 +499,24 @@ export function canStart(s: GameState, t: Tactic): boolean {
 export function blockedReason(s: GameState, t: Tactic): string | null {
   if (s.used.includes(t.id) || s.running.some((r) => r.id === t.id)) return "Läuft schon";
   if (s.cash - (t.cost ?? 0) < Math.max(0, netBurn(s)) * 2) return "Zu teuer";
-  if (s.running.length >= capacity(s)) return "Kein Kopf frei";
-  return null;
+  if (werKann(s, t)) return null;
+  if (!t.braucht) return "Niemand frei";
+  const imFach = s.leute.filter((p) => p.rolle === t.braucht);
+  if (!imFach.length) return `Niemand da, der ${ROLLE_KURZ[t.braucht]}`;
+  const laeuft = imFach.map((p) => woranSitzt(s, p)).find((r): r is Running => !!r);
+  const wer = imFach.length === 1 ? imFach[0].name : ROLLE_LABEL[t.braucht];
+  return laeuft ? `${wer} ist noch ${laeuft.left} ${laeuft.left === 1 ? "Monat" : "Monate"} beschäftigt` : `${wer} ist beschäftigt`;
 }
 
 /** Maßnahme starten: Geld ist sofort weg, die Wirkung kommt später. */
 export function startTactic(s: GameState, t: Tactic): GameState {
+  const wer = werKann(s, t);
+  if (!wer) return s;
   return {
     ...s,
     cash: s.cash - (t.cost ?? 0),
     used: [...s.used, t.id],
-    running: [...s.running, { id: t.id, left: Math.max(1, t.months), total: Math.max(1, t.months) }],
+    running: [...s.running, { id: t.id, left: Math.max(1, t.months), total: Math.max(1, t.months), wer: wer.id }],
   };
 }
 
@@ -492,6 +640,18 @@ export type Entscheidung = {
   title: string;
   /** Die Lage, zwei Sätze. Danach kommen die Wege. */
   beats: [string, string];
+  /** Fachwörter, ohne die die Frage nicht zu beantworten ist. */
+  begriffe?: Begriff[];
+  /** Zeigt die Reifegrad-Liste daneben. Nur die Geldfrage braucht sie. */
+  reife?: true;
+  /**
+   * Fragt sofort, ohne auf den Abstand zu warten.
+   *
+   * Für die Fragen, die zu einem Moment gehören und nicht zu einem
+   * Takt: wie ihr an die ersten Kunden kommt, gehört vor den ersten
+   * Kunden und nicht drei Monate danach.
+   */
+  sofort?: true;
   wege: Weg[];
   /** Erst, wenn das hier gilt. */
   when?: (s: GameState) => boolean;
@@ -516,7 +676,9 @@ export function entscheidungDue(s: GameState): boolean {
  * der drei Fragen einen Sinn.
  */
 export function drawEntscheidung(s: GameState, alle: Entscheidung[]): Entscheidung | null {
-  const offen = alle.filter((e) => !s.entschieden.includes(e.id) && (!e.when || e.when(s)));
+  const offen = alle.filter(
+    (e) => !s.entschieden.includes(e.id) && (!e.when || e.when(s)) && (e.sofort || entscheidungDue(s)),
+  );
   return offen.length ? offen[0] : null;
 }
 
@@ -623,7 +785,6 @@ export function meterViews(s: GameState): MeterView[] {
       label: "Stimmung",
       value: WORTE.stimmung[stimmung],
       punkte: stimmung,
-      note: `${s.headcount} ${s.headcount === 1 ? "Kopf" : "Köpfe"}`,
       tone: stimmung >= 3 ? "ok" : stimmung >= 2 ? "warn" : "bad",
     },
     {
@@ -686,8 +847,9 @@ export function badges(e: Effects | undefined): { label: string; up: boolean }[]
   push(e.customers, (n) => `${(e.customers ?? 0) > 0 ? "+" : "−"}${n} ${n === 1 ? "Kunde" : "Kunden"}`);
   push(e.product, (n) => `${(e.product ?? 0) > 0 ? "+" : "−"}${n} Produkt`);
   push(e.investors, (n) => `${(e.investors ?? 0) > 0 ? "+" : "−"}${n} Investoren`);
-  push(e.team, (n) => `${(e.team ?? 0) > 0 ? "+" : "−"}${n} Team`);
-  push(e.headcount, (n) => `${(e.headcount ?? 0) > 0 ? "+" : "−"}${n} auf der Gehaltsliste`);
+  push(e.team, (n) => `${(e.team ?? 0) > 0 ? "+" : "−"}${n} Stimmung`);
+  for (const n of e.einstellen ?? []) out.push({ label: `+ ${n.name} · ${fmtEuro(n.kosten)}/Monat`, up: true });
+  if (e.verlassen) out.push({ label: `− eine Person aus der ${ROLLE_LABEL[e.verlassen]}`, up: false });
   push(e.burn, (n) => `${(e.burn ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)}/Monat Fixkosten`, false);
   push(e.equity, (n) => `−${n} % der Firma`, false);
   return out;

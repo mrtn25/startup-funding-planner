@@ -15,12 +15,14 @@ import {
   applyEffects,
   badges,
   beatsOf,
+  blockedReason,
   deckFor,
   drawEntscheidung,
   entscheiden,
   entscheidungDue,
   fluss,
   fmtEuroExakt,
+  LEBEN_PRO_KOPF,
   forcedEnding,
   geldSkala,
   initialState,
@@ -34,6 +36,9 @@ import {
   runwayFill,
   saldo,
   tick,
+  uhrMonate,
+  UHR_MAX,
+  monateOhneUmsatz,
   type GameState,
   type Tactic,
 } from "./simulator.ts";
@@ -56,20 +61,47 @@ const GRUPPEN = ["Produkt", "Vertrieb", "Team", "Geld"];
 
 /* ── Parallel laufende Maßnahmen ── */
 
-test("so viele Maßnahmen gleichzeitig, wie ihr Köpfe seid", () => {
-  const s = S({ headcount: 2 });
+test("so viele Maßnahmen gleichzeitig, wie ihr Leute seid", () => {
+  const s = S();
   assert.equal(capacity(s), 2);
   const a = startTactic(s, T({ id: "a", months: 2 }));
   assert.equal(a.running.length, 1);
   const b = startTactic(a, T({ id: "b", months: 3 }));
   assert.equal(canStart(b, T({ id: "c" })), false, "zu zweit geht keine dritte");
   assert.equal(canStart(b, T({ id: "a" })), false, "dieselbe nicht zweimal");
-  // Ein Hire macht einen Platz frei.
-  assert.equal(canStart({ ...b, headcount: 3 }, T({ id: "c" })), true);
+  // Eine Einstellung macht einen Platz frei.
+  const drei = applyEffects(b, { einstellen: [{ name: "Timo", rolle: "operations", kosten: 3_800 }] });
+  assert.equal(canStart(drei, T({ id: "c" })), true);
+});
+
+test("jeder macht sein Fach, und nur seins", () => {
+  // Der Grund, warum zwei Gründer sich streiten: Lena baut, Jonas verkauft.
+  const s = S();
+  const bauen = T({ id: "bauen", months: 5, braucht: "entwicklung" });
+  const verkaufen = T({ id: "verkaufen", months: 2, braucht: "vertrieb" });
+  const gestartet = startTactic(s, bauen);
+  assert.equal(gestartet.running[0].wer, "lena");
+  assert.ok(canStart(gestartet, verkaufen), "Jonas kann verkaufen, während Lena baut");
+  assert.equal(canStart(gestartet, T({ id: "mehr", braucht: "entwicklung" })), false, "Lena kann nicht zwei Sachen bauen");
+  assert.match(blockedReason(gestartet, T({ id: "mehr", braucht: "entwicklung" })) ?? "", /Lena/);
+  // Und niemand kann, was niemand kann.
+  assert.equal(canStart(s, T({ id: "werben", braucht: "marketing" })), false);
+  assert.match(blockedReason(s, T({ id: "werben", braucht: "marketing" })) ?? "", /Niemand/);
+});
+
+test("wer geht, nimmt seine laufende Maßnahme mit", () => {
+  let s = applyEffects(S(), { einstellen: [{ name: "Sofia", rolle: "entwicklung", kosten: 6_400 }] });
+  s = startTactic(s, T({ id: "bauen", months: 4, braucht: "entwicklung" }));
+  s = startTactic(s, T({ id: "mehr", months: 4, braucht: "entwicklung" }));
+  assert.equal(s.running.length, 2, "Lena und Sofia bauen parallel");
+  const danach = applyEffects(s, { verlassen: "entwicklung" });
+  assert.equal(danach.leute.length, 2);
+  assert.equal(danach.running.length, 1, "die Maßnahme der Abgewanderten läuft nicht weiter");
+  assert.ok(danach.leute.every((p) => p.gruender), "Gründer kündigen nicht per Ereignis");
 });
 
 test("die Zeit läuft für alle laufenden Maßnahmen gleichzeitig", () => {
-  let s = startTactic(S({ headcount: 2 }), T({ id: "a", months: 1 }));
+  let s = startTactic(S(), T({ id: "a", months: 1 }));
   s = startTactic(s, T({ id: "b", months: 3 }));
   const erster = tickBoard(s);
   assert.deepEqual(erster.done, ["a"], "nach einem Monat ist nur die kurze fertig");
@@ -89,34 +121,51 @@ test("die Wirkung kommt beim Abschluss, die Kosten beim Start", () => {
 /* ── Die Uhr ── */
 
 test("der Runway ist Kasse durch das, was netto rausgeht", () => {
-  // 1.900 € fix plus 3 Kunden à 120 € Betreuung, minus 1.000 € MRR.
-  const s = S({ cash: 10_080, burn: 1_900, customers: 3, mrr: 1_000 });
-  assert.equal(netBurn(s), 1_260);
+  // 2.200 € Lebenshaltung für zwei Gründer, 300 € Server, 3 Kunden
+  // à 120 € Betreuung, minus 1.000 € Umsatz.
+  const s = S({ cash: 14_880, burn: 300, customers: 3, mrr: 1_000 });
+  assert.equal(netBurn(s), 1_860);
   assert.equal(runway(s), 8);
+});
+
+test("das Ersparte geht für Leben, Gehälter, Kunden und den Rest drauf", () => {
+  // Vier Posten statt einer Zahl: sonst steht da nur, dass Geld weg ist.
+  const zwei = S({ burn: 300, customers: 2 });
+  const f = fluss(zwei);
+  assert.equal(f.leben, 2 * LEBEN_PRO_KOPF, "beide Gründer müssen wohnen und essen");
+  assert.equal(f.gehaelter, 0, "Gründer zahlen sich nichts");
+  assert.equal(f.betreuung, 240);
+  assert.equal(f.sonstiges, 300);
+  assert.equal(f.raus, 2_740);
+  // Die erste Einstellung ist der Sprung, den man sehen muss.
+  const drei = applyEffects(zwei, { einstellen: [{ name: "Sofia", rolle: "entwicklung", kosten: 6_400 }] });
+  assert.equal(fluss(drei).gehaelter, 6_400);
+  assert.equal(fluss(drei).leben, 2 * LEBEN_PRO_KOPF, "Angestellte leben nicht vom Ersparten");
+  assert.equal(fluss(drei).raus, 9_140);
 });
 
 test("der Saldo sagt, in welche Richtung die Uhr läuft", () => {
   // Ohne Kunden läuft der Monat gegen euch, mit genug Kunden für euch.
-  assert.ok(saldo(S({ burn: 2_400, mrr: 0, customers: 0 })) < 0);
-  assert.equal(saldo(S({ burn: 2_400, mrr: 0, customers: 0 })), -2_400);
-  assert.ok(saldo(S({ burn: 2_400, mrr: 3_600, customers: 4 })) > 0);
+  assert.ok(saldo(S({ mrr: 0, customers: 0 })) < 0);
+  assert.equal(saldo(S({ mrr: 0, customers: 0 })), -2_400, "2.200 € Leben plus 200 € Server");
+  assert.ok(saldo(S({ mrr: 3_600, customers: 4 })) > 0);
   // Und er ist immer das Gegenstück zum Netto-Abfluss.
-  const s = S({ burn: 1_900, mrr: 1_000, customers: 3 });
+  const s = S({ burn: 300, mrr: 1_000, customers: 3 });
   assert.equal(saldo(s), -netBurn(s));
 });
 
 test("jeder zahlende Kunde bringt mehr, als seine Betreuung kostet", () => {
   // Sonst wäre der erste Kunde eine schlechte Nachricht — und genau
   // das war der Fehler: der Runway fiel weiter, obwohl Geld reinkam.
-  const ohne = S({ burn: 2_400, mrr: 0, customers: 0 });
-  const mit = S({ burn: 2_400, mrr: 890, customers: 1 });
+  const ohne = S({ mrr: 0, customers: 0 });
+  const mit = S({ mrr: 890, customers: 1 });
   assert.ok(saldo(mit) > saldo(ohne));
   assert.ok(runway({ ...mit, cash: 20_000 }) > runway({ ...ohne, cash: 20_000 }));
 });
 
 test("Erfolge feiern den Übergang und danach nie wieder", () => {
-  const arm = S({ mrr: 0, customers: 0, burn: 2_400 });
-  const erster = S({ mrr: 890, customers: 1, burn: 2_400 });
+  const arm = S({ mrr: 0, customers: 0 });
+  const erster = S({ mrr: 890, customers: 1 });
   const treffer = erfolge(arm, erster, ERFOLGE);
   assert.equal(treffer.length, 1);
   assert.equal(treffer[0].id, "erste-rechnung");
@@ -127,8 +176,8 @@ test("Erfolge feiern den Übergang und danach nie wieder", () => {
 });
 
 test("der Monat, der sich selbst trägt, ist ein eigener Moment", () => {
-  const rot = S({ burn: 2_400, mrr: 1_800, customers: 2 });
-  const schwarz = S({ burn: 2_400, mrr: 3_600, customers: 4, gefeiert: ["erste-rechnung"] });
+  const rot = S({ mrr: 1_800, customers: 2 });
+  const schwarz = S({ mrr: 3_600, customers: 4, gefeiert: ["erste-rechnung"] });
   assert.ok(saldo(rot) < 0 && saldo(schwarz) >= 0);
   const treffer = erfolge(rot, schwarz, ERFOLGE);
   assert.equal(treffer.length, 1);
@@ -143,7 +192,7 @@ test("jede Maßnahme sagt vorher, wie lange sie dauert", () => {
 });
 
 test("wer mehr einnimmt als ausgibt, hat keinen Countdown mehr", () => {
-  const s = S({ cash: 5_000, burn: 1_900, customers: 4, mrr: 4_000 });
+  const s = S({ cash: 5_000, burn: 300, customers: 4, mrr: 4_000 });
   assert.equal(runway(s), Infinity);
   const v = meterViews(s);
   assert.equal(v.length, 6);
@@ -153,7 +202,7 @@ test("wer mehr einnimmt als ausgibt, hat keinen Countdown mehr", () => {
 
 test("ein Monat kostet genau den Netto-Burn", () => {
   const s = S({ cash: 20_000, burn: 1_900, customers: 0, mrr: 0 });
-  assert.equal(tick(s).cash, 18_100);
+  assert.equal(tick(s).cash, 15_900);
   assert.equal(tick(s).month, 1);
 });
 
@@ -191,8 +240,9 @@ test("eine Maßnahme kostet sofort Geld, dann Zeit, dann wirkt sie", () => {
     S({ cash: 20_000, burn: 1_900, customers: 0, mrr: 0 }),
     T({ cost: 6_500, months: 2, effects: { customers: 2, mrr: 1_780 } }),
   );
-  // 20.000 − 6.500 Kosten − 2 × 1.900 Burn, dann erst kommen Kunden und MRR.
-  assert.equal(s.cash, 20_000 - 6_500 - 3_800);
+  // 20.000 − 6.500 Kosten − 2 × 4.100 (Leben plus Fixkosten), dann
+  // erst kommen Kunden und Umsatz.
+  assert.equal(s.cash, 20_000 - 6_500 - 8_200);
   assert.equal(s.customers, 2);
   assert.equal(s.mrr, 1_780);
   assert.equal(s.month, 2);
@@ -256,7 +306,7 @@ test("gegen die Haltung des Co-Founders zu spielen beendet die Partie", () => {
 test("der Tank zeigt ein Jahr als voll und leer als leer", () => {
   assert.equal(runwayFill(S({ cash: 0, mrr: 0, customers: 0 })), 0);
   assert.equal(runwayFill(S({ cash: 100_000, mrr: 0, customers: 0 })), 1);
-  const halb = runwayFill(S({ cash: 16_800, burn: 2_800, mrr: 0, customers: 0 }));
+  const halb = runwayFill(S({ cash: 16_800, burn: 600, mrr: 0, customers: 0 }));
   assert.ok(halb > 0.4 && halb < 0.6, `halb voll wäre 0,5, ist ${halb}`);
 });
 
@@ -292,7 +342,6 @@ test("die Anzeigen sagen etwas, das man benennen kann", () => {
   assert.equal(kunden.note, "Speditionen");
 
   const team = anfang.find((v) => v.label === "Stimmung")!;
-  assert.equal(team.note, "2 Köpfe");
   assert.ok(team.punkte !== undefined && team.punkte >= 1);
 
   const spaet = meterViews(S({ investors: 95, product: 92, customers: 1 }));
@@ -355,9 +404,15 @@ test("keine Phase ist eine Sackgasse", () => {
 
 test("Badges zeigen erst auf der Ergebniskarte, was passiert ist", () => {
   const labels = badges({ cash: -6_500, customers: 2, mrr: 1_780, investors: 8, team: -4 }).map((b) => b.label);
-  assert.deepEqual(labels, ["−6.5k €", "+1.8k € MRR", "+2 Kunden", "+8 Investoren", "−4 Team"]);
+  assert.deepEqual(labels, ["−6.5k €", "+1.8k € MRR", "+2 Kunden", "+8 Investoren", "−4 Stimmung"]);
   assert.equal(badges({ burn: 900 })[0].up, false, "mehr Burn ist keine gute Nachricht");
   assert.equal(badges(undefined).length, 0);
+  // Eine Einstellung steht mit Namen und Preis da, nicht als Kopfzahl.
+  assert.deepEqual(
+    badges({ einstellen: [{ name: "Marie", rolle: "vertrieb", kosten: 6_200 }] }).map((b) => b.label),
+    ["+ Marie · 6.2k €/Monat"],
+  );
+  assert.equal(badges({ verlassen: "entwicklung" })[0].up, false);
 });
 
 /* ── Enden ── */
@@ -401,9 +456,9 @@ test("Ereigniskarten kommen mit Abstand und jede nur einmal", () => {
   assert.equal(eventDue(S({ month: 5, lastEvent: 3 })), false);
   assert.equal(eventDue(S({ month: 6, lastEvent: 3 })), true);
 
-  const erste = drawEvent(S({ month: 6, customers: 5, mrr: 4_000, headcount: 3 }), EVENTS);
+  const erste = drawEvent(S({ month: 6, customers: 5, mrr: 4_000 }), EVENTS);
   assert.ok(erste);
-  const zweite = drawEvent(S({ month: 9, customers: 5, mrr: 4_000, headcount: 3, drawn: [erste!.id] }), EVENTS);
+  const zweite = drawEvent(S({ month: 9, customers: 5, mrr: 4_000, drawn: [erste!.id] }), EVENTS);
   assert.ok(zweite && zweite.id !== erste!.id);
 });
 
@@ -438,13 +493,24 @@ test("Entscheidungen kommen mit Abstand und jede Frage nur einmal", () => {
   assert.equal(entscheidungDue(S({ month: 4, lastChoice: 3 })), false);
   assert.equal(entscheidungDue(S({ month: 6, lastChoice: 3 })), true);
 
-  const lage = S({ product: 40, customers: 2, mrr: 890 });
+  const lage = S({ month: 6, lastChoice: 3, product: 40, customers: 2, mrr: 890 });
   const erste = drawEntscheidung(lage, ENTSCHEIDUNGEN);
   assert.ok(erste, "in dieser Lage muss eine Frage offen sein");
   const danach = entscheiden(lage, erste!, erste!.wege[0]);
   assert.ok(danach.entschieden.includes(erste!.id));
   assert.equal(danach.lastChoice, lage.month);
   assert.notEqual(drawEntscheidung(danach, ENTSCHEIDUNGEN)?.id, erste!.id, "dieselbe Frage wird zweimal gestellt");
+});
+
+test("die Frage vor dem ersten Kunden wartet nicht auf den Takt", () => {
+  // Wie ihr an Speditionen herangeht, gehört vor den ersten Kunden —
+  // nicht drei Monate danach, wenn die Frage beantwortet ist.
+  const gerade = S({ month: 5, lastChoice: 4, milestoneId: "kunden", product: 45, customers: 0 });
+  assert.equal(entscheidungDue(gerade), false, "der normale Abstand ist noch nicht um");
+  const e = drawEntscheidung(gerade, ENTSCHEIDUNGEN);
+  assert.equal(e?.id, "outreach");
+  // Und sie ist weg, sobald der erste Kunde da ist.
+  assert.notEqual(drawEntscheidung({ ...gerade, customers: 1 }, ENTSCHEIDUNGEN)?.id, "outreach");
 });
 
 test("die Reihenfolge der Entscheidungen ergibt einen Sinn", () => {
@@ -522,7 +588,7 @@ test("der Reifegrad sagt, was noch fehlt", () => {
 /* ── Geld sichtbar machen ── */
 
 test("der Fluss erklärt die Zahl, die unter der Uhr steht", () => {
-  const s = S({ burn: 2_400, mrr: 890, customers: 2 });
+  const s = S({ burn: 200, mrr: 890, customers: 2 });
   const f = fluss(s);
   assert.equal(f.betreuung, 240, "jeder Kunde kostet Betreuung");
   assert.equal(f.raus, 2_640);
@@ -564,6 +630,79 @@ test("eine Maßnahme heißt, wie sie heißt, und nicht wie ein Datenblatt", () =
   for (const t of Object.values(TACTICS)) {
     assert.ok(t.flavour.length > 25, `${t.id} erklärt sich nicht`);
   }
+});
+
+test("die Uhr zeigt nie Unendlich, weil Gehälter nicht unendlich warten", () => {
+  const knapp = S({ cash: 10_000, burn: 300, mrr: 0, customers: 0 });
+  assert.deepEqual(uhrMonate(knapp), { monate: 4, gedeckelt: false });
+
+  // Wer sich trägt, bekommt einen Deckel statt eines Unendlichzeichens.
+  const traegt = S({ cash: 60_000, burn: 300, mrr: 6_000, customers: 4 });
+  assert.equal(runway(traegt), Infinity);
+  const uhr = uhrMonate(traegt);
+  assert.equal(uhr.gedeckelt, true);
+  assert.equal(uhr.monate, UHR_MAX);
+
+  // Und daneben die ehrlichere Zahl: der Umsatz kann morgen weg sein.
+  assert.ok(monateOhneUmsatz(traegt) < UHR_MAX, "ohne Umsatz ist das Geld endlich");
+  assert.equal(monateOhneUmsatz(traegt), Math.floor(60_000 / (2_200 + 300 + 480)));
+});
+
+test("in jeder Phase hat jeder der beiden etwas zu tun", () => {
+  // Sonst sitzt einer von zwei Gründern eine ganze Phase lang da.
+  for (const m of MILESTONES) {
+    const deck = m.tactics.map((id) => TACTICS[id]);
+    for (const rolle of ["entwicklung", "vertrieb"] as const) {
+      assert.ok(
+        deck.some((t) => !t.braucht || t.braucht === rolle),
+        `${m.id}: für ${rolle} gibt es in dieser Phase nichts zu tun`,
+      );
+    }
+  }
+});
+
+test("keine Maßnahme verlangt ein Fach, das niemand hat", () => {
+  for (const t of Object.values(TACTICS)) {
+    if (!t.braucht) continue;
+    assert.ok(
+      ["entwicklung", "vertrieb"].includes(t.braucht),
+      `${t.id} braucht ${t.braucht} — das kann zu Spielbeginn niemand`,
+    );
+  }
+});
+
+test("was wehtut, sagt auch warum", () => {
+  // „Team −6“ ohne Satz dazu ist eine Zahl, die vom Himmel fällt.
+  for (const t of Object.values(TACTICS)) {
+    const schmerz = (["team", "product", "investors"] as const).filter((k) => (t.effects[k] ?? 0) < 0);
+    if (!schmerz.length) continue;
+    assert.ok(t.preis, `${t.id} zieht ${schmerz.join(", ")} ab und erklärt es nicht`);
+  }
+});
+
+test("Fachwörter auf einer Karte werden auf der Karte erklärt", () => {
+  const erklaert = new Set<string>();
+  for (const t of Object.values(TACTICS)) for (const b of t.begriffe ?? []) erklaert.add(b.wort);
+  for (const e of ENTSCHEIDUNGEN) for (const b of e.begriffe ?? []) erklaert.add(b.wort);
+  for (const wort of ["Matching", "Concierge-MVP", "Venture Case", "Power Law", "VSOP", "Stealth"]) {
+    assert.ok(erklaert.has(wort), `${wort} steht im Spiel und wird nirgends erklärt`);
+  }
+  // Jede Erklärung ist ein echter Satz und kein Stichwort.
+  const alle = [...Object.values(TACTICS).flatMap((t) => t.begriffe ?? []), ...ENTSCHEIDUNGEN.flatMap((e) => e.begriffe ?? [])];
+  for (const b of alle) assert.ok(b.erklaerung.length > 60, `${b.wort} wird in einem Stichwort "erklärt"`);
+});
+
+test("der Mentor behauptet nichts, was das Spiel später widerlegt", () => {
+  const alles = ONBOARDING.map((z) => z.text).join(" ");
+  // Haulway kommt erst im Spielverlauf bei Y Combinator rein — am
+  // Anfang darf das nicht schon dastehen.
+  assert.ok(!alles.includes("Combinator"), "das Onboarding nimmt den Zug von Haulway vorweg");
+  assert.ok(
+    RIVAL_STEPS.some((r) => r.label.includes("Y Combinator")),
+    "irgendwann muss der Zug kommen",
+  );
+  // Und er sagt, wer er ist.
+  assert.ok(/verkauft|Exit/.test(alles), "Tarek sagt nicht, warum man ihm zuhören sollte");
 });
 
 /* ── Eine ganze Partie ── */

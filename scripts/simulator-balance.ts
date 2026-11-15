@@ -10,7 +10,7 @@
    that a milestone is unreachable with its own deck.
    ══════════════════════════════════════════════════════════════ */
 
-import { applyEffects, canStart, deckFor, drawEntscheidung, drawEvent, entscheiden, entscheidungDue, eventDue, finishTactic, forcedEnding, initialState, startTactic, tickBoard, type GameState } from "../lib/simulator.ts";
+import { applyEffects, canStart, deckFor, drawEntscheidung, drawEvent, entscheiden, eventDue, finishTactic, forcedEnding, initialState, startTactic, tickBoard, type GameState } from "../lib/simulator.ts";
 import { ENTSCHEIDUNGEN, EVENTS, MILESTONE_BY_ID, TACTICS, pickEnding } from "../lib/simulator-scenes.ts";
 
 /** `pick` wählt eine Karte; `idle` sind Monate Zögern vor jedem Start. */
@@ -29,10 +29,8 @@ function play(pick: (n: number, step: number) => number, idle: number, seed: num
     /* Entscheidungen vor Ereignissen, wie auf dem Brett. Gewählt wird
        mit derselben Strategie wie bei den Maßnahmen — sonst bliebe der
        Lauf blind für Wege, die Geld oder Anteile kosten. */
-    if (entscheidungDue(s)) {
-      const e = drawEntscheidung(s, ENTSCHEIDUNGEN);
-      if (e) s = entscheiden(s, e, e.wege[pick(e.wege.length, step) % e.wege.length]);
-    }
+    const wahl = drawEntscheidung(s, ENTSCHEIDUNGEN);
+    if (wahl) s = entscheiden(s, wahl, wahl.wege[pick(wahl.wege.length, step) % wahl.wege.length]);
     if (eventDue(s)) {
       const e = drawEvent(s, EVENTS);
       if (e) s = applyEffects({ ...s, drawn: [...s.drawn, e.id], lastEvent: s.month }, e.effects);
@@ -54,7 +52,7 @@ function play(pick: (n: number, step: number) => number, idle: number, seed: num
     if (tot) return { ending: tot, ...snapshot(s) };
 
     const deck = deckFor(s, m, TACTICS).filter((t) => canStart(s, t));
-    if (deck.length && s.running.length < Math.max(1, s.headcount)) {
+    if (deck.length && s.running.length < Math.max(1, s.leute.length)) {
       for (let i = 0; i < idle; i++) monat();
       const t = deck[pick(deck.length, step)];
       s = startTactic(s, t);

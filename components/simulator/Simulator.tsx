@@ -14,27 +14,32 @@ import {
   drawEntscheidung,
   drawEvent,
   entscheiden,
-  entscheidungDue,
   erfolge,
   eventDue,
+  frei,
   finishTactic,
   fluss,
   fmtEuro,
   fmtEuroExakt,
   forcedEnding,
-  geldSkala,
   initialState,
   meterViews,
+  monateOhneUmsatz,
   reifegrad,
   rivalMove,
-  runway,
   runwayFill,
   saldo,
   startTactic,
   tickBoard,
+  uhrMonate,
+  woranSitzt,
+  ROLLE_KURZ,
+  ROLLE_LABEL,
+  type Begriff,
   type Effects,
   type Entscheidung,
   type GameState,
+  type Person,
   type Running,
   type Tactic,
   type Weg,
@@ -86,11 +91,34 @@ const GRUPPENBILD: Record<string, string> = {
   Geld: "angel-cafe",
 };
 
-/** Was auf der Zeile steht: wie lange es dauert und was es kostet. */
+/** Was auf der Zeile steht: wer, wie lange, und was es kostet. */
 function metaVon(t: Tactic, laeuft?: Running): string {
   if (laeuft) return `noch ${laeuft.left} ${laeuft.left === 1 ? "Monat" : "Monate"}`;
   const dauer = `${t.months} ${t.months === 1 ? "Monat" : "Monate"}`;
-  return t.cost ? `${dauer} · ${fmtEuro(t.cost)}` : `${dauer} · kostet kein Geld`;
+  const wer = t.braucht ? `${ROLLE_LABEL[t.braucht]} · ` : "";
+  return t.cost ? `${wer}${dauer} · ${fmtEuro(t.cost)}` : `${wer}${dauer} · kostet kein Geld`;
+}
+
+/** Fachwörter, die auf der Karte stehen und sonst niemand erklärt. */
+function Begriffe({ liste }: { liste?: Begriff[] }) {
+  if (!liste?.length) return null;
+  return (
+    <div className={styles.begriffe}>
+      {liste.map((b) => (
+        <p key={b.wort}>
+          <strong>{b.wort}:</strong> {b.erklaerung}
+          {b.quelle && (
+            <>
+              {" "}
+              <a href={b.quelle.href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                {b.quelle.text} ↗
+              </a>
+            </>
+          )}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 export default function Simulator() {
@@ -107,7 +135,6 @@ export default function Simulator() {
   const milestone = MILESTONE_BY_ID[state.milestoneId] ?? MILESTONES[0];
   const index = MILESTONES.findIndex((m) => m.id === milestone.id);
   const deck = useMemo(() => deckFor(state, milestone, TACTICS), [state, milestone]);
-  const months = runway(state);
   const ending = state.endingId ? ENDING_BY_ID[state.endingId] : null;
   const running = phase === "spiel" && !paused && !card && !detail && !wahl && !state.endingId;
 
@@ -220,14 +247,14 @@ export default function Simulator() {
   /* Entscheidungen haben Vorrang vor Ereignissen: eine Frage, die man
      beantworten muss, ist wichtiger als ein Zufall, der einem zustößt. */
   useEffect(() => {
-    if (!running || wahl || !entscheidungDue(state)) return;
+    if (!running || wahl) return;
     const e = drawEntscheidung(state, ENTSCHEIDUNGEN);
     if (e) setWahl(e);
   }, [state, running, wahl]);
 
   useEffect(() => {
     if (!running || !eventDue(state)) return;
-    if (entscheidungDue(state) && drawEntscheidung(state, ENTSCHEIDUNGEN)) return;
+    if (drawEntscheidung(state, ENTSCHEIDUNGEN)) return;
     const e = drawEvent(state, EVENTS);
     if (!e) return;
     setState((s) => applyEffects({ ...s, drawn: [...s.drawn, e.id], lastEvent: s.month }, e.effects));
@@ -321,7 +348,6 @@ export default function Simulator() {
         <div className={styles.blurred} aria-hidden="true">
           <Board
             state={state}
-            months={months}
             milestone={milestone}
             index={index}
             deck={deck}
@@ -331,32 +357,39 @@ export default function Simulator() {
             onPick={() => {}}
           />
         </div>
-        <button
-          type="button"
-          className={styles.coach}
-          onClick={() => {
-            if (!letzter) return setStep(step + 1);
-            setCards([phasenKarte(MILESTONES[0].id)]);
-            setBeat(0);
-            setPhase("spiel");
-          }}
-        >
-          <span className={styles.coachFigure}>
-            <Image src="/game/mentor.jpg" alt="Tarek" fill sizes="300px" className={styles.coachImg} priority />
-          </span>
-          <span className={styles.bubble}>
-            {satz.highlight ? (
-              <>
-                {satz.text.split(satz.highlight)[0]}
-                <em>{satz.highlight}</em>
-                {satz.text.split(satz.highlight)[1]}
-              </>
-            ) : (
-              satz.text
-            )}
-          </span>
-          <span className={styles.coachHint}>{letzter ? "Tippen und anfangen" : `Weiter · ${step + 1}/${ONBOARDING.length}`}</span>
-        </button>
+        {/* Tarek steht nicht mehr unten am Rand, sondern da, wo auch
+            alle anderen Karten stehen: in der Mitte. */}
+        <div className={styles.overlay}>
+          <button
+            type="button"
+            className={styles.coachKarte}
+            onClick={() => {
+              if (!letzter) return setStep(step + 1);
+              setCards([phasenKarte(MILESTONES[0].id)]);
+              setBeat(0);
+              setPhase("spiel");
+            }}
+          >
+            <span className={styles.coachBild}>
+              <Image src="/game/mentor.jpg" alt="Tarek" fill sizes="(max-width: 700px) 100vw, 460px" className={styles.coachImg} priority />
+            </span>
+            <span className={styles.coachBody}>
+              <span className={styles.coachName}>Tarek Yilmaz · hat verkauft, berät jetzt</span>
+              <span className={styles.bubble}>
+                {satz.highlight ? (
+                  <>
+                    {satz.text.split(satz.highlight)[0]}
+                    <em>{satz.highlight}</em>
+                    {satz.text.split(satz.highlight)[1]}
+                  </>
+                ) : (
+                  satz.text
+                )}
+              </span>
+              <span className={styles.weiterBtn}>{letzter ? "Los geht's" : `Weiter · ${step + 1}/${ONBOARDING.length}`}</span>
+            </span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -388,7 +421,6 @@ export default function Simulator() {
     <div className={styles.app} style={TAKT}>
       <Board
         state={state}
-        months={months}
         milestone={milestone}
         index={index}
         deck={deck}
@@ -406,16 +438,21 @@ export default function Simulator() {
               <h3>{detail.label}</h3>
               <p>{detail.flavour}</p>
               <div className={styles.detailMeta}>
+                {detail.braucht && <span className={styles.wer}>{ROLLE_LABEL[detail.braucht]}</span>}
                 <span className={styles.dauer}>
-                  Dauer: {detail.months} {detail.months === 1 ? "Monat" : "Monate"}
+                  {detail.months} {detail.months === 1 ? "Monat" : "Monate"}
                 </span>
                 {detail.cost ? (
-                  <span className={styles.kosten}>Kosten: {fmtEuro(detail.cost)}</span>
+                  <span className={styles.kosten}>{fmtEuro(detail.cost)}</span>
                 ) : (
                   <span className={styles.gratis}>Kostet kein Geld</span>
                 )}
               </div>
+              <Begriffe liste={detail.begriffe} />
               <Wirkung t={detail} />
+              {/* Warum die Balken so stehen. Ohne das ist „Team −2“ eine
+                  Zahl, die vom Himmel fällt. */}
+              {detail.preis && <p className={styles.preis}>{detail.preis}</p>}
               <div className={styles.detailActions}>
                 <button type="button" className={styles.ghost} onClick={() => setDetail(null)}>
                   Zurück
@@ -443,11 +480,12 @@ export default function Simulator() {
               {wahl.beats.map((b) => (
                 <p key={b.slice(0, 20)}>{b}</p>
               ))}
+              <Begriffe liste={wahl.begriffe} />
 
               {/* Bei der Frage nach fremdem Geld steht daneben, was davon
                   heute schon stimmt. „Sind wir bereit“ ist in Wahrheit
                   fünf Fragen, und die beantwortet man nicht im Gefühl. */}
-              {wahl.art === "weg" && (
+              {wahl.reife && (
                 <div className={styles.reife}>
                   <strong>Was Oltmanns sehen wird</strong>
                   {reifegrad(state).map((p) => (
@@ -533,7 +571,6 @@ export default function Simulator() {
 
 function Board({
   state,
-  months,
   milestone,
   index,
   deck,
@@ -543,7 +580,6 @@ function Board({
   onPick,
 }: {
   state: GameState;
-  months: number;
   milestone: (typeof MILESTONES)[number];
   index: number;
   deck: Tactic[];
@@ -552,8 +588,8 @@ function Board({
   onPause: () => void;
   onPick: (t: Tactic) => void;
 }) {
-  const knapp = isFinite(months) && months <= 6;
-  const frei = capacity(state) - state.running.length;
+  const { monate, gedeckelt } = uhrMonate(state);
+  const knapp = !gedeckelt && monate <= 6;
   const gruppen = GROUPS.map((g) => ({ name: g, karten: deck.filter((t) => t.group === g) })).filter((g) => g.karten.length);
 
   return (
@@ -568,8 +604,9 @@ function Board({
 
       <div className={styles.boardMain}>
         <aside className={styles.rail}>
-          <Uhr months={months} fill={runwayFill(state)} knapp={knapp} tickt={tickt} />
-          <Geld state={state} tickt={tickt} />
+          <Uhr monate={monate} gedeckelt={gedeckelt} fill={runwayFill(state)} knapp={knapp} tickt={tickt} />
+          <Geld state={state} />
+          <Mannschaft state={state} />
 
           <div className={styles.stats}>
             {meterViews(state).map((v) => (
@@ -586,9 +623,11 @@ function Board({
           <div className={styles.listHead}>
             <strong>{milestone.gateLabel}</strong>
             <span>
-              {frei > 0
-                ? `${frei} von ${capacity(state)} ${capacity(state) === 1 ? "Kopf" : "Köpfen"} frei`
-                : "Beide beschäftigt — erst muss etwas fertig werden"}
+              {frei(state).length
+                ? `Frei: ${frei(state)
+                    .map((p) => p.name)
+                    .join(", ")}`
+                : "Alle beschäftigt — erst muss etwas fertig werden"}
             </span>
           </div>
 
@@ -634,10 +673,21 @@ function Board({
  * viele Monate das Geld noch reicht. Was das Geld selbst tut, steht
  * darunter — siehe `Geld`.
  */
-function Uhr({ months, fill, knapp, tickt }: { months: number; fill: number; knapp: boolean; tickt: boolean }) {
+function Uhr({
+  monate,
+  gedeckelt,
+  fill,
+  knapp,
+  tickt,
+}: {
+  monate: number;
+  gedeckelt: boolean;
+  fill: number;
+  knapp: boolean;
+  tickt: boolean;
+}) {
   const UMFANG = 2 * Math.PI * 42;
   const anteil = Math.max(0, Math.min(1, fill));
-  const waechst = !isFinite(months);
   const striche = Array.from({ length: 12 }, (_, i) => {
     const w = (i * Math.PI) / 6;
     return { x1: 50 + 35 * Math.sin(w), y1: 50 - 35 * Math.cos(w), x2: 50 + 39 * Math.sin(w), y2: 50 - 39 * Math.cos(w) };
@@ -651,7 +701,7 @@ function Uhr({ months, fill, knapp, tickt }: { months: number; fill: number; kna
             cx="50"
             cy="50"
             r="42"
-            className={`${styles.uhrArc} ${waechst ? styles.uhrGut : knapp ? styles.uhrKnapp : ""}`}
+            className={`${styles.uhrArc} ${gedeckelt ? styles.uhrGut : knapp ? styles.uhrKnapp : ""}`}
             strokeDasharray={UMFANG}
             strokeDashoffset={UMFANG * (1 - anteil)}
           />
@@ -664,7 +714,10 @@ function Uhr({ months, fill, knapp, tickt }: { months: number; fill: number; kna
           </g>
         </svg>
         <span className={styles.uhrText}>
-          <span className={`${styles.clock} ${knapp && !waechst ? styles.clockLow : ""}`}>{isFinite(months) ? months : "∞"}</span>
+          <span className={`${styles.clock} ${knapp ? styles.clockLow : ""}`}>
+            {monate}
+            {gedeckelt && <em>+</em>}
+          </span>
           <span className={styles.clockUnit}>
             Monate
             <br />
@@ -677,45 +730,30 @@ function Uhr({ months, fill, knapp, tickt }: { months: number; fill: number; kna
 }
 
 /**
- * Der Monatsfortschritt, 0 bis 1.
- *
- * Zurückgesetzt wird er am Monatswechsel, nicht beim Einhängen — so
- * bleibt er auf den echten Monat geheftet, statt langsam davonzulaufen.
- * Ein Intervall und kein `requestAnimationFrame`, weil die Vorschau in
- * einem versteckten Reiter läuft und rAF dort stillsteht; vier Schritte
- * pro Sekunde reichen für eine Zahl, die man beim Lesen fallen sieht.
- */
-function useMonatsFluss(monat: number, tickt: boolean): number {
-  const [p, setP] = useState(0);
-  useEffect(() => {
-    setP(0);
-    if (!tickt) return;
-    const start = Date.now();
-    const id = window.setInterval(() => setP(Math.min(1, (Date.now() - start) / MS_PER_MONTH)), 250);
-    return () => window.clearInterval(id);
-  }, [monat, tickt]);
-  return p;
-}
-
-/**
  * Das Geld.
  *
- * Die Uhr sagt, wie lange es noch reicht — nicht, dass gerade welches
- * weggeht. Also läuft die Zahl hier mit: sie zählt den Monat über nach
- * unten, Euro für Euro, und sobald Speditionen zahlen, zählt sie nach
- * oben und der Balken wird grün. Darunter steht beides getrennt, weil
- * „2.520 € weniger“ nicht erklärt, wofür — und weil man sehen soll,
- * dass der erste Kunde die Richtung ändert und nicht bloß eine Zahl.
+ * Zwei Balken auf derselben Skala: rot, was rausgeht, grün, was
+ * reinkommt. Erst wenn Grün länger ist als Rot, trägt sich der Monat —
+ * das ist eine Sache von einem Blick und nicht von Kopfrechnen. Unter
+ * Rot steht, wofür: wohnen, Gehälter, Kunden, Rest. Vorher stand da
+ * eine Zahl, die kleiner wurde, und niemand wusste, warum.
+ *
+ * Der Betrag springt am Monatsersten, er läuft nicht durch. Geld geht
+ * in Monatsmieten und Gehaltsläufen weg, nicht sekundenweise, und eine
+ * Zahl, die unablässig herunterzählt, ist Druck ohne Information.
  */
-function Geld({ state, tickt }: { state: GameState; tickt: boolean }) {
-  const p = useMonatsFluss(state.month, tickt);
-  const { raus, rein } = fluss(state);
+function Geld({ state }: { state: GameState }) {
+  const { leben, gehaelter, betreuung, sonstiges, raus, rein } = fluss(state);
   const saldoWert = saldo(state);
   const waechst = saldoWert >= 0;
-  /* Zwischen zwei Monatswechseln interpoliert: bei p = 1 steht genau
-     der Betrag, mit dem der nächste Monat anfängt. */
-  const jetzt = Math.max(0, state.cash + saldoWert * p);
-  const anteil = Math.max(0.5, Math.min(100, (jetzt / geldSkala(state.cash)) * 100));
+  const skala = Math.max(raus, rein, 1);
+
+  const posten = [
+    { k: "Leben", v: leben },
+    { k: "Gehälter", v: gehaelter },
+    { k: "Kunden betreuen", v: betreuung },
+    { k: "Server & Büro", v: sonstiges },
+  ].filter((x) => x.v > 0);
 
   return (
     <div className={styles.geld}>
@@ -723,19 +761,30 @@ function Geld({ state, tickt }: { state: GameState; tickt: boolean }) {
         <span className={styles.geldLabel}>Konto</span>
         <span className={styles.geldMonat}>Monat {state.month}</span>
       </div>
-      <strong className={`${styles.geldZahl} ${waechst ? styles.geldZahlAuf : ""}`}>{fmtEuroExakt(jetzt)}</strong>
-      <div className={styles.geldBahn}>
-        <i className={`${styles.geldFuellung} ${waechst ? styles.geldAuf : styles.geldAb}`} style={{ width: `${anteil}%` }} />
-      </div>
-      <div className={styles.fluss}>
-        <span>
-          <i className={styles.flussRaus} aria-hidden="true" />− {fmtEuro(raus)}
+      {/* Der Schlüssel am Monat: die Zahl blinkt einmal auf, wenn sie springt. */}
+      <strong key={state.month} className={styles.geldZahl}>
+        {fmtEuroExakt(state.cash)}
+      </strong>
+
+      <div className={styles.balken}>
+        <span className={styles.balkenKopf}>
+          <i>Raus</i>
+          <b>{fmtEuro(raus)}</b>
         </span>
-        <span>
-          <i className={styles.flussRein} aria-hidden="true" />
-          {rein > 0 ? `+ ${fmtEuro(rein)}` : "nichts"}
+        <span className={styles.balkenBahn}>
+          <i className={styles.balkenRaus} style={{ width: `${(raus / skala) * 100}%` }} />
+        </span>
+        <span className={styles.posten}>{posten.map((x) => `${x.k} ${fmtEuro(x.v)}`).join(" · ")}</span>
+
+        <span className={styles.balkenKopf}>
+          <i>Rein</i>
+          <b>{rein > 0 ? fmtEuro(rein) : "noch nichts"}</b>
+        </span>
+        <span className={styles.balkenBahn}>
+          <i className={styles.balkenRein} style={{ width: `${(rein / skala) * 100}%` }} />
         </span>
       </div>
+
       <div className={`${styles.saldo} ${waechst ? styles.saldoAuf : styles.saldoAb}`}>
         <strong>
           {waechst ? "+" : "−"}
@@ -743,6 +792,56 @@ function Geld({ state, tickt }: { state: GameState; tickt: boolean }) {
         </strong>
         <span>{waechst ? "mehr rein als raus" : "jeden Monat weniger"}</span>
       </div>
+
+      {/* Die ehrlichere Zahl, sobald Umsatz da ist: der kann morgen weg
+          sein, die Gehälter nicht. */}
+      {rein > 0 && (
+        <div className={styles.ohneUmsatz}>
+          Ohne Umsatz reicht das Geld {monateOhneUmsatz(state)} {monateOhneUmsatz(state) === 1 ? "Monat" : "Monate"}.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Wer an Bord ist.
+ *
+ * „2 Köpfe“ stand vorher als Fußnote unter der Stimmung, und ab der
+ * dritten Einstellung wusste niemand mehr, wer eigentlich da ist und
+ * woran sitzt. Eine Firma ist aber genau das: Namen mit einem Fach.
+ * Hier steht, wer gerade gebunden ist und wie lange noch — das ist
+ * dieselbe Information wie „Kein Kopf frei“, nur als Antwort auf die
+ * Frage, die man wirklich hat.
+ */
+function Mannschaft({ state }: { state: GameState }) {
+  const kosten = fluss(state).gehaelter;
+  return (
+    <div className={styles.team}>
+      <div className={styles.teamKopf}>
+        <span className={styles.geldLabel}>Team</span>
+        <span className={styles.geldMonat}>
+          {state.leute.length} {kosten > 0 ? `· ${fmtEuro(kosten)}/Monat` : "· ohne Gehalt"}
+        </span>
+      </div>
+      {state.leute.map((p) => {
+        const laeuft = woranSitzt(state, p);
+        const was = laeuft ? TACTICS[laeuft.id]?.label : null;
+        return (
+          <div key={p.id} className={`${styles.kopf} ${laeuft ? styles.kopfBusy : ""}`}>
+            <span className={`${styles.avatar} ${styles[p.rolle]}`} aria-hidden="true">
+              {p.name.slice(0, 1)}
+            </span>
+            <span className={styles.kopfText}>
+              <strong>
+                {p.name}
+                {p.gruender && <em> · Gründung</em>}
+              </strong>
+              <span>{laeuft ? `${was} · noch ${laeuft.left}` : `${ROLLE_KURZ[p.rolle]} · frei`}</span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
