@@ -822,6 +822,25 @@
   background: var(--akzent);
   border-color: var(--akzent);
 }
+.punkteMinus i.punktAn {
+  background: var(--bad);
+  border-color: var(--bad);
+}
+.wirkungKopf {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  opacity: 0.5;
+  margin-top: 2px;
+}
+.wirkungKopf:first-child {
+  margin-top: 0;
+}
+.wirkungKopfMinus {
+  color: var(--bad);
+  opacity: 0.75;
+}
 .detailMeta {
   display: flex;
   gap: 6px;

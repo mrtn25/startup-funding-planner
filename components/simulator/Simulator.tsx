@@ -195,6 +195,19 @@ export default function Simulator() {
     zeigen(neue);
   }, [state, zeigen]);
 
+  /* Erfolge: Übergänge, nicht Zustände. Deshalb der Vergleich mit dem
+     vorigen Zustand statt einer Bedingung im Tick — die erste bezahlte
+     Rechnung kann aus einer Maßnahme kommen, aus einem Ereignis oder
+     aus einer Phase, und sie soll in allen drei Fällen gefeiert werden. */
+  const vorher = useRef(state);
+  useEffect(() => {
+    const treffer = erfolge(vorher.current, state, ERFOLGE);
+    vorher.current = state;
+    if (!treffer.length) return;
+    setState((s) => ({ ...s, gefeiert: [...s.gefeiert, ...treffer.map((e) => e.id)] }));
+    zeigen(treffer.map((e) => ({ key: `erfolg:${e.id}`, kind: "erfolg" as const, kicker: "Geschafft", title: e.title, beats: [...e.beats] })));
+  }, [state, zeigen]);
+
   /* Tor und Ende werden nach jeder Änderung geprüft, nicht nur wenn
      eine Maßnahme fertig wird. Vorher konnte ein Ereignis den zweiten
      Kunden bringen und das Brett blieb trotzdem in der alten Phase
@@ -222,10 +235,11 @@ export default function Simulator() {
             {
               key: `enter:${m.next}`,
               kind: "ereignis" as const,
-              kicker: "Montagmorgen",
+              kicker: bei!.kicker ?? "Montagmorgen",
               title: bei!.title,
+              image: bei!.kicker === "Tarek" ? "mentor" : undefined,
               beats: [...bei!.beats],
-              summary: bei!.effects,
+              summary: Object.keys(bei!.effects).length ? bei!.effects : undefined,
             },
           ]
         : []),
@@ -262,18 +276,6 @@ export default function Simulator() {
     setBeat(0);
   }, [state, running, zeigen]);
 
-  /* Erfolge: Übergänge, nicht Zustände. Deshalb der Vergleich mit dem
-     vorigen Zustand statt einer Bedingung im Tick — die erste bezahlte
-     Rechnung kann aus einer Maßnahme kommen, aus einem Ereignis oder
-     aus einer Phase, und sie soll in allen drei Fällen gefeiert werden. */
-  const vorher = useRef(state);
-  useEffect(() => {
-    const treffer = erfolge(vorher.current, state, ERFOLGE);
-    vorher.current = state;
-    if (!treffer.length) return;
-    setState((s) => ({ ...s, gefeiert: [...s.gefeiert, ...treffer.map((e) => e.id)] }));
-    zeigen(treffer.map((e) => ({ key: `erfolg:${e.id}`, kind: "erfolg" as const, kicker: "Geschafft", title: e.title, beats: [...e.beats] })));
-  }, [state, zeigen]);
 
   const starten = (t: Tactic) => {
     setDetail(null);
@@ -888,29 +890,53 @@ function Stat({ view }: { view: ReturnType<typeof meterViews>[number] }) {
   );
 }
 
-/** Wirkung als Balken statt als Satz. */
+/**
+ * Wirkung als Balken — getrennt nach dem, was sie bringt, und dem, was
+ * sie kostet.
+ *
+ * Vorher war beides derselbe gefüllte Balken: „Team 3/5“ stand auf
+ * einer Karte, die hinterher neun Punkte Stimmung abzog, und „Geld
+ * 4/5“ bedeutete beim Stipendium Einnahme und bei einer Einstellung
+ * Gehalt. Wer das einmal gemerkt hat, glaubt den Balken nicht mehr.
+ */
 function Wirkung({ t }: { t: Tactic }) {
   const labels: Record<string, string> = {
     produkt: "Produkt",
     umsatz: "Umsatz",
     geld: "Geld",
-    team: "Team",
+    team: "Stimmung",
     investoren: "Investoren",
   };
   const eintraege = Object.entries(t.impact) as [string, number][];
   if (!eintraege.length) return null;
+  const bringt = eintraege.filter(([, n]) => n > 0);
+  const kostet = eintraege.filter(([, n]) => n < 0);
+
+  const zeile = (k: string, n: number, minus: boolean) => (
+    <div key={k} className={styles.wirkungZeile}>
+      <span>{labels[k] ?? k}</span>
+      <span className={`${styles.punkte} ${minus ? styles.punkteMinus : ""}`}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <i key={i} className={i <= Math.abs(n) ? styles.punktAn : ""} />
+        ))}
+      </span>
+    </div>
+  );
+
   return (
     <div className={styles.wirkung}>
-      {eintraege.map(([k, n]) => (
-        <div key={k} className={styles.wirkungZeile}>
-          <span>{labels[k] ?? k}</span>
-          <span className={styles.punkte}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <i key={i} className={i <= n ? styles.punktAn : ""} />
-            ))}
-          </span>
-        </div>
-      ))}
+      {bringt.length > 0 && (
+        <>
+          <div className={styles.wirkungKopf}>Bringt</div>
+          {bringt.map(([k, n]) => zeile(k, n, false))}
+        </>
+      )}
+      {kostet.length > 0 && (
+        <>
+          <div className={`${styles.wirkungKopf} ${styles.wirkungKopfMinus}`}>Kostet</div>
+          {kostet.map(([k, n]) => zeile(k, n, true))}
+        </>
+      )}
     </div>
   );
 }
