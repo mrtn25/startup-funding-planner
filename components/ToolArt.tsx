@@ -168,7 +168,28 @@ function Network() {
   );
 }
 
+/** Exits: ein Weg, der sich teilt — und nicht jedes Ende ist dasselbe. */
+function Exits() {
+  return (
+    <svg viewBox={BOX} aria-hidden="true">
+      {/* Der gemeinsame Weg bis zur Gabelung. */}
+      <path d="M14 50h34" {...stift} strokeWidth={3.4} />
+      <path d="M48 50c14 0 14-32 28-32h22" {...stift} />
+      <path d="M48 50c14 0 14-12 28-12h22" {...stift} />
+      <path d="M48 50c14 0 14 12 28 12h22" {...stift} />
+      <path d="M48 50c14 0 14 32 28 32h22" {...stift} strokeWidth={1.8} strokeDasharray="5 5" opacity={0.5} />
+      {/* Vier Ausgänge, vier Bedeutungen. */}
+      <circle cx="106" cy="18" r="6" fill="currentColor" />
+      <circle cx="106" cy="38" r="6" {...stift} strokeWidth={2.4} />
+      <rect x="100" y="56" width="12" height="12" rx={3} {...stift} strokeWidth={2.4} />
+      <path d="M101 77l10 10M111 77l-10 10" {...stift} strokeWidth={2.2} opacity={0.5} />
+      <circle cx="48" cy="50" r="4.2" fill="currentColor" />
+    </svg>
+  );
+}
+
 const ZEICHNUNGEN: Record<string, () => React.JSX.Element> = {
+  exits: Exits,
   bootstrap: Bootstrap,
   recurring: Recurring,
   ready: Ready,

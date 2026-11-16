@@ -1,0 +1,504 @@
+/* Exit Strategies. Shares the token scheme of the other research-backed
+   tools so they read as one family. */
+
+.root {
+  --ex-bg: #ffffff;
+  --ex-bg2: #f7f7f5;
+  --ex-fg: #141413;
+  --ex-fg2: #5f5e5a;
+  --ex-fg3: #8a8880;
+  --ex-line: rgba(20, 20, 19, 0.12);
+  --ex-line2: rgba(20, 20, 19, 0.22);
+  --ex-sel: #c6f432;
+  --ex-sel-line: #9dc70f;
+  --ex-warn: #ba7517;
+  --ex-neg: #d85a30;
+  --ex-accent: hsl(248 100% 50%);
+
+  color: var(--ex-fg);
+  font-family: inherit;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  .root {
+    --ex-bg: #1a1a19;
+    --ex-bg2: #232322;
+    --ex-fg: #f2f1ec;
+    --ex-fg2: #b6b4ab;
+    --ex-fg3: #8a8880;
+    --ex-line: rgba(255, 255, 255, 0.13);
+    --ex-line2: rgba(255, 255, 255, 0.24);
+    --ex-accent: hsl(248 90% 78%);
+    --ex-sel-line: #c6f432;
+  }
+}
+
+.head {
+  max-width: 62ch;
+  margin-bottom: 1.5rem;
+}
+.head h2 {
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.22;
+  margin: 0 0 0.6rem;
+}
+.lead {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ex-fg2);
+  margin: 0;
+}
+
+/* ── The caveat, deliberately not foldable ── */
+
+.caveats {
+  border: 1px solid var(--ex-line2);
+  border-left: 4px solid var(--ex-warn);
+  border-radius: 12px;
+  background: var(--ex-bg2);
+  padding: 1rem 1.15rem 1.1rem;
+  margin-bottom: 1.75rem;
+}
+.caveatsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+.caveatsHead strong {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ex-warn);
+}
+.caveatsHead span {
+  font-size: 13px;
+  color: var(--ex-fg3);
+}
+.caveatList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem 1.5rem;
+}
+.caveatList strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 0.2rem;
+}
+.caveatList p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ex-fg2);
+  margin: 0;
+}
+
+/* ── Board ── */
+
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.inputs h3,
+.approach h3 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ex-fg3);
+  margin: 0 0 0.75rem;
+}
+.group {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1.1rem;
+}
+.group legend {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+.hint {
+  display: block;
+  font-size: 12px;
+  color: var(--ex-fg3);
+  margin-top: 0.3rem;
+  line-height: 1.45;
+}
+
+.cards {
+  display: grid;
+  gap: 0.4rem;
+}
+.card {
+  font: inherit;
+  text-align: left;
+  display: block;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--ex-line);
+  border-radius: 10px;
+  background: var(--ex-bg);
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.card:hover {
+  border-color: var(--ex-line2);
+}
+.card strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+.card span {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ex-fg2);
+}
+.cardOn {
+  border-color: var(--ex-sel-line);
+  background: color-mix(in srgb, var(--ex-sel) 18%, transparent);
+}
+
+.seg {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.segBtn {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border: 1px solid var(--ex-line);
+  border-radius: 999px;
+  background: var(--ex-bg);
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segOn {
+  border-color: var(--ex-sel-line);
+  background: color-mix(in srgb, var(--ex-sel) 26%, transparent);
+}
+
+.tick {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.tick:hover {
+  background: var(--ex-bg2);
+}
+.tick strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.tick em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--ex-fg3);
+  line-height: 1.4;
+}
+.box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--ex-line2);
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+.tickOn .box {
+  background: var(--ex-sel);
+  border-color: var(--ex-sel-line);
+  color: #17210a;
+}
+
+/* ── Results ── */
+
+.verdict {
+  border: 1px solid var(--ex-line2);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--ex-bg2);
+}
+.verdictLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ex-fg3);
+}
+.verdict strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0.15rem 0 0.4rem;
+}
+.verdict p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ex-fg2);
+  margin: 0 0 0.5rem;
+}
+.verdictNote {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ex-fg3);
+}
+
+.routes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.route {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  display: block;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--ex-line);
+  border-radius: 10px;
+  background: var(--ex-bg);
+  color: inherit;
+  cursor: pointer;
+}
+.route:hover {
+  border-color: var(--ex-line2);
+}
+.routeOpen {
+  border-color: var(--ex-line2);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.routeTop {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 0.25rem;
+}
+.routeTop strong {
+  font-size: 14.5px;
+  font-weight: 650;
+  flex: 1;
+  min-width: 0;
+}
+.routeWhy {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ex-fg2);
+}
+.badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--ex-bg2);
+  color: var(--ex-fg3);
+  border: 1px solid var(--ex-line);
+}
+.harvest {
+  color: #1a56db;
+  border-color: #93b4f8;
+  background: #e8f0fe;
+}
+.stewardship {
+  color: #167a5a;
+  border-color: rgba(29, 158, 117, 0.45);
+  background: rgba(29, 158, 117, 0.12);
+}
+.cessation {
+  color: var(--ex-neg);
+  border-color: rgba(216, 90, 48, 0.4);
+  background: rgba(216, 90, 48, 0.1);
+}
+.none {
+  color: var(--ex-warn);
+  border-color: rgba(186, 117, 23, 0.4);
+  background: rgba(186, 117, 23, 0.1);
+}
+.score {
+  flex: none;
+  width: 54px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ex-line);
+  overflow: hidden;
+}
+.score i {
+  display: block;
+  height: 100%;
+  background: var(--ex-accent);
+  border-radius: 999px;
+}
+
+.detail {
+  border: 1px solid var(--ex-line2);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  padding: 0.8rem 0.9rem 0.9rem;
+  background: var(--ex-bg2);
+}
+.detail dl {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.detail dt {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ex-fg3);
+  margin-bottom: 0.1rem;
+}
+.detail dd {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.trap dt {
+  color: var(--ex-neg);
+}
+.cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 0.7rem;
+}
+.cites a {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--ex-line);
+  color: var(--ex-fg3);
+  text-decoration: none;
+}
+.cites a:hover {
+  color: var(--ex-accent);
+  border-color: var(--ex-accent);
+}
+
+/* ── How a buyer comes about ── */
+
+.approach {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--ex-line);
+}
+.approach .lead {
+  max-width: 68ch;
+  margin-bottom: 1rem;
+}
+.approachList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.9rem 1.4rem;
+}
+.approachList strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+.approachList p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ex-fg2);
+  margin: 0 0 0.25rem;
+}
+.approachList span {
+  font-size: 12px;
+  color: var(--ex-fg3);
+}
+
+/* ── References ── */
+
+.biblio {
+  margin-top: 2rem;
+  border-top: 1px solid var(--ex-line);
+  padding-top: 1rem;
+}
+.biblio summary {
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ex-fg2);
+}
+.biblio ol {
+  margin: 0.9rem 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.biblio li {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ex-fg2);
+}
+.biblio a {
+  color: inherit;
+  text-decoration: none;
+}
+.biblio a:hover {
+  color: var(--ex-accent);
+}
+.caveat {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ex-fg3);
+  max-width: 72ch;
+  margin: 1rem 0 0;
+}

@@ -14,6 +14,7 @@ import StatsBoard from "./stats/StatsBoard";
 import Planner from "./planner/Planner";
 import RecurringCalc from "./recurring/RecurringCalc";
 import EquitySplit from "./split/EquitySplit";
+import ExitStrategies from "./exits/ExitStrategies";
 import RoundPlanner from "./round/RoundPlanner";
 import ReadyToRaise from "./ready/ReadyToRaise";
 
@@ -157,6 +158,10 @@ export default function ToolSwitcher() {
 
       <div id="panel-split" role="tabpanel" aria-labelledby="tab-split" hidden={view !== "tools" || active !== "split"}>
         <EquitySplit />
+      </div>
+
+      <div id="panel-exits" role="tabpanel" aria-labelledby="tab-exits" hidden={view !== "tools" || active !== "exits"}>
+        <ExitStrategies />
       </div>
 
       <div id="panel-network" role="tabpanel" aria-labelledby="tab-network" hidden={view !== "tools" || active !== "network"}>

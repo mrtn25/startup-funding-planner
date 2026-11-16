@@ -1,113 +1,143 @@
-/* Tests für die Bootstrap-Kriterien.
-     node --test lib/bootstrap.test.ts
-*/
+/* Tests für die Bootstrap-Prüfung.  node --test lib/bootstrap.test.ts */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEFAULT_BOOTSTRAP, assessBootstrap, type BootstrapInputs } from "./bootstrap.ts";
+import {
+  assess,
+  byFundability,
+  CONDITIONS,
+  EMPTY,
+  FACT_TEXT,
+  FACT_WEIGHT,
+  factScore,
+  MODELS,
+  MODEL_BY_ID,
+  SRC,
+  TECHNIQUES,
+  type BootstrapState,
+  type CondId,
+  type Facts,
+} from "./bootstrap.ts";
 
-/** Ein Geschäft, das jedes Kriterium erfüllt. */
-const IDEAL: BootstrapInputs = {
-  monthsToRevenue: 0,
-  grossMargin: 0.85,
-  upfrontCapital: 0,
-  paymentDays: -30,
-  marketClock: "open",
-  founderSells: true,
-  founderRunwayMonths: 24,
-  ambition: "profitable",
-};
+const S = (patch: Partial<BootstrapState> = {}): BootstrapState => ({ ...EMPTY, ...patch });
+const ALLE = CONDITIONS.map((c) => c.id);
 
-test("ein Geschäft, das alles erfüllt, wird auch so beurteilt", () => {
-  const r = assessBootstrap(IDEAL);
-  assert.equal(r.verdict, "yes");
-  assert.ok(r.score > 0.95);
-  assert.equal(r.hardStops.length, 0);
-  assert.equal(r.blocker, null);
+test("die vier Fakten sind vollständig gewichtet", () => {
+  const summe = Object.values(FACT_WEIGHT).reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(summe - 1) < 1e-9, `die Gewichte ergeben ${summe}, nicht 1`);
+  // Zeit bis zur ersten Rechnung wiegt am schwersten — das ist Bhidés Befund.
+  const sortiert = Object.entries(FACT_WEIGHT).sort((a, b) => b[1] - a[1]);
+  assert.equal(sortiert[0][0], "firstEuro");
 });
 
-test("jedes Kriterium bekommt ein eigenes Urteil", () => {
-  const r = assessBootstrap(IDEAL);
-  assert.equal(r.criteria.length, 8);
-  for (const c of r.criteria) {
-    assert.equal(c.verdict, "yes");
-    assert.ok(c.finding.length > 10, `${c.key} braucht einen Befund`);
-    assert.ok(c.requirement.length > 10, `${c.key} braucht eine Bedingung`);
-    assert.ok(c.sources.length > 0, `${c.key} braucht eine Quelle`);
+test("jedes Geschäftsmodell ist vollständig beschrieben", () => {
+  assert.ok(MODELS.length >= 8, "zu wenige Modelle, um eine echte Wahl zu sein");
+  for (const m of MODELS) {
+    assert.ok(m.what.length > 30, `${m.id}: sagt nicht, was verkauft wird`);
+    assert.ok(m.note.length > 50, `${m.id}: ohne ehrliches Urteil`);
+    assert.ok(m.lever.length > 30, `${m.id}: ohne Hebel`);
+    assert.ok(m.sources.length > 0, `${m.id} ohne Beleg`);
+    for (const id of m.sources) assert.ok(SRC[id], `${m.id} zitiert ${id}, das es nicht gibt`);
+    for (const k of Object.keys(FACT_WEIGHT) as (keyof Facts)[]) {
+      assert.ok(FACT_TEXT[k][m.facts[k]], `${m.id}: ${k} hat keinen Text`);
+    }
   }
 });
 
-/* ── Die harten Ausschlüsse ─────────────────────────────────── */
-
-test("Kapital vor dem ersten Verkauf ist ein Ausschluss, kein Abzug", () => {
-  const hardware = assessBootstrap({ ...IDEAL, upfrontCapital: 800 });
-  assert.equal(hardware.verdict, "no");
-  assert.ok(hardware.hardStops.some((c) => c.key === "upfrontCapital"));
-  // Und zwar auch dann, wenn sonst alles perfekt ist.
-  assert.ok(hardware.score > 0.5, "der Rest ist gut — trotzdem nein");
+test("Beratung steht oben, Hardware und Deep Tech unten", () => {
+  // Der Kern des Werkzeugs: das Modell entscheidet, nicht die Haltung.
+  const reihe = byFundability().map((m) => m.id);
+  assert.ok(reihe.indexOf("consulting") <= 2, "Dienstleistung muss unter den ersten stehen");
+  assert.ok(reihe.indexOf("productized") <= 2);
+  assert.ok(reihe.indexOf("hardware") >= reihe.length - 3, "Hardware kann sich nicht selbst finanzieren");
+  assert.ok(reihe.indexOf("deeptech") >= reihe.length - 3);
+  assert.ok(factScore(MODEL_BY_ID.consulting.facts) > factScore(MODEL_BY_ID.hardware.facts) + 0.5);
 });
 
-test("ein Land-Grab schließt Bootstrapping aus, so gut die Marge auch ist", () => {
-  const race = assessBootstrap({ ...IDEAL, marketClock: "landgrab" });
-  assert.equal(race.verdict, "no");
-  assert.ok(race.hardStops.some((c) => c.key === "marketClock"));
+test("kein Haken, kein Urteil", () => {
+  // Ohne eine einzige bezahlte Rechnung darf nirgends „geht“ stehen.
+  for (const m of MODELS) {
+    const r = assess(S({ model: m.id, ticked: [] }));
+    assert.notEqual(r.verdict, "yes", `${m.id} bekommt grünes Licht, ohne dass irgendetwas stimmt`);
+    assert.ok(r.blocker, "es muss immer einen nächsten Schritt geben");
+  }
 });
 
-test("ein Jahr ohne Umsatz ebenfalls", () => {
-  const slow = assessBootstrap({ ...IDEAL, monthsToRevenue: 18 });
-  assert.equal(slow.verdict, "no");
-  assert.ok(slow.hardStops.some((c) => c.key === "timeToRevenue"));
+test("dasselbe Geschäft, alles erfüllt — und es kippt", () => {
+  const leer = assess(S({ model: "consulting", ticked: [] }));
+  const voll = assess(S({ model: "consulting", ticked: ALLE }));
+  assert.equal(voll.verdict, "yes");
+  assert.ok(voll.score > leer.score + 0.4);
+  assert.equal(voll.blocker, null, "wenn alles stimmt, steht nichts mehr im Weg");
+  assert.match(voll.headline, /itself/);
 });
 
-test("ein offener Markt ist kein Ausschluss", () => {
-  assert.equal(assessBootstrap({ ...IDEAL, marketClock: "contested" }).hardStops.length, 0);
+test("alle Haken retten das falsche Geschäftsmodell nicht", () => {
+  // Eine unterschriebene Rechnung heilt keine Fabrik.
+  const hardware = assess(S({ model: "hardware", ticked: ALLE }));
+  assert.notEqual(hardware.verdict, "yes", "Hardware mit allen Haken ist trotzdem kein Selbstläufer");
+  assert.ok(hardware.weakFact, "das Modell muss seine eigene Grenze nennen");
+  const deeptech = assess(S({ model: "deeptech", ticked: ALLE }));
+  assert.ok(deeptech.score < assess(S({ model: "consulting", ticked: [] })).score + 0.3);
 });
 
-/* ── Die Skalen ─────────────────────────────────────────────── */
-
-test("eine dünne Marge senkt das Urteil, ohne es zu blockieren", () => {
-  const thin = assessBootstrap({ ...IDEAL, grossMargin: 0.2 });
-  const fat = assessBootstrap({ ...IDEAL, grossMargin: 0.85 });
-  const scoreOf = (r: ReturnType<typeof assessBootstrap>, k: string) =>
-    r.criteria.find((c) => c.key === k)!.score;
-  assert.equal(scoreOf(thin, "grossMargin"), 0);
-  assert.equal(scoreOf(fat, "grossMargin"), 1);
-  assert.ok(thin.score < fat.score);
-  assert.equal(thin.hardStops.length, 0);
+test("die erste bezahlte Rechnung ist der stärkste Haken", () => {
+  const ohne = assess(S({ model: "saas-smb", ticked: ALLE.filter((id) => id !== "paid") }));
+  const mit = assess(S({ model: "saas-smb", ticked: ALLE }));
+  assert.ok(mit.score - ohne.score >= 0.14, "bezahlt worden zu sein muss am schwersten wiegen");
+  assert.equal(ohne.blocker?.id, "paid", "was fehlt, muss als Erstes genannt werden");
 });
 
-test("Vorkasse zählt besser als ein langes Zahlungsziel", () => {
-  const cycle = (days: number) =>
-    assessBootstrap({ ...IDEAL, paymentDays: days }).criteria.find((c) => c.key === "cashCycle")!.score;
-  assert.equal(cycle(-30), 1);
-  assert.equal(cycle(90), 0);
-  assert.ok(cycle(30) > 0 && cycle(30) < 1);
+test("der Engpass ist immer der teuerste offene Punkt", () => {
+  const offen: CondId[] = ["ownRunway", "slowMarket"];
+  const r = assess(S({ model: "consulting", ticked: ALLE.filter((id) => !offen.includes(id)) }));
+  assert.equal(r.blocker?.id, "ownRunway", "sechs Monate ohne Gehalt wiegen schwerer als ein langsamer Markt");
+  assert.deepEqual(r.open.map((c) => c.id), offen);
+  for (const c of r.open) assert.ok(c.fix.length > 40, `${c.id} sagt nicht, was man tun kann`);
 });
 
-test("Venture-Ambition spricht gegen Bootstrapping, ohne es zu verbieten", () => {
-  const vc = assessBootstrap({ ...IDEAL, ambition: "venture" });
-  assert.ok(vc.criteria.find((c) => c.key === "ambition")!.score < 0.2);
-  assert.equal(vc.hardStops.length, 0);
+test("jede Bedingung erklärt sich und ist belegt", () => {
+  const summe = CONDITIONS.reduce((n, c) => n + c.weight, 0);
+  assert.ok(Math.abs(summe - 1) < 1e-9, `die Bedingungen ergeben ${summe}, nicht 1`);
+  for (const c of CONDITIONS) {
+    assert.ok(c.hint.length > 40, `${c.id}: man weiß nicht, wann man es ankreuzen darf`);
+    for (const id of c.sources) assert.ok(SRC[id], `${c.id} zitiert ${id}, das es nicht gibt`);
+  }
 });
 
-/* ── Der Engpass ────────────────────────────────────────────── */
-
-test("das schwächste Kriterium wird als Engpass benannt", () => {
-  const r = assessBootstrap({ ...IDEAL, grossMargin: 0.22 });
-  assert.equal(r.blocker?.key, "grossMargin");
+test("die Techniken sagen, wie schnell sie Geld bringen", () => {
+  assert.ok(TECHNIQUES.length >= 6);
+  const familien = new Set(TECHNIQUES.map((t) => t.family));
+  assert.ok(familien.size >= 5, "Winborg und Landström haben mehr als drei Kategorien");
+  for (const t of TECHNIQUES) {
+    assert.ok(t.what.length > 50, `${t.id} erklärt sich nicht`);
+    assert.ok(t.speed.length > 8, `${t.id} sagt nicht, wie schnell`);
+    for (const id of t.sources) assert.ok(SRC[id], `${t.id} zitiert ${id}, das es nicht gibt`);
+  }
+  // Kundengeld steht vor eigenem Geld — so fanden es Ebben und Johnson.
+  const ids = TECHNIQUES.map((t) => t.id);
+  assert.ok(ids.indexOf("advance") < ids.indexOf("own"));
 });
 
-test("wo nichts klemmt, wird auch kein Engpass erfunden", () => {
-  assert.equal(assessBootstrap(IDEAL).blocker, null);
+test("jede Quelle wird benutzt und hat eine Fundstelle", () => {
+  const benutzt = new Set<string>();
+  MODELS.forEach((m) => m.sources.forEach((s) => benutzt.add(s)));
+  CONDITIONS.forEach((c) => c.sources.forEach((s) => benutzt.add(s)));
+  TECHNIQUES.forEach((t) => t.sources.forEach((s) => benutzt.add(s)));
+  for (const [id, [zitat, href]] of Object.entries(SRC)) {
+    assert.ok(benutzt.has(id), `${id} steht im Verzeichnis, wird aber nirgends zitiert`);
+    assert.match(zitat, /\(\d{4}\)/, `${id}: ohne Jahr`);
+    assert.match(href, /^https:\/\//, `${id}: kein Link`);
+  }
 });
 
-test("die Ausgangswerte ergeben ein brauchbares, nicht geschöntes Bild", () => {
-  const r = assessBootstrap(DEFAULT_BOOTSTRAP);
-  assert.ok(r.score > 0.3 && r.score < 0.9, `unplausibler Startwert: ${r.score}`);
-  assert.ok(r.headline.length > 20);
-});
-
-test("die Gewichte summieren sich zu eins", () => {
-  const sum = assessBootstrap(IDEAL).criteria.reduce((a, c) => a + c.weight, 0);
-  assert.equal(Math.round(sum * 1000) / 1000, 1);
+test("der Inhalt ist auf Englisch wie der Rest der Werkzeuge", () => {
+  const text = [
+    ...MODELS.map((m) => `${m.label} ${m.what} ${m.note} ${m.lever}`),
+    ...CONDITIONS.map((c) => `${c.label} ${c.hint} ${c.fix}`),
+    ...TECHNIQUES.map((t) => `${t.label} ${t.what}`),
+  ].join(" ");
+  for (const wort of [" der ", " und ", " nicht ", " ihr ", " euch "]) {
+    assert.ok(!text.includes(wort), `deutscher Rest im Inhalt: "${wort}"`);
+  }
 });

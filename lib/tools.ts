@@ -9,7 +9,7 @@
    card nobody reads.
    ══════════════════════════════════════════════════════════════ */
 
-export type ToolId = "planner" | "network" | "ready" | "round" | "bootstrap" | "split" | "recurring";
+export type ToolId = "planner" | "network" | "ready" | "round" | "bootstrap" | "split" | "recurring" | "exits";
 
 export type Tool = {
   id: ToolId;
@@ -24,7 +24,13 @@ export const TOOLS: Tool[] = [
     id: "bootstrap",
     label: "Bootstrap",
     blurb:
-      "Set your margin, payment terms and time to first revenue. The model scores whether the business can fund itself and names the one condition holding it back.",
+      "Pick what you are building, tick what is already true. Eleven business models ranked by how well they fund themselves, the one condition in your way, and the ways to get money in now.",
+  },
+  {
+    id: "exits",
+    label: "Exit Strategies",
+    blurb:
+      "Ten ways out, ranked by what you want and what you built — with what each one costs you, and the evidence for why the exit should not be the plan.",
   },
   {
     id: "recurring",

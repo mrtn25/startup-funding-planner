@@ -27,7 +27,7 @@ export default function ToolGallery({ onOpenTool, onOpenView }: Props) {
   return (
     <section className={styles.wrap} id="tools" aria-labelledby="shelf-title">
       <div className={styles.head}>
-        <h2 id="shelf-title">Seven tools and one game</h2>
+        <h2 id="shelf-title">Eight tools and one game</h2>
         <p>
           Every one of them is a model with its sources written out, free, and nothing is stored anywhere. Pick the
           question you actually have.
