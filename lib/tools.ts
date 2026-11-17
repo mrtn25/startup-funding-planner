@@ -17,8 +17,12 @@ export type Tool = {
   blurb: string;
 };
 
-/* Ordered as the questions actually arrive: do you even need to raise,
-   are you ready, how much, what does it cost you, and who do you ask. */
+/* Ordered along the life of a company, because that is the order the
+   questions actually arrive in: can this pay for itself, what is the
+   revenue really worth, who owns it, are we ready to ask for money,
+   how much, what does it cost us, who do we ask — and, years later,
+   how does this end. A shelf sorted by topic makes you read all eight
+   to find yours; a shelf sorted by time lets you start where you are. */
 export const TOOLS: Tool[] = [
   {
     id: "bootstrap",
@@ -27,16 +31,16 @@ export const TOOLS: Tool[] = [
       "Pick what you are building, tick what is already true. Eleven business models ranked by how well they fund themselves, the one condition in your way, and the ways to get money in now.",
   },
   {
-    id: "exits",
-    label: "Exit Strategies",
-    blurb:
-      "Ten ways out, ranked by what you want and what you built — with what each one costs you, and the evidence for why the exit should not be the plan.",
-  },
-  {
     id: "recurring",
     label: "ARR & MRR",
     blurb:
       "Sort setup fees, one-offs and annual deals into what may be counted as ARR — and what diligence will strike out again.",
+  },
+  {
+    id: "split",
+    label: "Co-Founder Split",
+    blurb:
+      "Weigh idea, work, capital and risk for each founder and get a split with the reasoning written out — the part most teams skip.",
   },
   {
     id: "ready",
@@ -57,16 +61,16 @@ export const TOOLS: Tool[] = [
       "Model friends and family, angels and VCs across every round, build the cap table, and run the exit under different liquidation preferences.",
   },
   {
-    id: "split",
-    label: "Co-Founder Split",
-    blurb:
-      "Weigh idea, work, capital and risk for each founder and get a split with the reasoning written out — the part most teams skip.",
-  },
-  {
     id: "network",
     label: "Network Strategy",
     blurb:
       "Toggle your own attributes and see which route into a round fits your profile, with the evidence behind every node.",
+  },
+  {
+    id: "exits",
+    label: "Exit Strategies",
+    blurb:
+      "Ten ways out, ranked by what you want and what you built — with what each one costs you, and the evidence for why the exit should not be the plan.",
   },
 ];
 
