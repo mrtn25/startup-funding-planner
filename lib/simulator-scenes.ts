@@ -15,8 +15,18 @@
    Texte sind kurz. Wer spielt, will nicht lesen.
    ══════════════════════════════════════════════════════════════ */
 
-import type { Ending, Entscheidung, Erfolg, GameEvent, GameState, Milestone, RivalStep, Tactic } from "./simulator.ts";
-import { fmtEuro, saldo, UEBERHOLT } from "./simulator.ts";
+import type {
+  Angebot,
+  Ending,
+  Entscheidung,
+  Erfolg,
+  GameEvent,
+  GameState,
+  Milestone,
+  RivalStep,
+  Tactic,
+} from "./simulator.ts";
+import { arr, erloes, fmtEuro, MARKT_VIELFACHES, saldo, UEBERHOLT } from "./simulator.ts";
 
 export const ONBOARDING: { text: string; highlight?: string }[] = [
   {
@@ -30,7 +40,7 @@ export const ONBOARDING: { text: string; highlight?: string }[] = [
     text: "Aufgefallen ist es Jonas: jede vierte Fahrt kommt leer zurück, weil niemand Zeit hat, für die Rückfahrt eine Ladung zu suchen. Das will eure Software automatisch finden.",
   },
   {
-    text: "Jonas verkauft, du baust. Jeder von euch arbeitet an einer Sache gleichzeitig — und nur an seiner. Das ist die halbe Miete und der ganze Streit.",
+    text: "Jonas verkauft, du baust. Jeder von euch arbeitet an einer Sache gleichzeitig — und nur an seiner. Wer das vergisst, verspricht Kunden etwas, das der andere bauen muss.",
     highlight: "und nur an seiner",
   },
   {
@@ -438,7 +448,13 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       impact: { geld: 5, investoren: -3 },
       preis: "40 % in der ersten Runde. Das steht in jedem späteren Gespräch mit im Raum.",
       months: 1,
-      effects: { cash: 100_000, equity: -40, investors: -8 },
+      effects: {
+        cash: 100_000,
+        equity: -40,
+        investors: -8,
+        runde: { wer: "Oltmanns", betrag: 100_000, faktor: 1, participating: false },
+      },
+      link: { text: "Wie viel ihr überhaupt braucht — Round Planner", href: "/?tool=round" },
       alignmentBy: { bootstrap: -18, venture: 6 },
       /* Wer sich gegen fremdes Geld entschieden hat, dem liegt es nicht
          weiter im Stapel. */
@@ -456,7 +472,12 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       flavour: "Ein Kredit, der sich später in Anteile verwandelt — zum Preis der nächsten Runde, mit Abschlag.",
       impact: { geld: 5, investoren: 3 },
       months: 2,
-      effects: { cash: 100_000, equity: -11, investors: 3 },
+      effects: {
+        cash: 100_000,
+        equity: -11,
+        investors: 3,
+        runde: { wer: "Oltmanns (Wandeldarlehen)", betrag: 100_000, faktor: 1, participating: false },
+      },
       alignmentBy: { bootstrap: -6, venture: 8 },
       begriffe: [
         {
@@ -498,7 +519,13 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       impact: { geld: 3, team: -2, investoren: -1 },
       preis: "Drei Leute, die nicht beurteilen können, worauf sie sich einlassen — und die ihr Weihnachten seht.",
       months: 2,
-      effects: { cash: 24_000, equity: -6, investors: -2, team: -4 },
+      effects: {
+        cash: 24_000,
+        equity: -6,
+        investors: -2,
+        team: -4,
+        runde: { wer: "Familie und Freunde", betrag: 24_000, faktor: 1, participating: false },
+      },
       begriffe: [
         {
           wort: "Friends and Family",
@@ -538,7 +565,7 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       flavour: "Kommt von einer Frachtbörse, kennt die halbe Branche. Ab jetzt kann jemand verkaufen, während Jonas etwas anderes macht.",
       impact: { umsatz: 5, geld: -4 },
       preis: "6.200 € ab Tag eins, Abschlüsse ab Monat drei. Die Lücke dazwischen zahlt ihr.",
-      months: 4,
+      months: 3,
       effects: {
         einstellen: [{ name: "Marie", rolle: "vertrieb", kosten: 6_200 }],
         customers: 3,
@@ -651,7 +678,15 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       impact: { geld: 5, investoren: 5 },
       preis: "Ein Boardsitz heißt: vier Termine im Jahr, bei denen ihr erklärt, warum der Plan nicht aufging.",
       months: 4,
-      effects: { cash: 2_500_000, equity: -22, investors: 12, burn: 3_000 },
+      effects: {
+        cash: 2_500_000,
+        equity: -22,
+        investors: 12,
+        burn: 3_000,
+        /* Die Zeile, die beim Verkauf alles entscheidet. */
+        runde: { wer: "Anker-VC", betrag: 2_500_000, faktor: 2, participating: true },
+      },
+      link: { text: "Was eine Runde euch kostet — Dilution Planner", href: "/?tool=planner" },
       alignmentBy: { bootstrap: -12, venture: 10 },
       begriffe: [
         {
@@ -683,7 +718,14 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       ],
       impact: { geld: 4, investoren: 3 },
       months: 3,
-      effects: { cash: 800_000, equity: -15, investors: 6, burn: 500 },
+      effects: {
+        cash: 800_000,
+        equity: -15,
+        investors: 6,
+        burn: 500,
+        runde: { wer: "Angel-Club", betrag: 800_000, faktor: 1, participating: false },
+      },
+      link: { text: "Was eine Runde euch kostet — Dilution Planner", href: "/?tool=planner" },
       /* Wer sich gegen fremdes Geld entschieden hat, dem liegt es nicht
          weiter im Stapel. */
       when: (s: GameState) => s.kurs !== "bootstrap",
@@ -701,7 +743,15 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       impact: { geld: 5, umsatz: 5, investoren: -2 },
       preis: "Das Vorkaufsrecht steht in jedem späteren Datenraum und schreckt jeden anderen Käufer ab.",
       months: 3,
-      effects: { cash: 1_200_000, equity: -18, customers: 6, mrr: 5_340, investors: -6 },
+      effects: {
+        cash: 1_200_000,
+        equity: -18,
+        customers: 6,
+        mrr: 5_340,
+        investors: -6,
+        runde: { wer: "Die Frachtbörse", betrag: 1_200_000, faktor: 1, participating: true },
+      },
+      link: { text: "Was eine Runde euch kostet — Dilution Planner", href: "/?tool=planner" },
       /* Wer sich gegen fremdes Geld entschieden hat, dem liegt es nicht
          weiter im Stapel. */
       when: (s: GameState) => s.kurs !== "bootstrap",
@@ -735,7 +785,12 @@ export const TACTICS: Record<string, Tactic> = Object.fromEntries(
       impact: { geld: 3, investoren: -1 },
       preis: "Wer eine Brücke braucht, verhandelt bei der nächsten Runde aus der schwächeren Position.",
       months: 1,
-      effects: { cash: 150_000, equity: -5, investors: -3 },
+      effects: {
+        cash: 150_000,
+        equity: -5,
+        investors: -3,
+        runde: { wer: "Brücke von Oltmanns", betrag: 150_000, faktor: 1, participating: false },
+      },
       /* Wer sich gegen fremdes Geld entschieden hat, dem liegt es nicht
          weiter im Stapel. */
       when: (s: GameState) => s.kurs !== "bootstrap",
@@ -1160,6 +1215,7 @@ export const ENTSCHEIDUNGEN: Entscheidung[] = [
     art: "weg",
     reife: true,
     sofort: true,
+    link: { text: "Die fünf Haken im Einzelnen — Ready to Raise", href: "/?tool=ready" },
     kicker: "Die Frage dahinter",
     title: "Wollt ihr überhaupt fremdes Geld?",
     beats: [
@@ -1547,6 +1603,122 @@ export const EVENTS: GameEvent[] = [
   },
 ];
 
+/* ── Übernahmeangebote ───────────────────────────────────────── */
+
+/**
+ * Vier Käufer, in der Reihenfolge, in der sie anrufen.
+ *
+ * Das erste Angebot ist eine Falle, und zwar eine faire: alles, was
+ * man braucht, um es zu durchschauen, steht auf der Karte. Eine große
+ * Zahl in der Überschrift, davon ein Fünftel in bar, der Rest an
+ * Bedingungen geknüpft, die der Käufer selbst festlegt. Wer gelernt
+ * hat, zuerst nach dem Betrag am Tag der Unterschrift zu fragen,
+ * sieht es sofort. Wer nur „1,4 Mio.“ liest, unterschreibt.
+ */
+export const ANGEBOTE: Angebot[] = [
+  {
+    id: "boerse-kauf",
+    kaeufer: "Die Frachtbörse",
+    kicker: "Ein Anruf am Dienstag",
+    beats: [
+      "Die Frachtbörse, über die eure Kunden heute Ladungen tauschen, will euch kaufen. Nicht beteiligen — kaufen.",
+      "Ihr sitzt zu zweit in einer Küche und hattet 32.000 € Erspartes. Jetzt liegen 750.000 € auf dem Tisch.",
+    ],
+    warum: "Sie wollen nicht euer Produkt. Sie wollen, dass es das bei niemandem sonst gibt.",
+    preis: (s) => Math.max(750_000, arr(s) * 12),
+    /* 250.000 von 750.000 — der Rest hängt an ihren Zielen. */
+    bar: 1 / 3,
+    bedingungen: [
+      "250.000 € bei Unterschrift, in bar.",
+      "500.000 € als Earn-out über drei Jahre — zahlbar, wenn Umsatzziele erreicht werden, die danach sie festlegen.",
+      "Ihr bleibt beide drei Jahre angestellt. Wer früher geht, verliert seinen Anteil am Earn-out.",
+      "Das Produkt läuft unter ihrem Namen weiter. Euer Name verschwindet.",
+    ],
+    tarek: "Das Erste, was ich bei so einem Angebot mache: alles streichen, was nicht am Tag der Unterschrift auf dem Konto liegt. Dann bleiben 250.000 €, geteilt durch zwei, vor Steuern — gut zwei Jahresgehälter. Den Rest zahlt euch jemand, der danach eure Ziele festlegt.",
+    absage: [
+      "Ihr sagt ab. Jonas rechnet es an dem Abend noch dreimal durch.",
+      "Zwei Wochen später erzählt es jemand weiter: Es gibt da zwei in Hamburg, die hatten ein Angebot und haben Nein gesagt. Das hört sich für Investoren anders an als für euch.",
+    ],
+    absageEffects: { investors: 8, team: -4 },
+    link: { text: "Was ein Exit wirklich kostet — Exit Strategies", href: "/?tool=exits" },
+    when: (s) => s.customers >= 3 && s.month >= 7,
+  },
+  {
+    id: "konzern-kauf",
+    kaeufer: "Eine Logistikgruppe aus Dortmund",
+    kicker: "Nach vier Monaten Gesprächen",
+    beats: [
+      "Zweitausend eigene Lkw, elf Standorte, und seit anderthalb Jahren ein Digitalvorstand, der etwas vorzeigen muss.",
+      "Sie haben euch erst als Kunde kennengelernt, dann als Partner. Jetzt liegt ein Term Sheet da.",
+    ],
+    warum: "Sie könnten es selbst bauen und wissen, dass sie zwei Jahre brauchen würden. Die zwei Jahre kaufen sie.",
+    preis: (s) => Math.round(arr(s) * MARKT_VIELFACHES),
+    bedingungen: [
+      "Vollständig in bar, zahlbar bei Vollzug.",
+      "Zwölf Monate Bleibeklausel, danach frei.",
+      "Das Produkt läuft weiter, eure Kunden behalten ihre Verträge.",
+      "Üblich in dieser Branche: das Sechsfache des Jahresumsatzes, wenn er wächst.",
+    ],
+    tarek: "Das ist der Preis, der in dieser Branche gezahlt wird. Jetzt die unangenehme Rechnung: schaut rechts, was davon bei euch ankommt, nachdem die Investoren ihre Präferenz genommen haben.",
+    absage: [
+      "Ihr sagt ab. Der Digitalvorstand nimmt es sportlich und bleibt in Kontakt.",
+      "Ein Käufer, der einmal da war, ist der wahrscheinlichste Käufer beim nächsten Mal. Nur ist beim nächsten Mal auch sein Budget ein anderes.",
+    ],
+    absageEffects: { investors: 6, team: -3 },
+    link: { text: "Welche Tür für euch offen ist — Exit Strategies", href: "/?tool=exits" },
+    when: (s) => s.mrr >= 8_000 && s.month >= 12,
+  },
+  {
+    id: "haulway-kauf",
+    kaeufer: "Haulway",
+    kicker: "Aus San Francisco",
+    beats: [
+      "Die vier aus San Francisco rufen an. Sie haben Geld, einen deutschen Vertrieb und keine deutschen Kunden.",
+      "Ihr habt die Kunden. Das ist das ganze Gespräch.",
+    ],
+    warum: "Sie kaufen die zwei Jahre Vorsprung, die ihr im deutschen Markt habt — und nehmen sich damit den einzigen Wettbewerber vom Hof.",
+    preis: (s) => Math.round(arr(s) * 4),
+    bar: 2 / 3,
+    bedingungen: [
+      "Zwei Drittel in bar, ein Drittel in ihren Anteilen — bewertet zu ihrem letzten Preis.",
+      "Das Team wird übernommen, das Produkt in achtzehn Monaten abgeschaltet.",
+      "Eure Kunden wechseln auf ihr System. Zwei Drittel bleiben, sagen sie.",
+    ],
+    tarek: "Das Vierfache ist unter Marktpreis, und sie wissen, dass ihr das wisst. Sie bieten es trotzdem, weil sie der einzige Käufer sind, der schneller ist als ihr.",
+    absage: [
+      "Ihr sagt ab. Am selben Abend steht ihr Stellenangebot für einen Vertriebsleiter Deutschland online.",
+      "Jetzt wisst ihr sicher, dass sie kommen. Das ist mehr, als ihr gestern wusstet, und weniger, als ihr gebrauchen könnt.",
+    ],
+    absageEffects: { investors: -4, team: 5 },
+    link: { text: "Der Käufer, der aus einer Beziehung entsteht — Exit Strategies", href: "/?tool=exits" },
+    when: (s) => s.rival >= 35 && s.mrr >= 6_000,
+  },
+  {
+    id: "plattform-kauf",
+    kaeufer: "Eine europäische Logistikplattform",
+    kicker: "Das Angebot, auf das ihr gewartet habt",
+    beats: [
+      "Sie sind in sechs Ländern, ihr seid in dem einen, das ihnen fehlt. Der Vorstand war selbst in Hamburg.",
+      "Sie bieten das Neunfache eures Jahresumsatzes. In bar.",
+    ],
+    warum: "Ihr seid nicht billig, und darum geht es nicht: Sie kaufen einen Markt, in dem sie sonst bei null anfangen müssten.",
+    preis: (s) => Math.round(arr(s) * 9),
+    bedingungen: [
+      "Vollständig in bar.",
+      "Sechs Monate Übergabe, danach seid ihr frei.",
+      "Das Produkt wird ihr deutsches Angebot. Eure Leute bekommen Verträge.",
+    ],
+    tarek: "Das Neunfache zahlt niemand für ein Produkt. Das zahlt jemand für einen Markt, in dem ihr der schnellste Weg hinein seid. Solche Angebote kommen aus Beziehungen, nicht aus Prozessen.",
+    absage: [
+      "Ihr sagt ab und wollt es allein zu Ende bringen.",
+      "Eine mutige Entscheidung, und eine, über die ihr in zwei Jahren entweder lacht oder nicht redet.",
+    ],
+    absageEffects: { investors: 10, team: -6 },
+    link: { text: "Zehn Wege hinaus, und was jeder kostet — Exit Strategies", href: "/?tool=exits" },
+    when: (s) => s.mrr >= 18_000,
+  },
+];
+
 /* ── Haulway, San Francisco ──────────────────────────────────── */
 
 export const RIVAL_STEPS: RivalStep[] = [
@@ -1590,6 +1762,24 @@ export const RIVAL_STEPS: RivalStep[] = [
 
 /* ── Enden ───────────────────────────────────────────────────── */
 
+/**
+ * Die Abrechnung unter dem Schlussbild.
+ *
+ * Drei Zahlen, in der Reihenfolge, in der sie wehtun: was auf dem
+ * Schild stand, was davon wirklich geflossen ist, und was nach den
+ * Präferenzen bei euch ankommt.
+ */
+function beleg(s: GameState): string {
+  if (!s.verkauf) return "";
+  const { schild, erloest } = s.verkauf;
+  const a = erloes(erloest, s);
+  const teile = [`${fmtEuro(schild)} stand im Angebot`];
+  if (erloest < schild) teile.push(`${fmtEuro(erloest)} sind wirklich geflossen, der Rest hing an ihren Zielen`);
+  if (a.praeferenz > 0) teile.push(`${fmtEuro(a.praeferenz)} gingen vorweg an Investoren`);
+  teile.push(`bei euch beiden kamen ${fmtEuro(a.gruender)} an`);
+  return teile.join(" · ");
+}
+
 export const ENDINGS: Ending[] = [
   {
     id: "insolvent",
@@ -1621,8 +1811,13 @@ export const ENDINGS: Ending[] = [
     tone: "win",
     image: "ending-round",
     text: "Ein Fonds aus Berlin führt an, Oltmanns zieht mit. Vierzehn Leute, zwei Länder, und ein Markt, in dem jetzt zwei Firmen ernst genommen werden.",
-    payout: (s) =>
-      `${fmtEuro(s.mrr)} MRR, ${s.customers} Speditionen, ${Math.round(s.equity)} % bei euch${s.pref === "2x" ? " — bei 2× participating bleibt davon beim mittleren Exit wenig." : "."}`,
+    /* Jetzt eine echte Rechnung statt eines Satzes: was bei einem
+       Verkauf zum Zehnfachen des Jahresumsatzes bei euch ankäme. */
+    payout: (s) => {
+      const a = erloes(arr(s) * 10, s);
+      const gehoert = Math.round(s.equity);
+      return `${fmtEuro(s.mrr)} Umsatz im Monat, ${s.customers} Speditionen, ${gehoert} % bei euch. Bei einem Verkauf zum Zehnfachen des Jahresumsatzes — ${fmtEuro(a.preis)} — kämen bei euch ${fmtEuro(a.gruender)} an${a.praeferenz > 0 ? `, weil ${fmtEuro(a.praeferenz)} vorweg an Investoren gehen` : ""}.`;
+    },
   },
   {
     id: "profitabel",
@@ -1639,6 +1834,30 @@ export const ENDINGS: Ending[] = [
     image: "ending-round",
     text: "Eine Frachtbörse übernimmt das Team und schaltet das Produkt nach acht Monaten ab. Ihr habt Verträge mit Bonus, die Kunden eine Mail mit Frist.",
     payout: (s) => `${Math.round(s.equity)} % von einem Preis, bei dem nach den Präferenzen wenig bleibt.`,
+  },
+  {
+    id: "verkauft",
+    title: "Verkauft",
+    tone: "win",
+    image: "ending-round",
+    text: "Ein Notartermin, zwei Unterschriften, und eine Firma, die es seit drei Jahren gibt, gehört ab Freitag jemand anderem. Eure Kunden erfahren es am Montag aus einer Mail, die ihr selbst geschrieben habt.",
+    payout: (s) => beleg(s),
+  },
+  {
+    id: "verkauft-klein",
+    title: "Verkauft, und klein geblieben",
+    tone: "mixed",
+    image: "ending-round",
+    text: "Es ist ein Verkauf, und es ist kein Vermögen. Ihr habt drei Jahre gearbeitet, eine Firma gebaut, die funktioniert, und sie für eine Summe abgegeben, die eure alten Gehälter für ein paar Jahre ersetzt.",
+    payout: (s) => beleg(s),
+  },
+  {
+    id: "verkauft-leer",
+    title: "Verkauft, und für euch bleibt nichts",
+    tone: "loss",
+    image: "ending-empty",
+    text: "Der Verkauf geht durch, das Geld fließt, und keiner der Euros kommt bei euch an. Die Präferenzen der Investoren sind höher als der Preis — was auf eurem Anteilsschein steht, spielt dann keine Rolle mehr.",
+    payout: (s) => beleg(s),
   },
   {
     id: "finanziert",

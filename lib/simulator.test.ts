@@ -17,6 +17,9 @@ import {
   beatsOf,
   blockedReason,
   deckFor,
+  ablehnen,
+  annehmen,
+  drawAngebot,
   drawEntscheidung,
   entscheiden,
   entscheidungDue,
@@ -28,6 +31,7 @@ import {
   geldSkala,
   initialState,
   meterViews,
+  erloes,
   erfolge,
   netBurn,
   rivalMove,
@@ -38,13 +42,14 @@ import {
   saldo,
   tick,
   uhrMonate,
+  verkaufsEnde,
   UHR_MAX,
   UEBERHOLT,
   monateOhneUmsatz,
   type GameState,
   type Tactic,
 } from "./simulator.ts";
-import { ENDING_BY_ID, ENDINGS, ENTSCHEIDUNGEN, ERFOLGE, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
+import { ANGEBOTE, ENDING_BY_ID, ENDINGS, ENTSCHEIDUNGEN, ERFOLGE, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
 
 const S = (patch: Partial<GameState> = {}): GameState => ({ ...initialState(1), ...patch });
 const T = (patch: Partial<Tactic> = {}): Tactic => ({
@@ -447,7 +452,7 @@ test("jedes vergebene Ende existiert", () => {
   const ids = new Set(faelle.map(pickEnding));
   for (const id of ids) assert.ok(ENDING_BY_ID[id], `unbekannt: ${id}`);
   assert.ok(ids.size >= 5, "die meisten Enden müssen erreichbar sein");
-  assert.equal(ENDINGS.length, 8);
+  assert.equal(ENDINGS.length, 11);
 });
 
 test("leere Kasse schlägt jedes andere Ende", () => {
@@ -712,10 +717,14 @@ test("niemand sitzt da und wartet", () => {
 test("keine Maßnahme verlangt ein Fach, das niemand hat", () => {
   for (const t of Object.values(TACTICS)) {
     if (!t.braucht) continue;
-    assert.ok(
-      ["entwicklung", "vertrieb"].includes(t.braucht),
-      `${t.id} braucht ${t.braucht} — das kann zu Spielbeginn niemand`,
-    );
+    if (["entwicklung", "vertrieb"].includes(t.braucht)) continue;
+    /* Marketing und Operations gibt es erst, wenn jemand eingestellt
+       wurde — solche Karten müssen sich selbst sperren, sonst stehen
+       sie unerreichbar in der Liste. */
+    assert.ok(t.when, `${t.id} braucht ${t.braucht}, ist aber immer sichtbar`);
+    assert.equal(t.when!(S()), false, `${t.id} ist schon wählbar, bevor es jemanden mit diesem Fach gibt`);
+    const mit = applyEffects(S(), { einstellen: [{ name: "X", rolle: t.braucht, kosten: 3_000 }] });
+    assert.equal(t.when!(mit), true, `${t.id} bleibt gesperrt, obwohl jemand da ist`);
   }
 });
 
@@ -780,6 +789,20 @@ test("die Balken zeigen in dieselbe Richtung wie die Wirkung", () => {
       assert.equal(Math.sign(balken), Math.sign(w), `${t.id}: Balken ${k} ${balken}, Wirkung ${w}`);
     }
   }
+});
+
+test("wer fast pleite ist, darf trotzdem telefonieren", () => {
+  // Die Pufferregel galt auch für Karten ohne Preis. Bei 980 € Kasse
+  // stand hinter jeder Karte „Zu teuer“ — auch hinter der einen, die
+  // noch rausgeführt hätte.
+  const knapp = S({ cash: 980, mrr: 190, customers: 1 });
+  const gratis = T({ id: "anrufen", months: 2, braucht: "vertrieb" });
+  assert.ok(canStart(knapp, gratis), "eine kostenlose Maßnahme darf nie an der Kasse scheitern");
+  assert.equal(blockedReason(knapp, gratis), null);
+  // Was Geld kostet, bleibt gesperrt.
+  const teuer = T({ id: "messe", months: 2, cost: 6_500, braucht: "vertrieb" });
+  assert.equal(canStart(knapp, teuer), false);
+  assert.equal(blockedReason(knapp, teuer), "Zu teuer");
 });
 
 test("eine wiederholbare Karte bleibt wählbar", () => {
@@ -867,6 +890,142 @@ test("Tarek bleibt dabei und eröffnet die Kapitel", () => {
   // Und das Geld-Kapitel ist die Stelle, an der er beide Wege nennt.
   const geld = MILESTONE_BY_ID.geld.onEnter!.beats.join(" ");
   assert.match(geld, /gehört/, "er muss sagen, was fremdes Geld kostet");
+});
+
+/* ── Verkaufen ── */
+
+test("der Erlös ist nicht Preis mal Anteil", () => {
+  // Die Rechnung, die das Spiel bisher nicht hatte.
+  const ohne = S({ equity: 100, runden: [] });
+  assert.equal(erloes(1_000_000, ohne).gruender, 1_000_000);
+
+  // 2× participating: zuerst das Doppelte zurück, dann noch der Anteil.
+  const schlimm = S({
+    equity: 78,
+    runden: [{ wer: "Anker-VC", betrag: 2_500_000, faktor: 2, participating: true }],
+  });
+  const a = erloes(4_000_000, schlimm);
+  assert.equal(a.praeferenz, 5_000_000 > 4_000_000 ? 4_000_000 : 5_000_000);
+  assert.equal(a.gruender, 0, "bei 4 Mio. Preis und 5 Mio. Präferenz bleibt nichts");
+  assert.match(a.warnung ?? "", /zuerst/);
+
+  // Derselbe Preis, dieselbe Beteiligungshöhe, aber 1× ohne participating:
+  // die Investoren wandeln und nehmen nur ihren Anteil.
+  const fair = S({
+    equity: 78,
+    runden: [{ wer: "Angel-Club", betrag: 2_500_000, faktor: 1, participating: false }],
+  });
+  const b = erloes(4_000_000, fair);
+  assert.equal(b.praeferenz, 2_500_000, "1× heißt: einmal das Geld zurück");
+  assert.equal(b.gruender, 1_500_000, "und der Rest gehört euch");
+  assert.ok(b.gruender > a.gruender, "derselbe Preis, nur andere Bedingungen");
+});
+
+test("dieselbe Firma, zwei Term Sheets, zwei Leben", () => {
+  const basis = { equity: 80, mrr: 20_000 };
+  const teuer = S({ ...basis, runden: [{ wer: "VC", betrag: 2_000_000, faktor: 2, participating: true }] });
+  const sauber = S({ ...basis, runden: [{ wer: "Angels", betrag: 2_000_000, faktor: 1, participating: false }] });
+  const preis = 6_000_000;
+  assert.ok(erloes(preis, sauber).gruender > erloes(preis, teuer).gruender + 1_000_000);
+});
+
+test("das Ende folgt dem Geld, nicht dem Käufer", () => {
+  const leer = S({ equity: 80, runden: [{ wer: "VC", betrag: 3_000_000, faktor: 2, participating: true }] });
+  assert.equal(verkaufsEnde(leer, 4_000_000), "verkauft-leer");
+  assert.equal(verkaufsEnde(S({ equity: 100 }), 300_000), "verkauft-klein");
+  assert.equal(verkaufsEnde(S({ equity: 100 }), 4_000_000), "verkauft");
+  for (const id of ["verkauft", "verkauft-klein", "verkauft-leer"]) {
+    assert.ok(ENDING_BY_ID[id], `${id} fehlt in den Enden`);
+  }
+});
+
+test("das erste Angebot ist eine Falle, und man kann sie sehen", () => {
+  const a = ANGEBOTE[0];
+  assert.equal(a.id, "boerse-kauf");
+  // Alles, was man zum Durchschauen braucht, steht auf der Karte:
+  // der Barbetrag und das, was daran hängt.
+  const text = a.bedingungen.join(" ");
+  assert.match(text, /bei Unterschrift/, "der Barbetrag muss dastehen");
+  assert.match(text, /Earn-out/, "der Teil, der an Bedingungen hängt, muss dastehen");
+  assert.match(a.tarek, /Konto|bar/, "Tarek muss sagen, womit man das prüft");
+  // Und er nennt eine kleinere Zahl als die Überschrift.
+  const preis = a.preis(S({ mrr: 2_700, customers: 4 }));
+  assert.ok(preis >= 750_000, "die Überschrift muss groß sein, sonst ist es keine Falle");
+  // Aber nicht so groß, dass Annehmen die bessere Rechnung wäre.
+  const spaeter = ANGEBOTE.find((x) => x.id === "plattform-kauf")!.preis(S({ mrr: 20_000 }));
+  assert.ok(spaeter > preis * 2, "wer die Falle durchschaut, muss dafür belohnt werden");
+});
+
+test("die Falle zahlt nicht, was auf dem Schild steht", () => {
+  // Das ist der Kern: 750.000 € im Angebot, 250.000 € am Tag der
+  // Unterschrift, und der Rest hängt an Zielen, die der Käufer setzt.
+  const lage = S({ month: 8, customers: 4, mrr: 2_700, equity: 100 });
+  const falle = ANGEBOTE[0];
+  const preis = falle.preis(lage);
+  const danach = annehmen(lage, falle, preis);
+  assert.equal(danach.verkauf?.schild, preis);
+  assert.ok(danach.verkauf!.erloest < preis / 2, "die Barquote muss im Zustand ankommen");
+  assert.equal(danach.endingId, "verkauft-klein", "ein Drittel von 750k ist kein gutes Ende");
+
+  // Das faire Angebot zahlt dagegen voll aus.
+  const gross = S({ mrr: 20_000, equity: 100 });
+  const platt = ANGEBOTE.find((x) => x.id === "plattform-kauf")!;
+  const voll = annehmen(gross, platt, platt.preis(gross));
+  assert.equal(voll.verkauf!.erloest, voll.verkauf!.schild);
+  assert.equal(voll.endingId, "verkauft");
+});
+
+test("Angebote kommen in der Reihenfolge, in der sie Sinn ergeben", () => {
+  // Früh die Frachtbörse, spät die Plattform.
+  const frueh = S({ month: 8, customers: 4, mrr: 2_700 });
+  assert.equal(drawAngebot(frueh, ANGEBOTE)?.id, "boerse-kauf");
+  // Abgelehnt kommt dasselbe Angebot nicht wieder.
+  const danach = ablehnen(frueh, ANGEBOTE[0]);
+  assert.notEqual(drawAngebot(danach, ANGEBOTE)?.id, "boerse-kauf");
+  assert.ok(danach.investors > frueh.investors, "ein Angebot abzulehnen spricht sich herum");
+  // Und das große Angebot gibt es erst, wenn der Umsatz es trägt.
+  assert.equal(ANGEBOTE.find((x) => x.id === "plattform-kauf")!.when(frueh), false);
+  assert.equal(ANGEBOTE.find((x) => x.id === "plattform-kauf")!.when(S({ mrr: 20_000 })), true);
+});
+
+test("wer ablehnt und wächst, bekommt mehr geboten", () => {
+  // Die Wette, um die es geht: dasselbe Geschäft, zwei Jahre später.
+  const klein = S({ mrr: 2_700, customers: 4, month: 8 });
+  const gross = S({ mrr: 20_000, customers: 25, month: 26 });
+  const ersterPreis = ANGEBOTE[0].preis(klein);
+  const spaeterPreis = ANGEBOTE.find((x) => x.id === "plattform-kauf")!.preis(gross);
+  assert.ok(spaeterPreis > ersterPreis * 2, `${spaeterPreis} ist keine Belohnung für das Warten`);
+});
+
+test("jedes Angebot erklärt sich und verweist auf das Werkzeug", () => {
+  assert.ok(ANGEBOTE.length >= 3);
+  for (const a of ANGEBOTE) {
+    assert.equal(a.beats.length, 2, `${a.id} ohne zwei Beats`);
+    assert.equal(a.absage.length, 2, `${a.id} ohne Folge der Absage`);
+    assert.ok(a.bedingungen.length >= 3, `${a.id}: zu wenige Bedingungen, um etwas zu prüfen`);
+    assert.ok(a.warum.length > 40, `${a.id} sagt nicht, warum sie kaufen wollen`);
+    assert.ok(a.tarek.length > 60, `${a.id} ohne Einordnung`);
+    assert.ok(a.link?.href.startsWith("/?tool="), `${a.id} verweist nicht auf das passende Werkzeug`);
+    assert.ok(Object.keys(a.absageEffects).length > 0, `${a.id}: Ablehnen bleibt folgenlos`);
+  }
+});
+
+test("Geldkarten hinterlassen eine Präferenz, keine Fußnote", () => {
+  // Der Fehler, der das ganze Thema unsichtbar gemacht hat: die Karte
+  // sagte „2× participating“ und im Zustand stand nichts.
+  const vc = TACTICS["anker-vc"];
+  assert.ok(vc.effects.runde, "die größte Runde im Spiel hinterlässt keine Präferenz");
+  assert.equal(vc.effects.runde!.faktor, 2);
+  assert.equal(vc.effects.runde!.participating, true);
+  const danach = applyEffects(S(), vc.effects);
+  assert.equal(danach.runden.length, 1);
+  // Und jede Karte, die Geld gegen Anteile bringt, führt eine Runde.
+  for (const t of Object.values(TACTICS)) {
+    if ((t.effects.cash ?? 0) > 0 && (t.effects.equity ?? 0) < 0) {
+      assert.ok(t.effects.runde, `${t.id} nimmt Geld gegen Anteile, hinterlässt aber keine Runde`);
+      assert.equal(t.effects.runde!.betrag, t.effects.cash, `${t.id}: Betrag und Einzahlung weichen ab`);
+    }
+  }
 });
 
 /* ── Eine ganze Partie ── */

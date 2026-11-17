@@ -1085,6 +1085,153 @@
   color: var(--ok);
 }
 
+/* ── Das Übernahmeangebot ──
+   Die große Zahl oben, weil die zuerst wirkt. Direkt darunter, was sie
+   im Verhältnis zum Jahresumsatz bedeutet — und die Abrechnung, die
+   sonst erst nach der Unterschrift kommt. */
+
+.kickerKauf {
+  color: #167a5a;
+}
+.angebotKopf {
+  margin: 2px 0 12px;
+}
+.angebotPreis {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.angebotVielfaches {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #55646f;
+  margin-top: 5px;
+}
+.warum {
+  font-style: italic;
+  color: #55646f !important;
+}
+.bedingungen {
+  list-style: none;
+  margin: 0 0 13px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.bedingungen li {
+  position: relative;
+  padding-left: 15px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #40505e;
+}
+.bedingungen li::before {
+  content: "–";
+  position: absolute;
+  left: 0;
+  opacity: 0.5;
+}
+
+.abrechnung {
+  background: #f3f2ee;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.abrechnungKopf {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-bottom: 6px;
+}
+.abrechnung dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.abrechnung dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.abrechnung dt {
+  font-size: 12.5px;
+  color: #55646f;
+}
+.abrechnung dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.abzug {
+  color: var(--bad);
+}
+.abrechnungSumme {
+  border-top: 1px solid rgba(20, 20, 19, 0.14);
+  margin-top: 4px;
+  padding-top: 5px;
+}
+.abrechnungSumme dt {
+  font-weight: 700;
+  color: var(--ink);
+}
+.abrechnungSumme dd {
+  font-size: 15px;
+  font-weight: 700;
+}
+.abrechnungWarnung {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  color: var(--bad) !important;
+  margin: 7px 0 0 !important;
+}
+
+/* Tarek sagt dazu, womit man das prüft. */
+.tarek {
+  border-left: 3px solid var(--akzent);
+  padding: 2px 0 2px 11px;
+  margin-bottom: 13px;
+}
+.tarek span {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--akzent);
+  margin-bottom: 2px;
+}
+.tarek p {
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+  margin: 0 !important;
+}
+
+/* Verweis aus dem Spiel auf das Werkzeug, das es ausrechnet. */
+.toolLink {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--akzent);
+  text-decoration: none;
+  margin-bottom: 13px;
+}
+.toolLink:hover {
+  text-decoration: underline;
+}
+
 /* ── Knöpfe ── */
 
 .primary {
