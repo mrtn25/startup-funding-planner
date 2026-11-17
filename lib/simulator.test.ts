@@ -17,16 +17,21 @@ import {
   beatsOf,
   blockedReason,
   deckFor,
+  ablehnen,
+  annehmen,
+  drawAngebot,
   drawEntscheidung,
   entscheiden,
   entscheidungDue,
   fluss,
+  frei,
   fmtEuroExakt,
   LEBEN_PRO_KOPF,
   forcedEnding,
   geldSkala,
   initialState,
   meterViews,
+  erloes,
   erfolge,
   netBurn,
   rivalMove,
@@ -37,12 +42,14 @@ import {
   saldo,
   tick,
   uhrMonate,
+  verkaufsEnde,
   UHR_MAX,
+  UEBERHOLT,
   monateOhneUmsatz,
   type GameState,
   type Tactic,
 } from "./simulator.ts";
-import { ENDING_BY_ID, ENDINGS, ENTSCHEIDUNGEN, ERFOLGE, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
+import { ANGEBOTE, ENDING_BY_ID, ENDINGS, ENTSCHEIDUNGEN, ERFOLGE, EVENTS, MILESTONES, MILESTONE_BY_ID, ONBOARDING, RIVAL_STEPS, TACTICS, pickEnding } from "./simulator-scenes.ts";
 
 const S = (patch: Partial<GameState> = {}): GameState => ({ ...initialState(1), ...patch });
 const T = (patch: Partial<Tactic> = {}): Tactic => ({
@@ -314,9 +321,22 @@ test("der Tank zeigt ein Jahr als voll und leer als leer", () => {
 
 test("Retoura meldet sich, wenn sie an dir vorbeiziehen", () => {
   assert.equal(rivalMove(S({ rival: 10 }), RIVAL_STEPS), null);
-  const ersterZug = rivalMove(S({ rival: 30 }), RIVAL_STEPS);
-  assert.equal(ersterZug?.at, 25);
-  assert.equal(rivalMove(S({ rival: 30, rivalSeen: [25] }), RIVAL_STEPS), null);
+  const ersterZug = rivalMove(S({ rival: 20 }), RIVAL_STEPS);
+  assert.equal(ersterZug?.at, RIVAL_STEPS[0].at);
+  assert.equal(rivalMove(S({ rival: 20, rivalSeen: [RIVAL_STEPS[0].at] }), RIVAL_STEPS), null);
+});
+
+test("Haulway erreicht in einer normalen Partie jede seiner Stufen", () => {
+  // Vorher standen die Stufen bei 25/45/65/85, erreicht wurden in
+  // zwanzig Monaten aber nur 45 — die Drohung aus dem Onboarding blieb
+  // folgenlos, und „Haulway war schneller“ konnte nie eintreten.
+  let s = S();
+  for (let i = 0; i < 20; i++) s = tick(s);
+  const erreicht = RIVAL_STEPS.filter((st) => s.rival >= st.at);
+  assert.equal(erreicht.length, RIVAL_STEPS.length, `nach 20 Monaten erst ${erreicht.length} von ${RIVAL_STEPS.length} Stufen`);
+  // Überholt wird, wer nach knapp zwei Jahren noch kaum Kunden hat.
+  for (let i = 0; i < 4; i++) s = tick(s);
+  assert.ok(s.rival >= UEBERHOLT, `nach 24 Monaten erst ${Math.round(s.rival)} %`);
 });
 
 test("jeder Zug von Retoura kostet dich etwas", () => {
@@ -358,7 +378,9 @@ test("jede Karte nennt Dauer und Wirkung, aber verrät nichts im Text", () => {
     assert.ok(t.flavour.length > 25, `${t.id} ohne Beschreibung`);
     assert.ok(GRUPPEN.includes(t.group), `${t.id} hat die Gruppe "${t.group}"`);
     assert.ok(Object.keys(t.impact).length > 0, `${t.id} ohne sichtbare Wirkung`);
-    for (const n of Object.values(t.impact)) assert.ok(n >= 1 && n <= 5, `${t.id}: Wirkung ${n}`);
+    for (const n of Object.values(t.impact)) {
+      assert.ok(Math.abs(n) >= 1 && Math.abs(n) <= 5, `${t.id}: Wirkung ${n}`);
+    }
     assert.ok(t.beats.length === 2 || t.beatsBy, `${t.id} ohne zwei Beats`);
     const wirkt = Object.keys(t.effects).length > 0 || t.beatsBy;
     assert.ok(wirkt, `${t.id} ist folgenlos`);
@@ -404,7 +426,7 @@ test("keine Phase ist eine Sackgasse", () => {
 
 test("Badges zeigen erst auf der Ergebniskarte, was passiert ist", () => {
   const labels = badges({ cash: -6_500, customers: 2, mrr: 1_780, investors: 8, team: -4 }).map((b) => b.label);
-  assert.deepEqual(labels, ["−6.5k €", "+1.8k € MRR", "+2 Kunden", "+8 Investoren", "−4 Stimmung"]);
+  assert.deepEqual(labels, ["−6.5k €", "+1.8k € Umsatz/Monat", "+2 Kunden", "+8 Investoren", "−4 Stimmung"]);
   assert.equal(badges({ burn: 900 })[0].up, false, "mehr Burn ist keine gute Nachricht");
   assert.equal(badges(undefined).length, 0);
   // Eine Einstellung steht mit Namen und Preis da, nicht als Kopfzahl.
@@ -421,16 +443,16 @@ test("jedes vergebene Ende existiert", () => {
   const faelle = [
     S({ cash: 0 }),
     S({ alignment: 0, customers: 0 }),
-    S({ rival: 100, customers: 1 }),
+    S({ rival: 60, customers: 1 }),
     S({ mrr: 30_000, investors: 70, customers: 20 }),
-    S({ mrr: 20_000, customers: 15 }),
+    S({ mrr: 20_000, customers: 15, cash: 30_000 }),
     S({ mrr: 9_000, equity: 40, customers: 10 }),
     S({ cash: 20_000, mrr: 400 }),
   ];
   const ids = new Set(faelle.map(pickEnding));
   for (const id of ids) assert.ok(ENDING_BY_ID[id], `unbekannt: ${id}`);
   assert.ok(ids.size >= 5, "die meisten Enden müssen erreichbar sein");
-  assert.equal(ENDINGS.length, 7);
+  assert.equal(ENDINGS.length, 11);
 });
 
 test("leere Kasse schlägt jedes andere Ende", () => {
@@ -648,26 +670,61 @@ test("die Uhr zeigt nie Unendlich, weil Gehälter nicht unendlich warten", () =>
   assert.equal(monateOhneUmsatz(traegt), Math.floor(60_000 / (2_200 + 300 + 480)));
 });
 
-test("in jeder Phase hat jeder der beiden etwas zu tun", () => {
-  // Sonst sitzt einer von zwei Gründern eine ganze Phase lang da.
+test("in jeder Phase hat jeder der beiden etwas zu tun — auch noch im fünften Monat", () => {
+  // Einmal prüfen reicht nicht: die Karten sind verbraucht, sobald sie
+  // gespielt wurden. Im Geld-Kapitel gehörte alles dem Vertrieb, und
+  // die Entwicklerin saß vier Monate lang da und sah zu.
   for (const m of MILESTONES) {
     const deck = m.tactics.map((id) => TACTICS[id]);
     for (const rolle of ["entwicklung", "vertrieb"] as const) {
       assert.ok(
-        deck.some((t) => !t.braucht || t.braucht === rolle),
-        `${m.id}: für ${rolle} gibt es in dieser Phase nichts zu tun`,
+        deck.some((t) => (!t.braucht || t.braucht === rolle) && t.repeatable && !t.when),
+        `${m.id}: für ${rolle} gibt es keine Karte, die immer geht`,
       );
     }
   }
 });
 
+test("niemand sitzt da und wartet", () => {
+  // Durchgespielt mit der stursten Strategie: immer die oberste Karte.
+  // Wenn dabei ein Monat kommt, in dem jemand frei ist und nichts
+  // wählbar, ist das Kapitel zu dünn besetzt.
+  let s = S();
+  let leer = 0;
+  for (let runde = 0; runde < 120 && !s.endingId; runde++) {
+    const m = MILESTONE_BY_ID[s.milestoneId];
+    if (!m) break;
+    if (m.gate(s)) {
+      if (!m.next) break;
+      s = { ...s, milestoneId: m.next };
+      continue;
+    }
+    if (forcedEnding(s)) break;
+    const offen = deckFor(s, m, TACTICS).filter((t) => canStart(s, t));
+    if (offen.length) {
+      s = startTactic(s, offen[0]);
+      continue;
+    }
+    if (frei(s).length && s.running.length) leer++;
+    if (!s.running.length) break;
+    const { state, done } = tickBoard(s);
+    s = state;
+    for (const id of done) if (TACTICS[id]) s = finishTactic(s, TACTICS[id]);
+  }
+  assert.ok(leer <= 2, `${leer} Monate, in denen jemand frei war und nichts wählbar`);
+});
+
 test("keine Maßnahme verlangt ein Fach, das niemand hat", () => {
   for (const t of Object.values(TACTICS)) {
     if (!t.braucht) continue;
-    assert.ok(
-      ["entwicklung", "vertrieb"].includes(t.braucht),
-      `${t.id} braucht ${t.braucht} — das kann zu Spielbeginn niemand`,
-    );
+    if (["entwicklung", "vertrieb"].includes(t.braucht)) continue;
+    /* Marketing und Operations gibt es erst, wenn jemand eingestellt
+       wurde — solche Karten müssen sich selbst sperren, sonst stehen
+       sie unerreichbar in der Liste. */
+    assert.ok(t.when, `${t.id} braucht ${t.braucht}, ist aber immer sichtbar`);
+    assert.equal(t.when!(S()), false, `${t.id} ist schon wählbar, bevor es jemanden mit diesem Fach gibt`);
+    const mit = applyEffects(S(), { einstellen: [{ name: "X", rolle: t.braucht, kosten: 3_000 }] });
+    assert.equal(t.when!(mit), true, `${t.id} bleibt gesperrt, obwohl jemand da ist`);
   }
 });
 
@@ -703,6 +760,272 @@ test("der Mentor behauptet nichts, was das Spiel später widerlegt", () => {
   );
   // Und er sagt, wer er ist.
   assert.ok(/verkauft|Exit/.test(alles), "Tarek sagt nicht, warum man ihm zuhören sollte");
+});
+
+test("die Balken zeigen in dieselbe Richtung wie die Wirkung", () => {
+  // Vorher stand „Team 3/5“ auf einer Karte, die neun Punkte Stimmung
+  // abzog, und „Geld 4/5“ hieß beim Stipendium Einnahme und bei einer
+  // Einstellung Gehalt. Derselbe Balken, entgegengesetzte Bedeutung.
+  const paare: [keyof typeof TACTICS.tabelle.impact, (t: Tactic) => number][] = [
+    ["team", (t) => t.effects.team ?? 0],
+    ["produkt", (t) => t.effects.product ?? 0],
+    ["umsatz", (t) => (t.effects.mrr ?? 0) + (t.effects.customers ?? 0) * 100],
+    ["investoren", (t) => t.effects.investors ?? 0],
+    [
+      "geld",
+      (t) =>
+        (t.effects.cash ?? 0) -
+        (t.cost ?? 0) -
+        (t.effects.burn ?? 0) * 12 -
+        (t.effects.einstellen ?? []).reduce((n, e) => n + e.kosten * 12, 0),
+    ],
+  ];
+  for (const t of Object.values(TACTICS)) {
+    for (const [k, wirkung] of paare) {
+      const balken = t.impact[k];
+      if (balken === undefined) continue;
+      const w = wirkung(t);
+      if (w === 0) continue;
+      assert.equal(Math.sign(balken), Math.sign(w), `${t.id}: Balken ${k} ${balken}, Wirkung ${w}`);
+    }
+  }
+});
+
+test("wer fast pleite ist, darf trotzdem telefonieren", () => {
+  // Die Pufferregel galt auch für Karten ohne Preis. Bei 980 € Kasse
+  // stand hinter jeder Karte „Zu teuer“ — auch hinter der einen, die
+  // noch rausgeführt hätte.
+  const knapp = S({ cash: 980, mrr: 190, customers: 1 });
+  const gratis = T({ id: "anrufen", months: 2, braucht: "vertrieb" });
+  assert.ok(canStart(knapp, gratis), "eine kostenlose Maßnahme darf nie an der Kasse scheitern");
+  assert.equal(blockedReason(knapp, gratis), null);
+  // Was Geld kostet, bleibt gesperrt.
+  const teuer = T({ id: "messe", months: 2, cost: 6_500, braucht: "vertrieb" });
+  assert.equal(canStart(knapp, teuer), false);
+  assert.equal(blockedReason(knapp, teuer), "Zu teuer");
+});
+
+test("eine wiederholbare Karte bleibt wählbar", () => {
+  // Der Grund für Monate, in denen jemand frei war und nichts ging:
+  // „Ein Monat auf halber Kraft“ stand in der Liste und war gesperrt.
+  const immer = T({ id: "hoefe", months: 2, repeatable: true, braucht: "vertrieb" });
+  const fertig = { ...S(), used: ["hoefe"] };
+  assert.ok(canStart(fertig, immer), "wiederholbar heißt wiederholbar");
+  assert.equal(blockedReason(fertig, immer), null);
+  // Und eine einmalige bleibt einmalig.
+  const einmal = T({ id: "einmal", months: 1 });
+  assert.equal(canStart({ ...S(), used: ["einmal"] }, einmal), false);
+  assert.equal(blockedReason({ ...S(), used: ["einmal"] }, einmal), "Läuft schon");
+});
+
+test("wer kein fremdes Geld will, hat in jedem Kapitel noch Karten", () => {
+  for (const m of MILESTONES) {
+    const s = S({ milestoneId: m.id, kurs: "bootstrap", product: 60, customers: 8, mrr: 8_000, cash: 80_000 });
+    const deck = deckFor(s, m, TACTICS);
+    assert.ok(deck.length >= 3, `${m.id}: nur ${deck.length} Karten ohne fremdes Geld`);
+    assert.ok(
+      deck.some((t) => (t.effects.mrr ?? 0) > 0 || (t.effects.cash ?? 0) > 0),
+      `${m.id}: kein Weg, selbst Geld zu verdienen`,
+    );
+    assert.ok(
+      !deck.some((t) => (t.effects.equity ?? 0) < 0),
+      `${m.id}: Anteile kosten, obwohl man sich dagegen entschieden hat`,
+    );
+  }
+});
+
+test("die Geldfrage kommt zum Kapitelbeginn und hat Folgen", () => {
+  const start = S({ milestoneId: "geld", customers: 3, mrr: 2_000, month: 9, lastChoice: 8 });
+  const e = drawEntscheidung(start, ENTSCHEIDUNGEN);
+  assert.equal(e?.id, "weg", "die Frage nach fremdem Geld eröffnet das Kapitel");
+  const nein = e!.wege.find((w) => w.id === "nein")!;
+  const danach = entscheiden(start, e!, nein);
+  assert.equal(danach.kurs, "bootstrap");
+  // Und danach liegt keine Anteilskarte mehr im Stapel.
+  const deck = deckFor(danach, MILESTONE_BY_ID.geld, TACTICS);
+  assert.ok(deck.length >= 3);
+  assert.ok(!deck.some((t) => (t.effects.equity ?? 0) < 0), "nach dem Nein liegen die Investorenkarten weiter da");
+});
+
+test("„Es trägt sich“ bekommt nur, wem die Firma auch gehört", () => {
+  const finanziert = S({ mrr: 20_000, customers: 20, cash: 2_000_000, equity: 55, burn: 30_000 });
+  assert.notEqual(pickEnding(finanziert), "profitabel", "2,5 Mio. aufgenommen ist kein Bootstrapper-Ende");
+  assert.ok(ENDING_BY_ID[pickEnding(finanziert)]);
+  const eigen = S({ mrr: 14_000, customers: 14, cash: 60_000, equity: 95, burn: 2_000 });
+  assert.equal(pickEnding(eigen), "profitabel");
+});
+
+test("jeder Name ist vorgestellt, bevor er etwas tut", () => {
+  const onboarding = ONBOARDING.map((z) => z.text).join(" ");
+  for (const name of ["Ole", "Haulway", "Jonas"]) {
+    assert.ok(onboarding.includes(name), `${name} taucht im Spiel auf, ohne je vorgestellt zu werden`);
+  }
+  // Oltmanns steht nicht im Onboarding — dann muss jede Stelle, an der
+  // er auftaucht, selbst sagen, wer er ist.
+  const karten = Object.values(TACTICS).filter((t) => `${t.label} ${t.flavour}`.includes("Oltmanns"));
+  assert.ok(karten.length >= 2);
+  for (const t of karten) {
+    assert.match(`${t.label} ${t.flavour}`, /Reeder/, `${t.id} nennt Oltmanns, ohne zu sagen, wer das ist`);
+  }
+  assert.match(ENTSCHEIDUNGEN.find((e) => e.id === "weg")!.beats.join(" "), /Reeder/);
+});
+
+test("Sofia lässt sich nur halten, solange sie da ist", () => {
+  const halten = TACTICS["halten"];
+  assert.equal(halten.when!(S()), false, "ohne Sofia gibt es nichts zu halten");
+  const mit = applyEffects(S(), { einstellen: [{ name: "Sofia", rolle: "entwicklung", kosten: 6_400 }] });
+  assert.equal(halten.when!(mit), true);
+  assert.equal(halten.when!(applyEffects(mit, { verlassen: "entwicklung" })), false);
+});
+
+test("Tarek bleibt dabei und eröffnet die Kapitel", () => {
+  // Er sagt in Karte 1 „ich schau euch über die Schulter“ — und war
+  // danach einundzwanzig Monate lang nicht mehr zu sehen.
+  const mitTarek = MILESTONES.filter((m) => m.onEnter?.kicker === "Tarek");
+  assert.ok(mitTarek.length >= 4, `nur ${mitTarek.length} Kapitel haben eine Ansage von Tarek`);
+  for (const m of mitTarek) {
+    assert.equal(m.onEnter!.beats.length, 2, `${m.id}: Tarek redet nicht in zwei Sätzen`);
+    assert.deepEqual(m.onEnter!.effects, {}, `${m.id}: eine Ansage darf nichts am Spielstand ändern`);
+  }
+  // Und das Geld-Kapitel ist die Stelle, an der er beide Wege nennt.
+  const geld = MILESTONE_BY_ID.geld.onEnter!.beats.join(" ");
+  assert.match(geld, /gehört/, "er muss sagen, was fremdes Geld kostet");
+});
+
+/* ── Verkaufen ── */
+
+test("der Erlös ist nicht Preis mal Anteil", () => {
+  // Die Rechnung, die das Spiel bisher nicht hatte.
+  const ohne = S({ equity: 100, runden: [] });
+  assert.equal(erloes(1_000_000, ohne).gruender, 1_000_000);
+
+  // 2× participating: zuerst das Doppelte zurück, dann noch der Anteil.
+  const schlimm = S({
+    equity: 78,
+    runden: [{ wer: "Anker-VC", betrag: 2_500_000, faktor: 2, participating: true }],
+  });
+  const a = erloes(4_000_000, schlimm);
+  assert.equal(a.praeferenz, 5_000_000 > 4_000_000 ? 4_000_000 : 5_000_000);
+  assert.equal(a.gruender, 0, "bei 4 Mio. Preis und 5 Mio. Präferenz bleibt nichts");
+  assert.match(a.warnung ?? "", /zuerst/);
+
+  // Derselbe Preis, dieselbe Beteiligungshöhe, aber 1× ohne participating:
+  // die Investoren wandeln und nehmen nur ihren Anteil.
+  const fair = S({
+    equity: 78,
+    runden: [{ wer: "Angel-Club", betrag: 2_500_000, faktor: 1, participating: false }],
+  });
+  const b = erloes(4_000_000, fair);
+  assert.equal(b.praeferenz, 2_500_000, "1× heißt: einmal das Geld zurück");
+  assert.equal(b.gruender, 1_500_000, "und der Rest gehört euch");
+  assert.ok(b.gruender > a.gruender, "derselbe Preis, nur andere Bedingungen");
+});
+
+test("dieselbe Firma, zwei Term Sheets, zwei Leben", () => {
+  const basis = { equity: 80, mrr: 20_000 };
+  const teuer = S({ ...basis, runden: [{ wer: "VC", betrag: 2_000_000, faktor: 2, participating: true }] });
+  const sauber = S({ ...basis, runden: [{ wer: "Angels", betrag: 2_000_000, faktor: 1, participating: false }] });
+  const preis = 6_000_000;
+  assert.ok(erloes(preis, sauber).gruender > erloes(preis, teuer).gruender + 1_000_000);
+});
+
+test("das Ende folgt dem Geld, nicht dem Käufer", () => {
+  const leer = S({ equity: 80, runden: [{ wer: "VC", betrag: 3_000_000, faktor: 2, participating: true }] });
+  assert.equal(verkaufsEnde(leer, 4_000_000), "verkauft-leer");
+  assert.equal(verkaufsEnde(S({ equity: 100 }), 300_000), "verkauft-klein");
+  assert.equal(verkaufsEnde(S({ equity: 100 }), 4_000_000), "verkauft");
+  for (const id of ["verkauft", "verkauft-klein", "verkauft-leer"]) {
+    assert.ok(ENDING_BY_ID[id], `${id} fehlt in den Enden`);
+  }
+});
+
+test("das erste Angebot ist eine Falle, und man kann sie sehen", () => {
+  const a = ANGEBOTE[0];
+  assert.equal(a.id, "boerse-kauf");
+  // Alles, was man zum Durchschauen braucht, steht auf der Karte:
+  // der Barbetrag und das, was daran hängt.
+  const text = a.bedingungen.join(" ");
+  assert.match(text, /bei Unterschrift/, "der Barbetrag muss dastehen");
+  assert.match(text, /Earn-out/, "der Teil, der an Bedingungen hängt, muss dastehen");
+  assert.match(a.tarek, /Konto|bar/, "Tarek muss sagen, womit man das prüft");
+  // Und er nennt eine kleinere Zahl als die Überschrift.
+  const preis = a.preis(S({ mrr: 2_700, customers: 4 }));
+  assert.ok(preis >= 750_000, "die Überschrift muss groß sein, sonst ist es keine Falle");
+  // Aber nicht so groß, dass Annehmen die bessere Rechnung wäre.
+  const spaeter = ANGEBOTE.find((x) => x.id === "plattform-kauf")!.preis(S({ mrr: 20_000 }));
+  assert.ok(spaeter > preis * 2, "wer die Falle durchschaut, muss dafür belohnt werden");
+});
+
+test("die Falle zahlt nicht, was auf dem Schild steht", () => {
+  // Das ist der Kern: 750.000 € im Angebot, 250.000 € am Tag der
+  // Unterschrift, und der Rest hängt an Zielen, die der Käufer setzt.
+  const lage = S({ month: 8, customers: 4, mrr: 2_700, equity: 100 });
+  const falle = ANGEBOTE[0];
+  const preis = falle.preis(lage);
+  const danach = annehmen(lage, falle, preis);
+  assert.equal(danach.verkauf?.schild, preis);
+  assert.ok(danach.verkauf!.erloest < preis / 2, "die Barquote muss im Zustand ankommen");
+  assert.equal(danach.endingId, "verkauft-klein", "ein Drittel von 750k ist kein gutes Ende");
+
+  // Das faire Angebot zahlt dagegen voll aus.
+  const gross = S({ mrr: 20_000, equity: 100 });
+  const platt = ANGEBOTE.find((x) => x.id === "plattform-kauf")!;
+  const voll = annehmen(gross, platt, platt.preis(gross));
+  assert.equal(voll.verkauf!.erloest, voll.verkauf!.schild);
+  assert.equal(voll.endingId, "verkauft");
+});
+
+test("Angebote kommen in der Reihenfolge, in der sie Sinn ergeben", () => {
+  // Früh die Frachtbörse, spät die Plattform.
+  const frueh = S({ month: 8, customers: 4, mrr: 2_700 });
+  assert.equal(drawAngebot(frueh, ANGEBOTE)?.id, "boerse-kauf");
+  // Abgelehnt kommt dasselbe Angebot nicht wieder.
+  const danach = ablehnen(frueh, ANGEBOTE[0]);
+  assert.notEqual(drawAngebot(danach, ANGEBOTE)?.id, "boerse-kauf");
+  assert.ok(danach.investors > frueh.investors, "ein Angebot abzulehnen spricht sich herum");
+  // Und das große Angebot gibt es erst, wenn der Umsatz es trägt.
+  assert.equal(ANGEBOTE.find((x) => x.id === "plattform-kauf")!.when(frueh), false);
+  assert.equal(ANGEBOTE.find((x) => x.id === "plattform-kauf")!.when(S({ mrr: 20_000 })), true);
+});
+
+test("wer ablehnt und wächst, bekommt mehr geboten", () => {
+  // Die Wette, um die es geht: dasselbe Geschäft, zwei Jahre später.
+  const klein = S({ mrr: 2_700, customers: 4, month: 8 });
+  const gross = S({ mrr: 20_000, customers: 25, month: 26 });
+  const ersterPreis = ANGEBOTE[0].preis(klein);
+  const spaeterPreis = ANGEBOTE.find((x) => x.id === "plattform-kauf")!.preis(gross);
+  assert.ok(spaeterPreis > ersterPreis * 2, `${spaeterPreis} ist keine Belohnung für das Warten`);
+});
+
+test("jedes Angebot erklärt sich und verweist auf das Werkzeug", () => {
+  assert.ok(ANGEBOTE.length >= 3);
+  for (const a of ANGEBOTE) {
+    assert.equal(a.beats.length, 2, `${a.id} ohne zwei Beats`);
+    assert.equal(a.absage.length, 2, `${a.id} ohne Folge der Absage`);
+    assert.ok(a.bedingungen.length >= 3, `${a.id}: zu wenige Bedingungen, um etwas zu prüfen`);
+    assert.ok(a.warum.length > 40, `${a.id} sagt nicht, warum sie kaufen wollen`);
+    assert.ok(a.tarek.length > 60, `${a.id} ohne Einordnung`);
+    assert.ok(a.link?.href.startsWith("/?tool="), `${a.id} verweist nicht auf das passende Werkzeug`);
+    assert.ok(Object.keys(a.absageEffects).length > 0, `${a.id}: Ablehnen bleibt folgenlos`);
+  }
+});
+
+test("Geldkarten hinterlassen eine Präferenz, keine Fußnote", () => {
+  // Der Fehler, der das ganze Thema unsichtbar gemacht hat: die Karte
+  // sagte „2× participating“ und im Zustand stand nichts.
+  const vc = TACTICS["anker-vc"];
+  assert.ok(vc.effects.runde, "die größte Runde im Spiel hinterlässt keine Präferenz");
+  assert.equal(vc.effects.runde!.faktor, 2);
+  assert.equal(vc.effects.runde!.participating, true);
+  const danach = applyEffects(S(), vc.effects);
+  assert.equal(danach.runden.length, 1);
+  // Und jede Karte, die Geld gegen Anteile bringt, führt eine Runde.
+  for (const t of Object.values(TACTICS)) {
+    if ((t.effects.cash ?? 0) > 0 && (t.effects.equity ?? 0) < 0) {
+      assert.ok(t.effects.runde, `${t.id} nimmt Geld gegen Anteile, hinterlässt aber keine Runde`);
+      assert.equal(t.effects.runde!.betrag, t.effects.cash, `${t.id}: Betrag und Einzahlung weichen ab`);
+    }
+  }
 });
 
 /* ── Eine ganze Partie ── */

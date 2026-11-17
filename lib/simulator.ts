@@ -95,13 +95,21 @@ export type Effects = {
   einstellen?: Einstellung[];
   /** Wer geht: die erste angestellte Person dieser Rolle. */
   verlassen?: Rolle;
+  /** Eine Finanzierungsrunde, die beim Verkauf zuerst bedient wird. */
+  runde?: Runde;
   /** Agreement with Jonas about the path. */
   alignment?: number;
 };
 
-/** Wie stark eine Maßnahme worauf einzahlt — als Balken, nicht als Zahl.
-    Fünf Stufen, weil fünf Punkte man auf einen Blick zählt. */
-export type Impact = Partial<Record<"produkt" | "umsatz" | "geld" | "team" | "investoren", 1 | 2 | 3 | 4 | 5>>;
+/**
+ * Wie stark eine Maßnahme worauf einzahlt — als Balken, nicht als Zahl.
+ *
+ * Fünf Stufen in beide Richtungen. Vorher gab es nur positive Werte,
+ * und eine Karte mit „Team 3/5“ zog hinterher neun Punkte Stimmung ab:
+ * derselbe gefüllte Balken bedeutete mal Gewinn, mal Kosten. Jetzt ist
+ * ein Minus ein Minus, und die Anzeige malt es rot.
+ */
+export type Impact = Partial<Record<"produkt" | "umsatz" | "geld" | "team" | "investoren", -5 | -4 | -3 | -2 | -1 | 1 | 2 | 3 | 4 | 5>>;
 
 /** Ein Fachwort, das auf der Karte steht und das niemand erklärt bekommt. */
 export type Begriff = { wort: string; erklaerung: string; quelle?: { text: string; href: string } };
@@ -142,6 +150,8 @@ export type Tactic = {
   repeatable?: boolean;
   /** Was das Fachwort auf der Karte bedeutet. */
   begriffe?: Begriff[];
+  /** Verweis auf das Werkzeug, mit dem man das richtig rechnet. */
+  link?: Verweis;
 };
 
 export type Milestone = {
@@ -158,7 +168,14 @@ export type Milestone = {
   /** Fires on arrival, when its condition holds. The stage itself can
       do something to you — reaching the first invoice while still
       employed is not a state anybody's employer tolerates. */
-  onEnter?: { title: string; beats: [string, string]; effects: Effects; when?: (s: GameState) => boolean };
+  onEnter?: {
+    /** Wer spricht. Ohne Angabe: „Montagmorgen“. */
+    kicker?: string;
+    title: string;
+    beats: [string, string];
+    effects: Effects;
+    when?: (s: GameState) => boolean;
+  };
   next: string | null;
 };
 
@@ -194,6 +211,87 @@ export type Ending = {
 /** Eine laufende Maßnahme auf dem Brett — und wer daran sitzt. */
 export type Running = { id: string; left: number; total: number; wer: string };
 
+/**
+ * Eine Finanzierungsrunde, wie sie beim Verkauf zählt.
+ *
+ * Nicht der Anteil — der steht in `equity` — sondern das, was vorher
+ * abgezogen wird: Investoren bekommen ihr Geld zuerst zurück, mal
+ * einem Faktor, und bei „participating“ danach trotzdem noch ihren
+ * Anteil am Rest. Zwei Zeilen Vertrag, die aus einem Verkauf für
+ * vier Millionen null Euro für die Gründer machen können.
+ */
+export type Runde = {
+  /** Wer eingestiegen ist — für den Text auf der Abrechnung. */
+  wer: string;
+  /** Was eingezahlt wurde. */
+  betrag: number;
+  /** Wie viel davon beim Verkauf zuerst zurückfließt. */
+  faktor: 1 | 2;
+  /** Und danach trotzdem noch den Anteil am Rest? */
+  participating: boolean;
+};
+
+/** Wie ein Verkaufserlös tatsächlich aufgeteilt wird. */
+export type Abrechnung = {
+  preis: number;
+  /** Was Investoren vorweg nehmen. */
+  praeferenz: number;
+  /** Was danach übrig ist. */
+  rest: number;
+  /** Was davon noch an Investoren geht (participating oder gewandelt). */
+  investorenRest: number;
+  /** Was bei euch ankommt. */
+  gruender: number;
+  /** Null bis 1: wie viel vom Preis bei euch ankommt. */
+  anteilGruender: number;
+  /** Der Satz, der erklärt, warum die Zahl so klein ist. */
+  warnung: string | null;
+};
+
+/**
+ * Was beim Verkauf bei euch ankommt.
+ *
+ * Nicht Preis mal Anteil. Zuerst nehmen Investoren ihre Präferenz,
+ * dann teilt sich der Rest — und wer nicht participating ist, nimmt
+ * stattdessen seinen Anteil am ganzen Preis, wenn das mehr ist.
+ * Vereinfacht, aber in der Richtung, in der es wehtut, korrekt.
+ */
+export function erloes(preis: number, s: GameState): Abrechnung {
+  const anteilInvestoren = Math.max(0, Math.min(1, (100 - s.equity) / 100));
+  const stapel = s.runden.reduce((n, r) => n + r.betrag * r.faktor, 0);
+  const participating = s.runden.some((r) => r.participating);
+  const proRata = preis * anteilInvestoren;
+
+  /* Ohne participating wandeln Investoren, sobald ihr Anteil am
+     ganzen Preis mehr bringt als die Präferenz. */
+  if (!participating && proRata > stapel) {
+    const gruender = Math.max(0, preis - proRata);
+    return {
+      preis,
+      praeferenz: 0,
+      rest: preis,
+      investorenRest: proRata,
+      gruender,
+      anteilGruender: preis > 0 ? gruender / preis : 0,
+      warnung: null,
+    };
+  }
+
+  const praeferenz = Math.min(stapel, preis);
+  const rest = Math.max(0, preis - praeferenz);
+  const investorenRest = participating ? rest * anteilInvestoren : 0;
+  const gruender = Math.max(0, rest - investorenRest);
+
+  let warnung: string | null = null;
+  if (stapel > 0 && gruender <= 0) {
+    warnung = `Der Preis liegt unter dem, was Investoren zuerst zurückbekommen (${Math.round(stapel / 1000)}k €). Für euch bleibt nichts.`;
+  } else if (stapel > 0 && preis > 0 && gruender / preis < s.equity / 100 / 2) {
+    warnung = `Euch gehören ${Math.round(s.equity)} %, bei euch ankommen würden ${Math.round((gruender / preis) * 100)} %. Den Unterschied machen die Präferenzen.`;
+  }
+
+  return { preis, praeferenz, rest, investorenRest, gruender, anteilGruender: preis > 0 ? gruender / preis : 0, warnung };
+}
+
 export type GameState = {
   cash: number;
   /** Sonstige Fixkosten: Server, Büro, Buchhaltung. Ohne Gehälter. */
@@ -225,10 +323,39 @@ export type GameState = {
   drawn: string[];
   /** Monat der letzten Ereigniskarte — sie sollen nicht im Rudel kommen. */
   lastEvent: number;
-  /** Liquidationspräferenz aus der Runde, die man genommen hat. */
-  pref: "1x" | "2x" | null;
+  /**
+   * Was Investoren eingezahlt haben — und was sie beim Verkauf
+   * zuerst wiederbekommen.
+   *
+   * Vorher stand hier ein Feld `pref`, das nie beschrieben wurde: die
+   * Karte sagte „2× participating“, das Glossar erklärte es, und
+   * mechanisch passierte nichts. Damit war die wichtigste Rechnung
+   * des Spiels — Preis minus Präferenzstapel mal euer Anteil — nicht
+   * vorhanden, obwohl das Spiel „Kommt ihr zu einem Exit?“ heißt.
+   */
+  runden: Runde[];
   /** Schon gefeierte Erfolge — jeder Moment kommt genau einmal. */
   gefeiert: string[];
+  /** Angebote, die schon auf dem Tisch lagen — angenommen oder nicht. */
+  gesehen: string[];
+  /**
+   * Was beim Verkauf auf dem Schild stand — und was wirklich kam.
+   *
+   * Zwei Zahlen, weil sie fast nie gleich sind: ein Angebot über
+   * 750.000 € mit 250.000 € bei Unterschrift ist ein Angebot über
+   * 250.000 €, solange der Rest an Zielen hängt, die der Käufer
+   * danach festlegt.
+   */
+  verkauf: { schild: number; erloest: number } | null;
+  /**
+   * Wofür ihr euch entschieden habt.
+   *
+   * „Nein, kein fremdes Geld“ war vorher eine Zeile Text und sonst
+   * nichts: zwei Monate später lag dieselbe Investorenkarte wieder im
+   * Stapel. Jetzt steht der Kurs im Zustand, und die Karten richten
+   * sich danach.
+   */
+  kurs: "offen" | "bootstrap" | "venture";
   /** Schon getroffene Entscheidungen. Jede Frage wird einmal gestellt. */
   entschieden: string[];
   /** Monat der letzten Entscheidung — zwei an einem Abend sind keine. */
@@ -363,8 +490,11 @@ export function initialState(seed = 1): GameState {
     endingId: null,
     drawn: [],
     lastEvent: 0,
-    pref: null,
+    runden: [],
     gefeiert: [],
+    gesehen: [],
+    verkauf: null,
+    kurs: "offen",
     entschieden: [],
     lastChoice: 0,
     seed,
@@ -396,6 +526,7 @@ export function applyEffects(s: GameState, e: Effects | undefined): GameState {
     /* Equity only ever goes down. There is no scene that gives it back. */
     equity: clamp(s.equity + Math.min(0, e.equity ?? 0)),
     burn: Math.max(0, s.burn + (e.burn ?? 0)),
+    runden: e.runde ? [...s.runden, e.runde] : s.runden,
     leute,
     /* Wer geht, nimmt seine laufende Maßnahme mit. */
     running: leute.length === s.leute.length ? s.running : s.running.filter((r) => leute.some((p) => p.id === r.wer)),
@@ -468,8 +599,12 @@ export function frei(s: GameState): Person[] {
  * Schikane — es ist der Grund, warum zwei Gründer sich streiten.
  */
 export function werKann(s: GameState, t: Tactic): Person | null {
-  const kandidaten = frei(s).filter((p) => !t.braucht || p.rolle === t.braucht);
-  return kandidaten[0] ?? null;
+  if (t.braucht) return frei(s).find((p) => p.rolle === t.braucht) ?? null;
+  /* Ohne Fach übernimmt, wer am ehesten entbehrlich ist — sonst sucht
+     die Entwicklerin zwei Monate lang eine Vertrieblerin, während der
+     Vertriebler danebensteht. */
+  const offen = frei(s);
+  return offen.find((p) => !p.gruender) ?? offen[offen.length - 1] ?? null;
 }
 
 /** Was eine laufende Maßnahme gerade blockiert, für die Leiste links. */
@@ -487,18 +622,34 @@ export function woranSitzt(s: GameState, p: Person): Running | null {
  */
 export function canStart(s: GameState, t: Tactic): boolean {
   if (!werKann(s, t)) return false;
-  if (s.running.some((r) => r.id === t.id) || s.used.includes(t.id)) return false;
-  /* Und mit zwei Monaten Puffer: niemand bucht einen Messestand von
-     seinem letzten Euro, und ein Spiel, in dem genau das der häufigste
-     Tod ist, bestraft Rechnen statt Entscheiden. */
+  if (verbraucht(s, t)) return false;
+  /* Zwei Monate Puffer — aber nur für Karten, die Geld kosten.
+     Niemand bucht einen Messestand von seinem letzten Euro. Wer fast
+     pleite ist, muss aber telefonieren dürfen: vorher stand hinter
+     jeder Karte „Zu teuer“, auch hinter den kostenlosen, und das
+     Spiel sperrte genau den Weg zu, der noch rausgeführt hätte. */
+  if (!t.cost) return true;
   const puffer = Math.max(0, netBurn(s)) * 2;
-  return s.cash - (t.cost ?? 0) >= puffer;
+  return s.cash - t.cost >= puffer;
+}
+
+/**
+ * Schon durch?
+ *
+ * Wiederholbare Karten zählen nicht als verbraucht — sie standen
+ * trotzdem gesperrt in der Liste, weil hier nur `used` geprüft wurde.
+ * Das war der Grund für Monate, in denen jemand frei war und nichts
+ * wählbar: die eine Karte, die immer gehen sollte, ging nie zweimal.
+ */
+function verbraucht(s: GameState, t: Tactic): boolean {
+  if (s.running.some((r) => r.id === t.id)) return true;
+  return !t.repeatable && s.used.includes(t.id);
 }
 
 /** Warum nicht — für die Beschriftung des Knopfs. */
 export function blockedReason(s: GameState, t: Tactic): string | null {
-  if (s.used.includes(t.id) || s.running.some((r) => r.id === t.id)) return "Läuft schon";
-  if (s.cash - (t.cost ?? 0) < Math.max(0, netBurn(s)) * 2) return "Zu teuer";
+  if (verbraucht(s, t)) return "Läuft schon";
+  if (t.cost && s.cash - t.cost < Math.max(0, netBurn(s)) * 2) return "Zu teuer";
   if (werKann(s, t)) return null;
   if (!t.braucht) return "Niemand frei";
   const imFach = s.leute.filter((p) => p.rolle === t.braucht);
@@ -630,6 +781,8 @@ export type Weg = {
   beats: [string, string];
   /** Wo der Preis davon abhängt, was Jonas will. */
   alignmentBy?: Record<Stance, number>;
+  /** Legt den Kurs fest — und damit, welche Karten künftig liegen. */
+  setztKurs?: GameState["kurs"];
 };
 
 export type Entscheidung = {
@@ -644,6 +797,8 @@ export type Entscheidung = {
   begriffe?: Begriff[];
   /** Zeigt die Reifegrad-Liste daneben. Nur die Geldfrage braucht sie. */
   reife?: true;
+  /** Verweis auf das Werkzeug, das diese Frage durchrechnet. */
+  link?: Verweis;
   /**
    * Fragt sofort, ohne auf den Abstand zu warten.
    *
@@ -693,6 +848,7 @@ export function entscheiden(s: GameState, e: Entscheidung, w: Weg): GameState {
   return {
     ...nach,
     alignment: clamp(nach.alignment + alignmentOfWeg(w, s.stance)),
+    kurs: w.setztKurs ?? nach.kurs,
     entschieden: [...s.entschieden, e.id],
     lastChoice: s.month,
   };
@@ -718,6 +874,105 @@ export function reifegrad(s: GameState): Reifepunkt[] {
   ];
 }
 
+/* ── Übernahmeangebote ───────────────────────────────────────── */
+
+/**
+ * Jemand will euch kaufen.
+ *
+ * Das Spiel heißt „Kommt ihr zu einem Exit?“ und hatte bis hierhin
+ * keinen: Partien endeten, weil eine Umsatzschwelle fiel, und welches
+ * Ende man bekam, entschied das Spiel. Ein Angebot ist das Gegenteil
+ * davon — eine Zahl auf dem Tisch, eine Frist, und die Frage, ob man
+ * sie nimmt oder darauf wettet, dass es mehr wird.
+ *
+ * Das erste Angebot ist mit Absicht eine Falle. Es nennt eine große
+ * absolute Summe und ein schlechtes Vielfaches, und beides steht auf
+ * derselben Karte. Wer weiß, wie man eine Firma bewertet, sieht es;
+ * wer nur die Million liest, nimmt an.
+ */
+
+/** Was in dieser Branche für wachsende Softwarefirmen gezahlt wird. */
+export const MARKT_VIELFACHES = 6;
+
+/** Jahresumsatz — die Zahl, gegen die ein Angebot zu prüfen ist. */
+export function arr(s: GameState): number {
+  return s.mrr * 12;
+}
+
+/** Das Wievielfache des Jahresumsatzes bietet jemand? */
+export function vielfaches(preis: number, s: GameState): number | null {
+  const jahr = arr(s);
+  return jahr > 0 ? preis / jahr : null;
+}
+
+export type Angebot = {
+  id: string;
+  /** Wer anruft. */
+  kaeufer: string;
+  kicker: string;
+  /** Die Lage, zwei Sätze. */
+  beats: [string, string];
+  /** Was sie an euch wollen. */
+  warum: string;
+  /** Der Preis, aus dem Spielstand gerechnet. */
+  preis: (s: GameState) => number;
+  /** Was im Angebot steht, Zeile für Zeile. */
+  bedingungen: string[];
+  /** Tareks Satz dazu — hier steht, womit man das prüft. */
+  tarek: string;
+  /** Was passiert, wenn ihr ablehnt. */
+  absage: [string, string];
+  absageEffects: Effects;
+  /**
+   * Wie viel vom Preis am Tag der Unterschrift fließt, 0 bis 1.
+   *
+   * Der Rest ist Earn-out oder Käuferanteile — im Spiel kommt er
+   * nicht an, so wie er in der Wirklichkeit meistens nicht ankommt.
+   */
+  bar?: number;
+  /** Verweis auf das Werkzeug, mit dem man das nachrechnet. */
+  link?: Verweis;
+  when: (s: GameState) => boolean;
+};
+
+/**
+ * Welches Ende ein Verkauf bekommt.
+ *
+ * Nicht der Käufer entscheidet das, sondern was ankommt. Derselbe
+ * Preis ist ein guter Tag oder ein leeres Konto, je nachdem, was
+ * vorher unterschrieben wurde.
+ */
+export function verkaufsEnde(s: GameState, preis: number): string {
+  const a = erloes(preis, s);
+  if (a.gruender <= 0) return "verkauft-leer";
+  if (a.gruender < 600_000) return "verkauft-klein";
+  return "verkauft";
+}
+
+/** Ein Verweis auf eines der Werkzeuge auf dieser Seite. */
+export type Verweis = { text: string; href: string };
+
+/** Das nächste Angebot, das noch nicht auf dem Tisch lag. */
+export function drawAngebot(s: GameState, alle: Angebot[]): Angebot | null {
+  return alle.find((a) => !s.gesehen.includes(a.id) && a.when(s)) ?? null;
+}
+
+/** Annehmen: die Partie endet hier — zu dem, was tatsächlich fließt. */
+export function annehmen(s: GameState, a: Angebot, preis: number): GameState {
+  const erloest = Math.round(preis * (a.bar ?? 1));
+  return {
+    ...s,
+    gesehen: [...s.gesehen, a.id],
+    verkauf: { schild: preis, erloest },
+    endingId: verkaufsEnde(s, erloest),
+  };
+}
+
+/** Ablehnen: ihr wettet darauf, dass es mehr wird. */
+export function ablehnen(s: GameState, a: Angebot): GameState {
+  return applyEffects({ ...s, gesehen: [...s.gesehen, a.id] }, a.absageEffects);
+}
+
 /* ── The rival ───────────────────────────────────────────────── */
 
 /** Retoura's next move, if it has reached one you have not seen. */
@@ -728,12 +983,22 @@ export function rivalMove(s: GameState, steps: RivalStep[]): RivalStep | null {
 
 /* ── Where a run ends ────────────────────────────────────────── */
 
+/**
+ * Ab wann Haulway vorbeigezogen ist.
+ *
+ * Vorher stand hier 100 — eine Zahl, die der Konkurrent in einer
+ * normalen Partie nie erreicht: er wächst auf etwa 45 in zwanzig
+ * Monaten. Das Ende „Haulway war schneller“ konnte damit gar nicht
+ * eintreten, und die Drohung aus dem Onboarding blieb folgenlos.
+ */
+export const UEBERHOLT = 46;
+
 export function forcedEnding(s: GameState): string | null {
   if (s.cash <= 0) return "insolvent";
   /* Losing Jonas before there is a company is the end of the company.
      Later it is a bad quarter and a smaller cap table. */
   if (s.alignment <= 0 && s.customers === 0) return "split";
-  if (s.rival >= 100 && s.customers < 8) return "outrun";
+  if (s.rival >= UEBERHOLT && s.customers < 6) return "outrun";
   return null;
 }
 
@@ -843,7 +1108,7 @@ export function badges(e: Effects | undefined): { label: string; up: boolean }[]
     out.push({ label: fmt(Math.abs(v)), up: goodUp ? v > 0 : v < 0 });
   };
   push(e.cash, (n) => `${(e.cash ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)}`);
-  push(e.mrr, (n) => `${(e.mrr ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)} MRR`);
+  push(e.mrr, (n) => `${(e.mrr ?? 0) > 0 ? "+" : "−"}${fmtEuro(n)} Umsatz/Monat`);
   push(e.customers, (n) => `${(e.customers ?? 0) > 0 ? "+" : "−"}${n} ${n === 1 ? "Kunde" : "Kunden"}`);
   push(e.product, (n) => `${(e.product ?? 0) > 0 ? "+" : "−"}${n} Produkt`);
   push(e.investors, (n) => `${(e.investors ?? 0) > 0 ? "+" : "−"}${n} Investoren`);

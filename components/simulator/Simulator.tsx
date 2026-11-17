@@ -13,7 +13,12 @@ import {
   deckFor,
   drawEntscheidung,
   drawEvent,
+  ablehnen,
+  annehmen,
+  arr,
+  drawAngebot,
   entscheiden,
+  erloes,
   erfolge,
   eventDue,
   frei,
@@ -24,6 +29,7 @@ import {
   forcedEnding,
   initialState,
   meterViews,
+  MARKT_VIELFACHES,
   monateOhneUmsatz,
   reifegrad,
   rivalMove,
@@ -37,6 +43,7 @@ import {
   ROLLE_LABEL,
   type Begriff,
   type Effects,
+  type Angebot,
   type Entscheidung,
   type GameState,
   type Person,
@@ -46,6 +53,7 @@ import {
 } from "@/lib/simulator";
 import {
   ENDING_BY_ID,
+  ANGEBOTE,
   ENTSCHEIDUNGEN,
   ERFOLGE,
   EVENTS,
@@ -129,6 +137,7 @@ export default function Simulator() {
   const [beat, setBeat] = useState(0);
   const [detail, setDetail] = useState<Tactic | null>(null);
   const [wahl, setWahl] = useState<Entscheidung | null>(null);
+  const [angebot, setAngebot] = useState<Angebot | null>(null);
   const [paused, setPaused] = useState(false);
 
   const card = cards[0] ?? null;
@@ -136,7 +145,7 @@ export default function Simulator() {
   const index = MILESTONES.findIndex((m) => m.id === milestone.id);
   const deck = useMemo(() => deckFor(state, milestone, TACTICS), [state, milestone]);
   const ending = state.endingId ? ENDING_BY_ID[state.endingId] : null;
-  const running = phase === "spiel" && !paused && !card && !detail && !wahl && !state.endingId;
+  const running = phase === "spiel" && !paused && !card && !detail && !wahl && !angebot && !state.endingId;
 
   /* Jeder Kartenschlüssel kommt genau einmal durch — und das ist keine
      Vorsicht, sondern die Reparatur: `reactStrictMode` ruft jeden
@@ -195,6 +204,19 @@ export default function Simulator() {
     zeigen(neue);
   }, [state, zeigen]);
 
+  /* Erfolge: Übergänge, nicht Zustände. Deshalb der Vergleich mit dem
+     vorigen Zustand statt einer Bedingung im Tick — die erste bezahlte
+     Rechnung kann aus einer Maßnahme kommen, aus einem Ereignis oder
+     aus einer Phase, und sie soll in allen drei Fällen gefeiert werden. */
+  const vorher = useRef(state);
+  useEffect(() => {
+    const treffer = erfolge(vorher.current, state, ERFOLGE);
+    vorher.current = state;
+    if (!treffer.length) return;
+    setState((s) => ({ ...s, gefeiert: [...s.gefeiert, ...treffer.map((e) => e.id)] }));
+    zeigen(treffer.map((e) => ({ key: `erfolg:${e.id}`, kind: "erfolg" as const, kicker: "Geschafft", title: e.title, beats: [...e.beats] })));
+  }, [state, zeigen]);
+
   /* Tor und Ende werden nach jeder Änderung geprüft, nicht nur wenn
      eine Maßnahme fertig wird. Vorher konnte ein Ereignis den zweiten
      Kunden bringen und das Brett blieb trotzdem in der alten Phase
@@ -222,10 +244,11 @@ export default function Simulator() {
             {
               key: `enter:${m.next}`,
               kind: "ereignis" as const,
-              kicker: "Montagmorgen",
+              kicker: bei!.kicker ?? "Montagmorgen",
               title: bei!.title,
+              image: bei!.kicker === "Tarek" ? "mentor" : undefined,
               beats: [...bei!.beats],
-              summary: bei!.effects,
+              summary: Object.keys(bei!.effects).length ? bei!.effects : undefined,
             },
           ]
         : []),
@@ -262,22 +285,34 @@ export default function Simulator() {
     setBeat(0);
   }, [state, running, zeigen]);
 
-  /* Erfolge: Übergänge, nicht Zustände. Deshalb der Vergleich mit dem
-     vorigen Zustand statt einer Bedingung im Tick — die erste bezahlte
-     Rechnung kann aus einer Maßnahme kommen, aus einem Ereignis oder
-     aus einer Phase, und sie soll in allen drei Fällen gefeiert werden. */
-  const vorher = useRef(state);
+
+  /* Ein Angebot hat Vorrang vor allem: es ist das einzige Ereignis im
+     Spiel, das die Partie beenden kann, und es hat eine Frist. */
   useEffect(() => {
-    const treffer = erfolge(vorher.current, state, ERFOLGE);
-    vorher.current = state;
-    if (!treffer.length) return;
-    setState((s) => ({ ...s, gefeiert: [...s.gefeiert, ...treffer.map((e) => e.id)] }));
-    zeigen(treffer.map((e) => ({ key: `erfolg:${e.id}`, kind: "erfolg" as const, kicker: "Geschafft", title: e.title, beats: [...e.beats] })));
-  }, [state, zeigen]);
+    if (!running || angebot) return;
+    const a = drawAngebot(state, ANGEBOTE);
+    if (a) setAngebot(a);
+  }, [state, running, angebot]);
 
   const starten = (t: Tactic) => {
     setDetail(null);
     setState((s) => startTactic(s, t));
+  };
+
+  /* Annehmen beendet die Partie zu diesem Preis — welches Ende es
+     wird, entscheidet nicht der Käufer, sondern was ankommt. */
+  const verkaufen = (a: Angebot, preis: number) => {
+    setAngebot(null);
+    setState((s) => annehmen(s, a, preis));
+  };
+
+  const absagen = (a: Angebot) => {
+    setAngebot(null);
+    setState((s) => ablehnen(s, a));
+    zeigen([
+      { key: `absage:${a.id}`, kind: "ereignis", kicker: a.kaeufer, title: "Ihr habt abgelehnt", beats: [...a.absage], summary: a.absageEffects },
+    ]);
+    setBeat(0);
   };
 
   /* Einen Weg nehmen. Die Folge steht auf einer Karte wie jede andere,
@@ -314,6 +349,7 @@ export default function Simulator() {
     setStep(0);
     setDetail(null);
     setWahl(null);
+    setAngebot(null);
     setPaused(false);
     setPhase("titel");
   };
@@ -449,6 +485,7 @@ export default function Simulator() {
                 )}
               </div>
               <Begriffe liste={detail.begriffe} />
+              <ToolLink link={detail.link} />
               <Wirkung t={detail} />
               {/* Warum die Balken so stehen. Ohne das ist „Team −2“ eine
                   Zahl, die vom Himmel fällt. */}
@@ -471,6 +508,10 @@ export default function Simulator() {
         </div>
       )}
 
+      {/* Das Angebot. Die große Zahl steht oben, die Rechnung daneben —
+          beides auf derselben Karte, damit man es sehen kann. */}
+      {angebot && !card && <Kaufangebot a={angebot} state={state} onJa={verkaufen} onNein={absagen} />}
+
       {wahl && !card && (
         <div className={styles.overlay}>
           <div className={styles.detail}>
@@ -481,6 +522,7 @@ export default function Simulator() {
                 <p key={b.slice(0, 20)}>{b}</p>
               ))}
               <Begriffe liste={wahl.begriffe} />
+              <ToolLink link={wahl.link} />
 
               {/* Bei der Frage nach fremdem Geld steht daneben, was davon
                   heute schon stimmt. „Sind wir bereit“ ist in Wahrheit
@@ -846,6 +888,141 @@ function Mannschaft({ state }: { state: GameState }) {
   );
 }
 
+
+/** Ein Verweis aus dem Spiel auf das Werkzeug, das die Sache ausrechnet. */
+function ToolLink({ link }: { link?: { text: string; href: string } }) {
+  if (!link) return null;
+  return (
+    <a
+      className={styles.toolLink}
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {link.text} ↗
+    </a>
+  );
+}
+
+/**
+ * Das Übernahmeangebot.
+ *
+ * Oben die große Zahl, weil die zuerst wirkt. Direkt darunter, was sie
+ * im Verhältnis zum Jahresumsatz bedeutet, und rechts die Abrechnung:
+ * was vorweg an Investoren geht und was bei euch ankommt. Alles, was
+ * man zum Durchschauen braucht, steht auf derselben Karte — und beim
+ * ersten Angebot reicht das trotzdem nicht, wenn man nur die Million
+ * liest.
+ */
+function Kaufangebot({
+  a,
+  state,
+  onJa,
+  onNein,
+}: {
+  a: Angebot;
+  state: GameState;
+  onJa: (a: Angebot, preis: number) => void;
+  onNein: (a: Angebot) => void;
+}) {
+  const preis = a.preis(state);
+  const bar = a.bar ?? 1;
+  /* Nur was am Tag der Unterschrift fließt, ist der Preis. */
+  const erloest = Math.round(preis * bar);
+  const ab = erloes(erloest, state);
+  const jahr = arr(state);
+  /* Das Vielfache taugt erst als Maßstab, wenn es einen nennenswerten
+     Jahresumsatz gibt. Bei 28k Umsatz ist jedes Angebot ein hohes
+     Vielfaches — die Zahl würde für die Falle werben statt gegen. */
+  const vf = jahr >= 100_000 ? preis / jahr : null;
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.detail}>
+        <div className={styles.detailBody}>
+          <div className={`${styles.kicker} ${styles.kickerKauf}`}>
+            {a.kicker} · {a.kaeufer}
+          </div>
+
+          <div className={styles.angebotKopf}>
+            <strong className={styles.angebotPreis}>{fmtEuroExakt(preis)}</strong>
+            <span className={styles.angebotVielfaches}>
+              {bar < 1
+                ? `davon ${fmtEuroExakt(erloest)} bei Unterschrift — der Rest hängt an Bedingungen`
+                : "vollständig bei Vollzug zahlbar"}
+              {vf
+                ? ` · das ${vf.toFixed(1)}-fache eures Jahresumsatzes${vf < MARKT_VIELFACHES ? `, üblich ist das ${MARKT_VIELFACHES}-fache` : ""}`
+                : ""}
+            </span>
+          </div>
+
+          {a.beats.map((b) => (
+            <p key={b.slice(0, 20)}>{b}</p>
+          ))}
+          <p className={styles.warum}>{a.warum}</p>
+
+          <ul className={styles.bedingungen}>
+            {a.bedingungen.map((b) => (
+              <li key={b.slice(0, 24)}>{b}</li>
+            ))}
+          </ul>
+
+          {/* Die Rechnung, die sonst erst nach der Unterschrift kommt. */}
+          <div className={styles.abrechnung}>
+            <span className={styles.abrechnungKopf}>Was bei euch ankommt</span>
+            <dl>
+              <div>
+                <dt>Im Angebot</dt>
+                <dd>{fmtEuroExakt(preis)}</dd>
+              </div>
+              {bar < 1 && (
+                <div>
+                  <dt>Davon bar bei Unterschrift</dt>
+                  <dd>{fmtEuroExakt(erloest)}</dd>
+                </div>
+              )}
+              {ab.praeferenz > 0 && (
+                <div>
+                  <dt>Investoren vorweg</dt>
+                  <dd className={styles.abzug}>− {fmtEuroExakt(ab.praeferenz)}</dd>
+                </div>
+              )}
+              {ab.investorenRest > 0 && (
+                <div>
+                  <dt>Investoren am Rest</dt>
+                  <dd className={styles.abzug}>− {fmtEuroExakt(ab.investorenRest)}</dd>
+                </div>
+              )}
+              <div className={styles.abrechnungSumme}>
+                <dt>Für euch beide</dt>
+                <dd>{fmtEuroExakt(ab.gruender)}</dd>
+              </div>
+            </dl>
+            {ab.warnung && <p className={styles.abrechnungWarnung}>{ab.warnung}</p>}
+          </div>
+
+          <div className={styles.tarek}>
+            <span>Tarek</span>
+            <p>{a.tarek}</p>
+          </div>
+
+          <ToolLink link={a.link} />
+
+          <div className={styles.detailActions}>
+            <button type="button" className={styles.ghost} onClick={() => onNein(a)}>
+              Ablehnen
+            </button>
+            <button type="button" className={styles.primary} onClick={() => onJa(a, preis)}>
+              Annehmen und verkaufen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Der Kreis links neben jeder Maßnahme: leer, laufend, erledigt. */
 function Ring({ laeuft, fertig }: { laeuft?: { left: number; total: number }; fertig: boolean }) {
   const UMFANG = 2 * Math.PI * 15;
@@ -888,29 +1065,53 @@ function Stat({ view }: { view: ReturnType<typeof meterViews>[number] }) {
   );
 }
 
-/** Wirkung als Balken statt als Satz. */
+/**
+ * Wirkung als Balken — getrennt nach dem, was sie bringt, und dem, was
+ * sie kostet.
+ *
+ * Vorher war beides derselbe gefüllte Balken: „Team 3/5“ stand auf
+ * einer Karte, die hinterher neun Punkte Stimmung abzog, und „Geld
+ * 4/5“ bedeutete beim Stipendium Einnahme und bei einer Einstellung
+ * Gehalt. Wer das einmal gemerkt hat, glaubt den Balken nicht mehr.
+ */
 function Wirkung({ t }: { t: Tactic }) {
   const labels: Record<string, string> = {
     produkt: "Produkt",
     umsatz: "Umsatz",
     geld: "Geld",
-    team: "Team",
+    team: "Stimmung",
     investoren: "Investoren",
   };
   const eintraege = Object.entries(t.impact) as [string, number][];
   if (!eintraege.length) return null;
+  const bringt = eintraege.filter(([, n]) => n > 0);
+  const kostet = eintraege.filter(([, n]) => n < 0);
+
+  const zeile = (k: string, n: number, minus: boolean) => (
+    <div key={k} className={styles.wirkungZeile}>
+      <span>{labels[k] ?? k}</span>
+      <span className={`${styles.punkte} ${minus ? styles.punkteMinus : ""}`}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <i key={i} className={i <= Math.abs(n) ? styles.punktAn : ""} />
+        ))}
+      </span>
+    </div>
+  );
+
   return (
     <div className={styles.wirkung}>
-      {eintraege.map(([k, n]) => (
-        <div key={k} className={styles.wirkungZeile}>
-          <span>{labels[k] ?? k}</span>
-          <span className={styles.punkte}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <i key={i} className={i <= n ? styles.punktAn : ""} />
-            ))}
-          </span>
-        </div>
-      ))}
+      {bringt.length > 0 && (
+        <>
+          <div className={styles.wirkungKopf}>Bringt</div>
+          {bringt.map(([k, n]) => zeile(k, n, false))}
+        </>
+      )}
+      {kostet.length > 0 && (
+        <>
+          <div className={`${styles.wirkungKopf} ${styles.wirkungKopfMinus}`}>Kostet</div>
+          {kostet.map(([k, n]) => zeile(k, n, true))}
+        </>
+      )}
     </div>
   );
 }
